@@ -25,6 +25,12 @@ RUN apt-get update \
       --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json \
     && arduino-cli lib install \
       "Adafruit Unified Sensor" \
+      "Adafruit MPU6050" \
+      "Adafruit BME280 Library" \
+      "BH1750" \
+      "Adafruit VL53L0X" \
+      "Adafruit SGP30 Sensor" \
+      "HX711 Arduino Library" \
       "DHT sensor library" \
       "Adafruit NeoPixel" \
       "ESP32Servo" \
@@ -48,6 +54,7 @@ RUN mkdir -p /opt/arduino/cache /tmp/MakeableWarmup \
       esp32:esp32:esp32 \
       esp32:esp32:esp32s2 \
       esp32:esp32:esp32s3 \
+      esp32:esp32:esp32s3:FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi \
       esp32:esp32:esp32c3 \
       esp32:esp32:esp32c6; do \
         arduino-cli compile \

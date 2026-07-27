@@ -10,6 +10,14 @@ import {
   validateBeginnerPlan,
   wireDescription,
 } from "./lib/beginner-plan.mjs";
+import {
+  buildAcaciaStageUrl,
+  buildAcaciaProposalRequest,
+  cleanOAuthCallbackUrl,
+  groupAcaciaRequiredParts,
+  normalizeAcaciaProposalResponse,
+  parseAcaciaProgram,
+} from "./lib/acacia-program.mjs";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -36,7 +44,18 @@ const FIRMWARE_BLOCKING_PLAN_ISSUES = new Set([
 ]);
 let serverConfig = window.MAKEABLE_CONFIG || window.CIRCUIT_CODEX_CONFIG || {};
 const initialAuthSearch = window.location.search;
-const WORKFLOW_STAGES = [
+let storedAuthReturnUrl = "";
+try {
+  storedAuthReturnUrl = JSON.parse(sessionStorage.getItem(AUTH_FLOW_KEY) || "null")?.returnUrl || "";
+} catch {
+  storedAuthReturnUrl = "";
+}
+const initialAuthParams = new URLSearchParams(initialAuthSearch);
+const isAuthCallback = initialAuthParams.has("code") || initialAuthParams.has("error");
+const activeProgramId =
+  parseAcaciaProgram(window.location.search) ||
+  (isAuthCallback ? parseAcaciaProgram(storedAuthReturnUrl) : null);
+const STANDARD_WORKFLOW_STAGES = [
   {
     hash: "#capture",
     label: "Step 1: Start",
@@ -63,6 +82,34 @@ const WORKFLOW_STAGES = [
     hint: "Optionally add a photo, publish, and share the verified build.",
   },
 ];
+const ACACIA_WORKFLOW_STAGES = [
+  {
+    hash: "#capture",
+    label: "Step 1: Idea",
+    hint: "Describe the outcome you want. Makeable already knows the Acacia kit.",
+  },
+  {
+    hash: "#plan",
+    label: "Step 2: Plan",
+    hint: "Check the feasible first version, route, challenge level, and exact kit parts.",
+  },
+  {
+    hash: "#flash",
+    label: "Step 3: Build",
+    hint: "Connect one registry-checked wire at a time, then load the board.",
+  },
+  {
+    hash: "#verify",
+    label: "Step 4: Test",
+    hint: "Verify the board messages and the real-world behavior.",
+  },
+  {
+    hash: "#document",
+    label: "Step 5: Showcase",
+    hint: "Package the working result as evidence for a hackathon or portfolio.",
+  },
+];
+const WORKFLOW_STAGES = activeProgramId ? ACACIA_WORKFLOW_STAGES : STANDARD_WORKFLOW_STAGES;
 
 const settings = {
   githubOwner: serverConfig.githubOwner || "",
@@ -121,6 +168,16 @@ const state = {
   publishOperationActive: false,
   auth: loadStoredAuth(),
   account: null,
+  programId: activeProgramId || "",
+  program: null,
+  programLoadStatus: activeProgramId ? "pending" : "idle",
+  proposal: null,
+  proposalStatus: "idle",
+  proposalAbort: null,
+  proposalRequestVersion: 0,
+  difficultyOverride: "",
+  acceptedPlanId: "",
+  technicalRoute: null,
 };
 
 let photoAnalysisTimerId = null;
@@ -234,6 +291,40 @@ const els = {
   accountButton: $("#accountButton"),
   creditBadge: $("#creditBadge"),
   accountName: $("#accountName"),
+  programBadge: $("#programBadge"),
+  startHeading: $("#startHeading"),
+  startSubheading: $("#startSubheading"),
+  acaciaKitIntro: $("#acaciaKitIntro"),
+  planHeading: $("#planHeading"),
+  planSubheading: $("#planSubheading"),
+  planPrivacyNote: $("#planPrivacyNote"),
+  acaciaPlanPanel: $("#acaciaPlanPanel"),
+  acaciaPlanLoading: $("#acaciaPlanLoading"),
+  acaciaPlanError: $("#acaciaPlanError"),
+  acaciaPlanResult: $("#acaciaPlanResult"),
+  acaciaRouteStatus: $("#acaciaRouteStatus"),
+  acaciaFeasibleTitle: $("#acaciaFeasibleTitle"),
+  acaciaFeasibleSummary: $("#acaciaFeasibleSummary"),
+  acaciaFitBadge: $("#acaciaFitBadge"),
+  acaciaOriginalIdea: $("#acaciaOriginalIdea"),
+  acaciaAdaptation: $("#acaciaAdaptation"),
+  acaciaAdaptationReason: $("#acaciaAdaptationReason"),
+  acaciaPreservedIntent: $("#acaciaPreservedIntent"),
+  acaciaDeferredFeatures: $("#acaciaDeferredFeatures"),
+  acaciaRouteCard: document.querySelector(".acacia-route-card"),
+  acaciaRouteLabel: $("#acaciaRouteLabel"),
+  acaciaRouteReason: $("#acaciaRouteReason"),
+  acaciaCapabilities: $("#acaciaCapabilities"),
+  acaciaDifficultyCard: $("#acaciaDifficultyCard"),
+  acaciaDifficultyReason: $("#acaciaDifficultyReason"),
+  acaciaDifficultyButtons: document.querySelectorAll("[data-acacia-difficulty]"),
+  acaciaCoreParts: $("#acaciaCoreParts"),
+  acaciaSharedParts: $("#acaciaSharedParts"),
+  acaciaNoSharedParts: $("#acaciaNoSharedParts"),
+  acaciaChangesSection: $("#acaciaChangesSection"),
+  acaciaChanges: $("#acaciaChanges"),
+  editAcaciaIdeaButton: $("#editAcaciaIdeaButton"),
+  acceptAcaciaRouteButton: $("#acceptAcaciaRouteButton"),
 };
 
 const hardwarePlanSchema = {
@@ -562,6 +653,13 @@ const firmwareSchema = {
 const HOSTED_FIRMWARE_LIBRARIES = [
   "ESP32 Arduino core built-ins (Arduino, Wire, SPI, WiFi, HTTPClient, Preferences, FS)",
   "Adafruit Unified Sensor",
+  "Adafruit MPU6050",
+  "Adafruit BME280 Library",
+  "BH1750",
+  "Adafruit VL53L0X",
+  "Adafruit PN532",
+  "Adafruit SGP30 Sensor",
+  "HX711 Arduino Library",
   "DHT sensor library",
   "Adafruit NeoPixel",
   "ESP32Servo",
@@ -594,6 +692,7 @@ const ideaSuggestionSchema = {
   required: ["suggestions"],
 };
 
+applyProgramMode();
 bindEvents();
 renderEmptyPlan();
 const initialStageIndex = WORKFLOW_STAGES.findIndex((stage) => stage.hash === window.location.hash);
@@ -602,10 +701,21 @@ setActiveWorkflowStage(Math.max(initialStageIndex, 0), {
   replace: true,
 });
 drawPartsCanvas();
-refreshServerConfig().then(initializeAuth);
+refreshServerConfig().then(async () => {
+  if (isAcaciaMode()) await loadAcaciaProgramDefinition();
+  await initializeAuth();
+});
 refreshEsp32Status();
 if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
   globalThis.__MAKEABLE_TEST_API__ = {
+    getProgramState() {
+      return {
+        programId: state.programId,
+        proposalStatus: state.proposalStatus,
+        proposal: state.proposal,
+        acceptedPlanId: state.acceptedPlanId,
+      };
+    },
     async loadPlan(plan, imageDataUrl = "", options = {}) {
       invalidatePendingGeneration();
       resetBuildEvidence();
@@ -698,6 +808,62 @@ window.addEventListener("hashchange", () => {
   }
 });
 
+function isAcaciaMode() {
+  return state.programId === "nus-acacia";
+}
+
+function acaciaStageUrl(
+  hash = window.location.hash || "#capture",
+  returnUrl = storedAuthReturnUrl,
+) {
+  return buildAcaciaStageUrl(
+    window.location,
+    returnUrl,
+    hash,
+  );
+}
+
+function applyProgramMode() {
+  if (!isAcaciaMode()) return;
+  document.body.classList.add("program-acacia");
+  document.body.dataset.program = "acacia";
+  document.body.dataset.programMode = "acacia";
+  document.title = "Build with the Acacia kit · Makeable";
+  if (els.programBadge) els.programBadge.hidden = false;
+  if (els.acaciaKitIntro) els.acaciaKitIntro.hidden = false;
+  document.querySelectorAll("[data-general-entry]").forEach((element) => {
+    element.hidden = true;
+  });
+  document.querySelectorAll("[data-general-plan]").forEach((element) => {
+    element.hidden = true;
+  });
+  if (els.acaciaPlanPanel) els.acaciaPlanPanel.hidden = false;
+  if (els.startHeading) els.startHeading.innerHTML = "What do you want to <span>make happen?</span>";
+  if (els.startSubheading) {
+    els.startSubheading.textContent =
+      "Start with the impact or experience you want. Makeable will fit it to Acacia’s known kit.";
+  }
+  if (els.ideaNextButton) els.ideaNextButton.textContent = "Find my build path";
+  if (els.voiceTranscriptBox) {
+    els.voiceTranscriptBox.textContent = "Type, tap an example, or describe the outcome in your own words.";
+  }
+  if (els.planHeading) els.planHeading.innerHTML = "Your idea. One<br /><span>feasible path.</span>";
+  if (els.planSubheading) {
+    els.planSubheading.textContent =
+      "See what stays, what changes, and which Acacia parts make the first version possible.";
+  }
+  if (els.planPrivacyNote) {
+    els.planPrivacyNote.textContent =
+      "No parts photo needed. This route comes from Acacia’s fixed ESP32-S3 kit registry.";
+  }
+  const timelineLabels = ["Idea", "Plan", "Build", "Test", "Showcase"];
+  document.querySelectorAll("[data-timeline-label]").forEach((label) => {
+    const text = label.querySelector("strong") || label;
+    text.textContent = timelineLabels[Number(label.dataset.timelineLabel)] || text.textContent;
+  });
+  renderAcaciaProposal();
+}
+
 function bindEvents() {
   els.homeButton?.addEventListener("click", showIntro);
   els.homeBrandLink?.addEventListener("click", showIntro);
@@ -726,7 +892,17 @@ function bindEvents() {
     button.addEventListener("click", () => setActiveWorkflowStage(Number(button.dataset.workflowStage || 0)));
   });
   els.stageBackButton.addEventListener("click", () => setActiveWorkflowStage(state.activeWorkflowStageIndex - 1));
-  els.stageNextButton.addEventListener("click", () => setActiveWorkflowStage(state.activeWorkflowStageIndex + 1));
+  els.stageNextButton.addEventListener("click", () => {
+    if (isAcaciaMode() && state.activeWorkflowStageIndex === 0) {
+      void advanceFromIdea();
+      return;
+    }
+    if (isAcaciaMode() && state.activeWorkflowStageIndex === 1 && !state.plan) {
+      void acceptAcaciaProposal();
+      return;
+    }
+    setActiveWorkflowStage(state.activeWorkflowStageIndex + 1);
+  });
   els.prevBuildStepButton?.addEventListener("click", () => setActiveBuildStep(state.activeBuildStepIndex - 1));
   els.nextBuildStepButton?.addEventListener("click", advanceBuildStep);
   els.showWiringButton?.addEventListener("click", () => setBuildMode("wiring"));
@@ -757,6 +933,11 @@ function bindEvents() {
   els.coverAltText?.addEventListener("input", refreshCompletionPreview);
   els.shareBuildButton?.addEventListener("click", sharePublishedBuild);
   els.accountButton?.addEventListener("click", handleAccountButton);
+  els.acaciaDifficultyButtons.forEach((button) => {
+    button.addEventListener("click", () => selectAcaciaDifficulty(button.dataset.acaciaDifficulty));
+  });
+  els.editAcaciaIdeaButton?.addEventListener("click", reviseAcaciaIdea);
+  els.acceptAcaciaRouteButton?.addEventListener("click", acceptAcaciaProposal);
   updateIdeaActions();
   updatePhotoReadiness();
 }
@@ -771,6 +952,16 @@ function showIntro(event) {
   state.finalTranscript = "";
   state.interimTranscript = "";
   state.generationId = "";
+  cancelAcaciaProposalRequest();
+  state.proposal = null;
+  state.proposalStatus = "idle";
+  state.difficultyOverride = "";
+  state.acceptedPlanId = "";
+  state.technicalRoute = null;
+  state.plan = null;
+  resetBuildEvidence();
+  renderEmptyPlan();
+  renderAcaciaProposal();
   if (els.ideaText) els.ideaText.value = "";
   if (els.voiceTranscriptBox) els.voiceTranscriptBox.textContent = "Type, tap an example, or use your voice.";
   if (els.photoFirstStatus) els.photoFirstStatus.textContent = "I’ll look only after you choose or take a photo.";
@@ -818,12 +1009,27 @@ function updateIdeaActions() {
   if (els.ideaNextButton) {
     els.ideaNextButton.disabled = !hasIdea;
   }
+  if (isAcaciaMode() && state.activeWorkflowStageIndex === 0 && els.stageNextButton) {
+    els.stageNextButton.disabled = !hasIdea;
+  }
   if (els.analyzeButton && !state.photoAnalysisBusy) {
     els.analyzeButton.textContent = hasIdea ? "Make my beginner guide" : "Suggest what I can build";
   }
 }
 
 function handleIdeaChange() {
+  if (isAcaciaMode() && (state.proposal || state.proposalStatus === "loading")) {
+    cancelAcaciaProposalRequest();
+    state.proposal = null;
+    state.proposalStatus = "idle";
+    state.difficultyOverride = "";
+    state.acceptedPlanId = "";
+    state.technicalRoute = null;
+    state.plan = null;
+    resetBuildEvidence();
+    renderEmptyPlan();
+    renderAcaciaProposal();
+  }
   if (state.generationId) {
     invalidatePendingGeneration();
     setPhotoAnalysisBusy(false);
@@ -902,8 +1108,16 @@ function renderPhotoAnalysisElapsed() {
 
 function announceStageGuard(requestedIndex, activeIndex) {
   if (requestedIndex >= 2 && !state.plan) {
-    setStatus(els.transcriptBox, "I need one confirmed photo and a safe parts plan before the first wire.", "warn");
-    els.analyzeButton?.focus();
+    if (isAcaciaMode()) {
+      if (els.acaciaPlanError) {
+        setStatus(els.acaciaPlanError, "Accept one feasible Acacia build path before opening the build guide.", "warn");
+        els.acaciaPlanError.hidden = false;
+      }
+      els.acceptAcaciaRouteButton?.focus();
+    } else {
+      setStatus(els.transcriptBox, "I need one confirmed photo and a safe parts plan before the first wire.", "warn");
+      els.analyzeButton?.focus();
+    }
     return;
   }
   if (requestedIndex >= 3 && state.flashStatus !== "success") {
@@ -941,7 +1155,407 @@ async function advanceFromIdea() {
     await startSignIn();
     return;
   }
+  if (isAcaciaMode()) {
+    await requestAcaciaProposal();
+    return;
+  }
   setActiveWorkflowStage(1);
+}
+
+async function loadAcaciaProgramDefinition() {
+  if (!isAcaciaMode()) return null;
+  state.programLoadStatus = "loading";
+  try {
+    const response = await apiJson("/api/programs/nus-acacia");
+    if (response?.program?.id !== state.programId) {
+      throw new Error("The Acacia program registry returned the wrong program.");
+    }
+    state.program = response.program;
+    state.programLoadStatus = "ready";
+    return response.program;
+  } catch (error) {
+    console.error(error);
+    state.programLoadStatus = "error";
+    if (els.acaciaPlanError) {
+      setStatus(
+        els.acaciaPlanError,
+        `The Acacia kit registry is not available yet: ${error.message}`,
+        "danger",
+      );
+      els.acaciaPlanError.hidden = false;
+    }
+    return null;
+  }
+}
+
+function cancelAcaciaProposalRequest() {
+  state.proposalRequestVersion += 1;
+  state.proposalAbort?.abort();
+  state.proposalAbort = null;
+  document.body.removeAttribute("data-acacia-routing");
+}
+
+async function requestAcaciaProposal(options = {}) {
+  if (!isAcaciaMode()) return;
+  const idea = String(options.idea ?? els.ideaText?.value ?? "").trim();
+  const difficulty = String(options.difficulty ?? state.difficultyOverride ?? "").trim();
+  let request;
+  try {
+    request = buildAcaciaProposalRequest({
+      idea,
+      difficulty: difficulty || "recommended",
+    });
+  } catch (error) {
+    if (els.acaciaPlanError) {
+      setStatus(els.acaciaPlanError, error.message, "danger");
+      els.acaciaPlanError.hidden = false;
+    }
+    els.ideaText?.focus();
+    return;
+  }
+
+  cancelAcaciaProposalRequest();
+  const requestVersion = state.proposalRequestVersion;
+  const controller = new AbortController();
+  state.proposalAbort = controller;
+  invalidatePendingGeneration();
+  state.proposal = null;
+  state.proposalStatus = "loading";
+  state.acceptedPlanId = "";
+  state.technicalRoute = null;
+  state.plan = null;
+  resetBuildEvidence();
+  renderEmptyPlan();
+  document.body.dataset.acaciaRouting = "true";
+  setActiveWorkflowStage(1);
+  renderAcaciaProposal();
+
+  try {
+    const response = await apiJson("/api/programs/nus-acacia/proposals", {
+      method: "POST",
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+    if (controller.signal.aborted || requestVersion !== state.proposalRequestVersion) return;
+    state.proposal = normalizeAcaciaProposalResponse(response);
+    state.proposalStatus = "ready";
+    state.technicalRoute = state.proposal.proposal.family;
+    renderAcaciaProposal();
+    requestAnimationFrame(() => els.acaciaFeasibleTitle?.focus({ preventScroll: true }));
+  } catch (error) {
+    if (error?.name === "AbortError" || requestVersion !== state.proposalRequestVersion) return;
+    console.error(error);
+    state.proposalStatus = "error";
+    if (els.acaciaPlanError) {
+      setStatus(
+        els.acaciaPlanError,
+        `I couldn’t match that idea to the Acacia kit yet: ${error.message}`,
+        "danger",
+      );
+      els.acaciaPlanError.hidden = false;
+    }
+    renderAcaciaProposal();
+  } finally {
+    if (requestVersion === state.proposalRequestVersion) {
+      state.proposalAbort = null;
+      document.body.removeAttribute("data-acacia-routing");
+    }
+  }
+}
+
+function renderAcaciaProposal() {
+  if (!isAcaciaMode() || !els.acaciaPlanPanel) return;
+  const normalized = state.proposal;
+  const proposal = normalized?.proposal;
+  const isLoading = state.proposalStatus === "loading";
+  const isError = state.proposalStatus === "error";
+  els.acaciaPlanPanel.hidden = false;
+  els.acaciaPlanLoading.hidden = !isLoading && state.proposalStatus !== "idle";
+  els.acaciaPlanResult.hidden = !proposal;
+  if (!isError) els.acaciaPlanError.hidden = true;
+  if (!proposal) {
+    els.acaciaPlanPanel.dataset.planFeasibility = isError ? "error" : "pending";
+    if (state.activeWorkflowStageIndex === 1 && els.stageNextButton) {
+      els.stageNextButton.disabled = true;
+    }
+    return;
+  }
+
+  const reshaped = proposal.routeStatus === "reshaped";
+  const grouped = groupAcaciaRequiredParts(normalized);
+  const routeLabel = acaciaRouteLabel(proposal.family);
+  const routeStatus = reshaped ? "reshaped" : "ready";
+  els.acaciaPlanPanel.dataset.planFeasibility = routeStatus;
+  els.acaciaPlanPanel.dataset.buildRoute = proposal.family;
+  els.acaciaPlanResult.dataset.planStatus = routeStatus;
+  els.acaciaRouteCard.dataset.technicalRoute = proposal.family;
+  els.acaciaFeasibleTitle.textContent = proposal.projectTitle;
+  els.acaciaFeasibleSummary.textContent = proposal.supportedIdea;
+  els.acaciaFitBadge.textContent = reshaped ? "Goal preserved · path reshaped" : "Fits the Acacia kit";
+  els.acaciaFitBadge.classList.toggle("is-adapted", reshaped);
+  els.acaciaOriginalIdea.textContent = proposal.originalIdea;
+  els.acaciaAdaptation.hidden = !reshaped;
+  els.acaciaAdaptationReason.textContent = reshaped
+    ? `${proposal.preservation?.change || "The first version was narrowed."} ${proposal.preservation?.reason || ""}`.trim()
+    : "";
+  renderTextList(
+    els.acaciaPreservedIntent,
+    reshaped ? [proposal.preservation?.originalGoal || proposal.originalIdea] : [],
+    "data-preserved-intent",
+  );
+  renderTextList(
+    els.acaciaDeferredFeatures,
+    reshaped
+      ? [proposal.preservation?.change || "The unsupported implementation is deferred."]
+      : [],
+    "data-deferred-feature",
+  );
+  els.acaciaRouteLabel.textContent = routeLabel;
+  els.acaciaRouteReason.textContent = acaciaRouteExplanation(proposal);
+  renderTextList(els.acaciaCapabilities, acaciaRouteCapabilities(proposal.family));
+  els.acaciaDifficultyReason.textContent =
+    acaciaDifficultyExplanation(proposal, grouped);
+  els.acaciaDifficultyCard.dataset.difficultyRecommended = proposal.recommendedDifficulty;
+  els.acaciaDifficultyButtons.forEach((button) => {
+    const selected = button.dataset.acaciaDifficulty === proposal.difficulty;
+    button.setAttribute("aria-pressed", String(selected));
+    button.disabled = ["loading", "accepting", "generating"].includes(state.proposalStatus);
+  });
+  renderAcaciaParts(els.acaciaCoreParts, grouped.core);
+  renderAcaciaParts(els.acaciaSharedParts, grouped.shared);
+  els.acaciaNoSharedParts.hidden = grouped.shared.length > 0;
+  const changes = [
+    ...(reshaped && proposal.preservation?.change ? [proposal.preservation.change] : []),
+    ...(proposal.warnings || []).map(({ message }) => message).filter(Boolean),
+  ];
+  renderTextList(els.acaciaChanges, [...new Set(changes)]);
+  els.acaciaChangesSection.hidden = changes.length === 0;
+  els.acceptAcaciaRouteButton.disabled = ["accepting", "generating"].includes(state.proposalStatus);
+  els.acceptAcaciaRouteButton.textContent = state.proposalStatus === "accepting"
+    ? "Preparing your build…"
+    : state.proposalStatus === "generating"
+      ? "Checking the board software…"
+      : "Build this version";
+  if (state.activeWorkflowStageIndex === 1 && els.stageNextButton) {
+    els.stageNextButton.disabled = ["loading", "accepting", "generating"].includes(state.proposalStatus);
+  }
+}
+
+function renderTextList(list, values, dataAttribute = "") {
+  if (!list) return;
+  list.innerHTML = "";
+  for (const value of values.filter(Boolean)) {
+    const item = document.createElement("li");
+    item.textContent = value;
+    if (dataAttribute) item.setAttribute(dataAttribute, "");
+    list.append(item);
+  }
+}
+
+function renderAcaciaParts(list, parts) {
+  if (!list) return;
+  list.innerHTML = "";
+  for (const part of parts) {
+    const item = document.createElement("li");
+    item.dataset.partId = part.id;
+    item.dataset.availability = part.availability;
+    item.innerHTML = "<strong></strong><small></small>";
+    item.querySelector("strong").textContent = part.label;
+    item.querySelector("small").textContent = part.pool === "shared"
+      ? `${part.kind} · reserve from Acacia’s shared advanced pool`
+      : `${part.kind} · included in your team kit`;
+    list.append(item);
+  }
+}
+
+function acaciaRouteLabel(family) {
+  return {
+    rules: "Rule-based automation",
+    connected: "Connection-ready sensing",
+    tinyml: "TinyML data preparation",
+    cloud: "Cloud-ready local prototype",
+    hybrid: "Hybrid-ready local prototype",
+  }[family] || "Acacia build route";
+}
+
+function capitalize(value) {
+  const text = String(value || "");
+  return text ? `${text[0].toUpperCase()}${text.slice(1)}` : "";
+}
+
+function acaciaRouteExplanation(proposal) {
+  const explanations = {
+    rules: "The ESP32 reads a sensor and responds with clear, testable rules. This is the shortest path to a working physical demo.",
+    connected: "This slice verifies the sensor and formats bounded readings locally. Wi-Fi provisioning, device identity, ingestion and a live dashboard remain deferred.",
+    tinyml: "Start by verifying the sensor and collecting labeled examples. A model is only claimed after it is trained and validated.",
+    cloud: "This slice produces a local sensor-and-rules demonstrator plus a bounded sample payload. Managed interpretation, notifications and remote delivery remain deferred.",
+    hybrid: "This slice verifies the supervised local sensing and stop-control path. Trained inference, autonomous control, telemetry and cloud delivery remain deferred.",
+  };
+  return `${explanations[proposal.family] || ""} ${proposal.supportedIdea}`.trim();
+}
+
+function acaciaDifficultyExplanation(proposal, grouped) {
+  const trackCopy = {
+    beginner:
+      "Beginner keeps one dependable input-to-feedback loop and asks for a plain-language explanation.",
+    builder:
+      "Builder adds one approved challenge part, calibration from real readings, and a two-state comparison.",
+    advanced:
+      "Advanced adds up to two approved challenge parts plus nominal, boundary, and recovery evidence.",
+  }[proposal.difficulty] || "";
+  const poolCopy = grouped.shared.length
+    ? ` This version needs ${grouped.shared.length} item${grouped.shared.length === 1 ? "" : "s"} from Acacia’s shared pool.`
+    : " This version stays inside the team’s core kit.";
+  const recommendationCopy = proposal.difficulty === proposal.recommendedDifficulty
+    ? ` ${capitalize(proposal.recommendedDifficulty)} is Makeable’s recommended starting point for this route.`
+    : ` You selected ${capitalize(proposal.difficulty)}; Makeable recommends ${capitalize(proposal.recommendedDifficulty)} for the first pass.`;
+  return `${trackCopy}${poolCopy}${recommendationCopy}`.trim();
+}
+
+function acaciaRouteCapabilities(family) {
+  if (family === "tinyml") {
+    return [
+      "Verify the sensor stream before collecting data",
+      "Collect labeled examples for the chosen classes",
+      "Train and validate a model before claiming on-device prediction",
+    ];
+  }
+  if (family === "connected" || family === "cloud" || family === "hybrid") {
+    return [
+      "Verify the local physical path before any future connection",
+      "Prepare bounded serial evidence or a sample payload",
+      "Keep provisioning, remote delivery and autonomous control deferred",
+      "Use Makeable-managed services—no student OpenAI key",
+    ];
+  }
+  return [
+    "Read a known Acacia sensor",
+    "Apply a clear threshold or state rule",
+    "Show a visible, audible, or physical result",
+  ];
+}
+
+async function selectAcaciaDifficulty(difficulty) {
+  if (!["beginner", "builder", "advanced"].includes(difficulty)) return;
+  if (state.proposal?.proposal?.difficulty === difficulty && state.proposalStatus === "ready") return;
+  state.difficultyOverride = difficulty;
+  await requestAcaciaProposal({ difficulty });
+}
+
+function reviseAcaciaIdea() {
+  cancelAcaciaProposalRequest();
+  invalidatePendingGeneration();
+  state.proposal = null;
+  state.proposalStatus = "idle";
+  state.difficultyOverride = "";
+  state.acceptedPlanId = "";
+  state.technicalRoute = null;
+  state.plan = null;
+  resetBuildEvidence();
+  renderAcaciaProposal();
+  setActiveWorkflowStage(0);
+  requestAnimationFrame(() => els.ideaText?.focus());
+}
+
+async function acceptAcaciaProposal() {
+  const proposal = state.proposal?.proposal;
+  if (!proposal || ["accepting", "generating"].includes(state.proposalStatus)) return;
+  const idea = proposal.originalIdea;
+  const acceptanceVersion = state.proposalRequestVersion;
+  const acceptedProposalId = proposal.planId;
+  state.proposalStatus = "accepting";
+  renderAcaciaProposal();
+  try {
+    const response = await apiJson(
+      `/api/programs/nus-acacia/plans/${encodeURIComponent(proposal.planId)}/accept`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          idea,
+          difficulty: proposal.difficulty,
+          registryVersion: proposal.registryVersion,
+        }),
+      },
+    );
+    if (response?.planId !== proposal.planId || !response?.buildPlan) {
+      throw new Error("The accepted Acacia build did not match the proposal.");
+    }
+    if (
+      acceptanceVersion !== state.proposalRequestVersion ||
+      state.proposal?.proposal?.planId !== acceptedProposalId
+    ) {
+      return;
+    }
+    state.acceptedPlanId = response.planId;
+    state.technicalRoute = proposal.family;
+    state.plan = normalizePlan(
+      {
+        ...response.buildPlan,
+        programId: state.programId,
+        acceptedPlanId: response.planId,
+        technicalRoute: proposal.family,
+        proposal,
+      },
+      { userRequest: idea },
+    );
+    state.planIssues = validateBeginnerPlan(state.plan);
+    state.plan.warnings = [
+      ...new Set([
+        ...(state.plan.warnings || []),
+        ...state.planIssues.map(({ message }) => message),
+      ]),
+    ];
+    resetBuildEvidence();
+    renderPlan();
+    const generationContext = beginGenerationContext(idea);
+    const acceptedPlan = state.plan;
+    let firmwareNotice = "";
+    if (serverConfig.hasOpenAIKey) {
+      state.proposalStatus = "generating";
+      renderAcaciaProposal();
+      try {
+        await generateFirmwareForPlan(idea, generationContext);
+        if (serverConfig.hasAccounts) await refreshAccount();
+      } catch (firmwareError) {
+        console.error(firmwareError);
+        firmwareNotice =
+          `The physical guide is ready, but the board software still needs a retry: ${firmwareError.message}`;
+      }
+    } else {
+      firmwareNotice =
+        "The physical guide is ready. Makeable’s managed software service is not configured in this environment yet.";
+    }
+    if (!isGenerationCurrent(generationContext, acceptedPlan)) return;
+    state.proposalStatus = "ready";
+    renderPlan();
+    renderAcaciaProposal();
+    setActiveWorkflowStage(2);
+    if (firmwareNotice) {
+      setStatus(els.esp32Status, `${firmwareNotice} Return to Plan and choose “Build this version” to retry.`, "warn");
+      if (els.compileFlashButton) {
+        els.compileFlashButton.disabled = true;
+        els.compileFlashButton.textContent = "Board software not ready";
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    if (
+      acceptanceVersion !== state.proposalRequestVersion ||
+      state.proposal?.proposal?.planId !== acceptedProposalId
+    ) {
+      return;
+    }
+    state.proposalStatus = "ready";
+    renderAcaciaProposal();
+    if (els.acaciaPlanError) {
+      setStatus(
+        els.acaciaPlanError,
+        `I couldn’t prepare that build path yet: ${error.message}`,
+        "danger",
+      );
+      els.acaciaPlanError.hidden = false;
+    }
+  }
 }
 
 function setActiveWorkflowStage(index, options = {}) {
@@ -988,8 +1602,13 @@ function setActiveWorkflowStage(index, options = {}) {
   els.stageControlTitle.textContent = stage.label;
   els.stageControlHint.textContent = stage.hint;
   els.stageBackButton.disabled = activeIndex === 0;
-  els.stageNextButton.disabled = activeIndex === WORKFLOW_STAGES.length - 1;
-  els.stageNextButton.textContent = ["Check my parts", "Build it", "Test my hardware", "Celebrate", "All set"][activeIndex];
+  els.stageNextButton.disabled =
+    activeIndex === WORKFLOW_STAGES.length - 1 ||
+    (isAcaciaMode() && activeIndex === 0 && !els.ideaText?.value.trim()) ||
+    (isAcaciaMode() && activeIndex === 1 && !state.proposal?.proposal);
+  els.stageNextButton.textContent = (isAcaciaMode()
+    ? ["See my plan", "Build it", "Test my hardware", "Showcase", "All set"]
+    : ["Check my parts", "Build it", "Test my hardware", "Celebrate", "All set"])[activeIndex];
 
   if (activeIndex === 2 && (!state.preparationConfirmed || els.codeWorkspace?.hidden !== false)) {
     setBuildMode(state.preparationConfirmed ? "wiring" : "prepare");
@@ -1002,7 +1621,9 @@ function setActiveWorkflowStage(index, options = {}) {
   }
 
   if (options.updateHash !== false) {
-    const url = `${window.location.pathname}${stage.hash}`;
+    const url = isAcaciaMode()
+      ? acaciaStageUrl(stage.hash)
+      : `${window.location.pathname}${stage.hash}`;
     window.history.replaceState(null, "", url);
   }
 
@@ -1083,7 +1704,10 @@ async function initializeAuth() {
       await refreshAccount();
       const pendingIdea = sessionStorage.getItem("makeable.pendingIdea");
       if (pendingIdea && !els.ideaText.value.trim()) els.ideaText.value = pendingIdea;
-      if (sessionStorage.getItem("makeable.signInIntent") === "plan") setActiveWorkflowStage(1);
+      if (sessionStorage.getItem("makeable.signInIntent") === "plan") {
+        if (isAcaciaMode()) await requestAcaciaProposal();
+        else setActiveWorkflowStage(1);
+      }
       sessionStorage.removeItem("makeable.pendingIdea");
       sessionStorage.removeItem("makeable.signInIntent");
     }
@@ -1125,7 +1749,10 @@ async function startSignIn() {
   const loginState = randomBase64Url(32);
   const challengeBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
   const challenge = bytesToBase64Url(new Uint8Array(challengeBytes));
-  sessionStorage.setItem(AUTH_FLOW_KEY, JSON.stringify({ verifier, loginState }));
+  const returnUrl = isAcaciaMode()
+    ? acaciaStageUrl(window.location.hash || "#capture")
+    : `${window.location.pathname}${window.location.hash || "#capture"}`;
+  sessionStorage.setItem(AUTH_FLOW_KEY, JSON.stringify({ verifier, loginState, returnUrl }));
   const authorizeUrl = new URL("/oauth2/authorize", normalizedCognitoDomain());
   authorizeUrl.search = new URLSearchParams({
     client_id: serverConfig.cognitoClientId,
@@ -1163,8 +1790,20 @@ async function finishSignIn(params) {
     refreshToken: tokens.refresh_token,
     expiresAt: Date.now() + Number(tokens.expires_in || 3600) * 1000,
   });
+  const savedReturnUrl = flow.returnUrl
+    ? new URL(flow.returnUrl, window.location.origin)
+    : null;
+  const returnHash = savedReturnUrl?.hash || "";
+  const hash = window.location.hash || returnHash || "#capture";
+  const cleanUrl = isAcaciaMode()
+    ? acaciaStageUrl(hash, flow.returnUrl)
+    : `${savedReturnUrl?.pathname || window.location.pathname}${hash}`;
   sessionStorage.removeItem(AUTH_FLOW_KEY);
-  window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash || "#capture"}`);
+  window.history.replaceState(
+    null,
+    "",
+    isAcaciaMode() ? cleanOAuthCallbackUrl(cleanUrl, hash) : cleanUrl,
+  );
 }
 
 async function getAccessToken({ interactive = true } = {}) {
@@ -2483,6 +3122,12 @@ async function generateFirmwareForPlan(idea, generationContext) {
 }
 
 function buildFirmwarePrompt(idea, plan) {
+  const technicalRoute = plan.technicalRoute || plan.proposal?.family || "rules";
+  const routeGuard = technicalRoute === "tinyml"
+    ? "- This is the pre-training TinyML stage. Generate sensor-verification and labeled-data-collection firmware only. Do not claim a trained model or on-device prediction exists."
+    : ["connected", "cloud", "hybrid"].includes(technicalRoute)
+      ? `- This ${technicalRoute} route is a local preparation stage only. Generate offline sensor, state-machine, serial-evidence and local-feedback firmware. Do not invent Wi-Fi credentials, device tokens, ingestion endpoints, dashboards, notifications, trained inference, autonomous control or remote delivery.`
+      : `- Technical route: ${technicalRoute}. Implement only the bounded behavior and hardware already present in the validated plan.`;
   return [
     `Project idea: ${idea}`,
     "",
@@ -2509,6 +3154,8 @@ function buildFirmwarePrompt(idea, plan) {
     ),
     "",
     "Requirements:",
+    `- Program: ${plan.programId || "standard"}; registry verification source: ${plan.verificationSource || "photo"}.`,
+    routeGuard,
     "- Return one complete ESP32 Arduino-core C++ sketch with Serial.begin(115200).",
     "- Print CIRCUITCODEX_DIAGNOSTIC_READY in setup and the plan's diagnostic markers.",
     "- Keep boot-pin use and assumptions explicit in notes.",
@@ -2634,7 +3281,9 @@ function normalizePlan(plan, options = {}) {
     pinAssignments: [],
     serialProtocol: [],
   };
-  const projectParts = filterProjectParts(rawParts, wiringSteps, firmwareSpec, plan.summary || "", plan.powerPlan);
+  const projectParts = plan.verificationSource === "program_registry"
+    ? rawParts
+    : filterProjectParts(rawParts, wiringSteps, firmwareSpec, plan.summary || "", plan.powerPlan);
 
   const normalizedPlan = normalizeBeginnerPlan({
     ...plan,
@@ -2828,7 +3477,9 @@ function projectTitleWithoutRemovedPower(value) {
 
 function renderEmptyPlan() {
   els.partsList.innerHTML = "";
-  if (els.partsCountLabel) els.partsCountLabel.textContent = "Waiting for a photo";
+  if (els.partsCountLabel) {
+    els.partsCountLabel.textContent = isAcaciaMode() ? "Waiting for an accepted plan" : "Waiting for a photo";
+  }
   if (els.boardConfidence) {
     els.boardConfidence.hidden = true;
     delete els.boardConfidence.dataset.result;
@@ -2841,7 +3492,11 @@ function renderEmptyPlan() {
 
 function renderEmptyVisualSteps() {
   const controls = getBuildStepControls();
-  els.visualStepList.innerHTML = `<div class="visual-step-empty"><strong>Your guide will appear here</strong><span>Once I read the photo, I’ll show one clear move at a time.</span></div>`;
+  els.visualStepList.innerHTML = `<div class="visual-step-empty"><strong>Your guide will appear here</strong><span>${
+    isAcaciaMode()
+      ? "Accept a kit-aware path and I’ll show one exact registered connection at a time."
+      : "Once I read the photo, I’ll show one clear move at a time."
+  }</span></div>`;
   restoreBuildStepControls(controls);
   if (els.buildStepCounter) els.buildStepCounter.textContent = "Move 0 of 0";
   if (els.buildStepDots) els.buildStepDots.innerHTML = "";
@@ -2865,7 +3520,9 @@ function renderPlan() {
     row.innerHTML = `<strong></strong><span></span>`;
     row.querySelector("strong").textContent = part.name;
     const support = String(part.compatibilityStatus || "").replaceAll("_", " ");
-    row.querySelector("span").textContent = `${part.role} · ${Math.round((part.confidence || 0) * 100)}% confidence${support ? ` · ${support}` : ""}`;
+    row.querySelector("span").textContent = plan.verificationSource === "program_registry"
+      ? `${part.role} · ${part.pool === "shared" ? "Borrow from Acacia" : "Core team kit"}${support ? ` · ${support}` : ""}`
+      : `${part.role} · ${Math.round((part.confidence || 0) * 100)}% confidence${support ? ` · ${support}` : ""}`;
     els.partsList.append(row);
   });
   if (!plan.parts.length) renderEmptyPlan();
@@ -2906,6 +3563,14 @@ function renderPlan() {
 function renderBoardConfidence(plan) {
   if (!els.boardConfidence || !els.boardConfidenceValue || !els.boardConfidenceDetail) return;
   const assessment = esp32IdentityAssessment(plan);
+  if (assessment.reason === "registry-sourced") {
+    els.boardConfidence.hidden = false;
+    els.boardConfidence.dataset.result = "pass";
+    els.boardConfidenceValue.textContent = "Acacia N16R8 profile selected";
+    els.boardConfidenceDetail.textContent =
+      "The guide targets Acacia’s documented Waveshare carrier. Match the SKU and every printed pin label; bench qualification is still pending.";
+    return;
+  }
   const hasScore = assessment.percent !== null;
   els.boardConfidence.hidden = false;
   els.boardConfidence.dataset.result = assessment.accepted ? "pass" : "needs-photo";
@@ -2955,9 +3620,11 @@ function renderPreparation() {
     .filter((value) => value && !/^unknown|unconfirmed$/i.test(value))
     .join(" · ");
   if (els.boardIdentity) {
-    const confidenceLabel = boardIdentity.percent === null
-      ? "ESP32 identity score unavailable"
-      : `${boardIdentity.percent}% ESP32-family confidence (${boardIdentity.thresholdPercent}% minimum)`;
+    const confidenceLabel = boardIdentity.reason === "registry-sourced"
+      ? "Documented Acacia carrier profile selected; printed-label check still required"
+      : boardIdentity.percent === null
+        ? "ESP32 identity score unavailable"
+        : `${boardIdentity.percent}% ESP32-family confidence (${boardIdentity.thresholdPercent}% minimum)`;
     els.boardIdentity.textContent = `${boardName || detectedProfile?.label || "ESP32 board"}. ${confidenceLabel}. Reset is printed ${profile.resetLabel || fallbackGuide.resetLabel}; BOOT is printed ${profile.bootLabel || fallbackGuide.bootLabel}.`;
   }
   if (els.usbCableGuide) {
@@ -3001,7 +3668,9 @@ function renderPreparation() {
     if (!wires.length) {
       const item = document.createElement("li");
       item.textContent = state.planIssues.some(({ code }) => code === "missing-wiring-steps")
-        ? "No safe jumper-wire map was confirmed from this photo."
+        ? plan.verificationSource === "program_registry"
+          ? "No registry-validated jumper-wire map is available for this route."
+          : "No safe jumper-wire map was confirmed from this photo."
         : "No jumper wires are needed for this board-only build.";
       els.cableInventoryList.append(item);
     }
@@ -3118,19 +3787,44 @@ function renderVisualSteps() {
   card.className = "visual-step-card is-active";
   const photo = document.createElement("div");
   photo.className = "step-photo-pane";
-  const canvas = document.createElement("canvas");
-  canvas.setAttribute("aria-label", `Photo showing connection ${activeIndex + 1}`);
-  const reference = document.createElement("aside");
-  reference.className = "pin-reference";
-  reference.innerHTML = `<span>Your photo · exact receptacles</span><div class="pin-reference-views"><figure><canvas data-pin-side="from"></canvas><figcaption></figcaption></figure><i aria-hidden="true">→</i><figure><canvas data-pin-side="to"></canvas><figcaption></figcaption></figure></div><p></p>`;
-  reference.querySelector("[data-pin-side='from']").setAttribute("aria-label", `Close-up of ${step.fromPrintedPin} in your photo`);
-  reference.querySelector("[data-pin-side='to']").setAttribute("aria-label", `Close-up of ${step.toPrintedPin} in your photo`);
-  reference.querySelectorAll("figcaption")[0].textContent = step.fromPrintedPin;
-  reference.querySelectorAll("figcaption")[1].textContent = step.toPrintedPin;
-  reference.querySelector("p").textContent = state.imageElement
-    ? "These are crops from your photo—not a guessed board layout. Match the highlighted metal pin or hole, then read the printed label once more."
-    : "The exact crops appear here when the parts photo is available.";
-  photo.append(canvas, reference);
+  const registryPlan = plan.verificationSource === "program_registry";
+  let canvas = null;
+  let reference = null;
+  if (registryPlan) {
+    photo.classList.add("step-photo-pane--registry");
+    const connectionMap = document.createElement("div");
+    connectionMap.className = "registry-connection-map";
+    connectionMap.innerHTML = `
+      <span class="registry-map-source">Acacia kit registry · connection ${activeIndex + 1}</span>
+      <div class="registry-map-route">
+        <div><small>Start at</small><strong data-registry-from></strong><span data-registry-from-pin></span></div>
+        <i aria-hidden="true">→</i>
+        <div><small>Connect to</small><strong data-registry-to></strong><span data-registry-to-pin></span></div>
+      </div>
+      <p>Match the printed labels exactly. The route is registry-backed, so no photo confidence or guessed pin position is being used.</p>
+    `;
+    const fromPart = plan.parts.find(({ id }) => id === step.fromPartId);
+    const toPart = plan.parts.find(({ id }) => id === step.toPartId);
+    connectionMap.querySelector("[data-registry-from]").textContent = fromPart?.name || step.from;
+    connectionMap.querySelector("[data-registry-from-pin]").textContent = step.fromPrintedPin;
+    connectionMap.querySelector("[data-registry-to]").textContent = toPart?.name || step.to;
+    connectionMap.querySelector("[data-registry-to-pin]").textContent = step.toPrintedPin;
+    photo.append(connectionMap);
+  } else {
+    canvas = document.createElement("canvas");
+    canvas.setAttribute("aria-label", `Photo showing connection ${activeIndex + 1}`);
+    reference = document.createElement("aside");
+    reference.className = "pin-reference";
+    reference.innerHTML = `<span>Your photo · exact receptacles</span><div class="pin-reference-views"><figure><canvas data-pin-side="from"></canvas><figcaption></figcaption></figure><i aria-hidden="true">→</i><figure><canvas data-pin-side="to"></canvas><figcaption></figcaption></figure></div><p></p>`;
+    reference.querySelector("[data-pin-side='from']").setAttribute("aria-label", `Close-up of ${step.fromPrintedPin} in your photo`);
+    reference.querySelector("[data-pin-side='to']").setAttribute("aria-label", `Close-up of ${step.toPrintedPin} in your photo`);
+    reference.querySelectorAll("figcaption")[0].textContent = step.fromPrintedPin;
+    reference.querySelectorAll("figcaption")[1].textContent = step.toPrintedPin;
+    reference.querySelector("p").textContent = state.imageElement
+      ? "These are crops from your photo—not a guessed board layout. Match the highlighted metal pin or hole, then read the printed label once more."
+      : "The exact crops appear here when the parts photo is available.";
+    photo.append(canvas, reference);
+  }
   const copy = document.createElement("div");
   copy.className = "visual-step-copy";
   const meta = document.createElement("p");
@@ -3212,11 +3906,13 @@ function renderVisualSteps() {
     els.nextBuildStepButton.textContent = activeIndex === steps.length - 1 ? "All wires connected" : "I connected it";
   }
 
-  requestAnimationFrame(() => {
-    drawVisualStep(canvas, step, activeIndex);
-    drawPinReference(reference.querySelector("[data-pin-side='from']"), step.fromPinBbox, step.fromPrintedPin, "#4f46e5");
-    drawPinReference(reference.querySelector("[data-pin-side='to']"), step.toPinBbox, step.toPrintedPin, stepColor(step.wireColor, activeIndex));
-  });
+  if (canvas && reference) {
+    requestAnimationFrame(() => {
+      drawVisualStep(canvas, step, activeIndex);
+      drawPinReference(reference.querySelector("[data-pin-side='from']"), step.fromPinBbox, step.fromPrintedPin, "#4f46e5");
+      drawPinReference(reference.querySelector("[data-pin-side='to']"), step.toPinBbox, step.toPrintedPin, stepColor(step.wireColor, activeIndex));
+    });
+  }
 }
 
 function getBuildStepControls() {
@@ -4094,7 +4790,7 @@ async function compileAndFlashFirmware() {
     setFlashProgress(0, "Starting the real board loader");
     const testAdapter = globalThis.__MAKEABLE_FLASH_TEST_ADAPTER__;
     if (typeof testAdapter === "function") await testAdapter({ port, images: compiled.images, profile });
-    else await flashFirmwareImages(port, compiled.images);
+    else await flashFirmwareImages(port, compiled.images, compiled.flashConfig);
     state.flashStatus = "success";
     state.automaticTestStatus = "pending";
     state.diagnosticLogOffset = state.serialLog.length;
@@ -4125,7 +4821,7 @@ async function findOrRequestEspPort() {
   return granted[0] || navigator.serial.requestPort({ filters: USB_SERIAL_FILTERS });
 }
 
-async function flashFirmwareImages(port, images) {
+async function flashFirmwareImages(port, images, flashConfig = {}) {
   if (!images?.length) throw new Error("No firmware images were returned from the compiler.");
 
   const esptool = await import("https://unpkg.com/esptool-js@0.5.7/bundle.js");
@@ -4160,9 +4856,9 @@ async function flashFirmwareImages(port, images) {
     appendSerial("Makeable: Sending the code now.\n");
     await esploader.writeFlash({
       fileArray,
-      flashMode: "dio",
-      flashFreq: "40m",
-      flashSize: "4MB",
+      flashMode: flashConfig.mode || "dio",
+      flashFreq: flashConfig.frequency || "40m",
+      flashSize: flashConfig.size || "4MB",
       eraseAll: true,
       compress: true,
       reportProgress: (fileIndex, written, total) => {
@@ -4634,7 +5330,11 @@ async function sharePublishedBuild() {
 async function apiJson(path, options = {}) {
   const base = String(serverConfig.apiBaseUrl || "").replace(/\/$/, "");
   const requestUrl = base && path !== "/api/config" ? `${base}${path}` : path;
-  const requiresAuth = serverConfig.hasAccounts && /^\/api\/(account|openai|firmware|github)(\/|$)/.test(path);
+  const protectedProgramPath =
+    /^\/api\/programs\/(?:nus-acacia|acacia)\/(?:proposals|plans)(?:\/|$)/.test(path);
+  const requiresAuth =
+    serverConfig.hasAccounts &&
+    (/^\/api\/(account|openai|firmware|github)(\/|$)/.test(path) || protectedProgramPath);
   const accessToken = requiresAuth ? await getAccessToken() : await getAccessToken({ interactive: false });
   const { generationId, ...fetchOptions } = options;
   const response = await fetch(requestUrl, {

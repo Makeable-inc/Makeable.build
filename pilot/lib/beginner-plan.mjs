@@ -22,6 +22,7 @@ export const ESP32_IDENTITY_CONFIDENCE_THRESHOLD = 0.55;
 
 export function esp32IdentityAssessment(plan = {}) {
   const parts = Array.isArray(plan.parts) ? plan.parts : [];
+  const registrySourced = plan.verificationSource === "program_registry";
   const candidates = parts.filter((part) => /esp32/i.test(`${part?.name || ""} ${part?.type || ""}`));
   const candidate = candidates
     .slice()
@@ -34,18 +35,21 @@ export function esp32IdentityAssessment(plan = {}) {
   const percent = confidence === null ? null : Math.round(confidence * 1000) / 10;
   const reason = !candidate
     ? "missing-candidate"
-    : confidence === null
-      ? "missing-score"
-      : confidence < ESP32_IDENTITY_CONFIDENCE_THRESHOLD
-        ? "below-threshold"
-        : "accepted";
+    : registrySourced
+      ? "registry-sourced"
+      : confidence === null
+        ? "missing-score"
+        : confidence < ESP32_IDENTITY_CONFIDENCE_THRESHOLD
+          ? "below-threshold"
+          : "accepted";
   return {
     candidate,
     confidence,
     percent,
     threshold: ESP32_IDENTITY_CONFIDENCE_THRESHOLD,
     thresholdPercent,
-    accepted: reason === "accepted",
+    accepted: reason === "accepted" || reason === "registry-sourced",
+    verificationSource: registrySourced ? "program_registry" : "photo",
     reason,
   };
 }
@@ -99,6 +103,7 @@ export function isStandalonePowerSourcePart(part = {}) {
 
 export function validateBeginnerPlan(plan = {}) {
   const issues = [];
+  const registrySourced = plan.verificationSource === "program_registry";
   const parts = Array.isArray(plan.parts) ? plan.parts : [];
   const normalizedPartIds = parts.map((part) => clean(part?.id));
   const partIds = new Set(normalizedPartIds.filter(Boolean));
@@ -166,7 +171,9 @@ export function validateBeginnerPlan(plan = {}) {
       issue(
         "block",
         "missing-wiring-steps",
-        "I recognized parts that need wiring, but I could not confirm any safe connection steps. Take one closer photo with both wire ends and the printed pin labels visible; I will not invent the missing connections.",
+        registrySourced
+          ? "This registered kit path needs external wiring, but it has no validated connection steps. Makeable will not invent the missing connections."
+          : "I recognized parts that need wiring, but I could not confirm any safe connection steps. Take one closer photo with both wire ends and the printed pin labels visible; I will not invent the missing connections.",
       ),
     );
   }
@@ -228,9 +235,12 @@ export function validateBeginnerPlan(plan = {}) {
     }
 
     if (
-      step.pinLocationsConfirmed !== true ||
-      !isConfirmedPinBox(step.fromPinBbox) ||
-      !isConfirmedPinBox(step.toPinBbox)
+      !registrySourced &&
+      (
+        step.pinLocationsConfirmed !== true ||
+        !isConfirmedPinBox(step.fromPinBbox) ||
+        !isConfirmedPinBox(step.toPinBbox)
+      )
     ) {
       issues.push(
         issue(
@@ -240,7 +250,7 @@ export function validateBeginnerPlan(plan = {}) {
           connectionId,
         ),
       );
-    } else {
+    } else if (!registrySourced) {
       if (!fromPart || !toPart) {
         issues.push(
           issue(
@@ -300,17 +310,24 @@ export function validateBeginnerPlan(plan = {}) {
 
     if (!SHAREABLE_POWER_LABELS.has(toPin)) {
       const previous = usedTargetPins.get(toPin);
-      if (toPin && previous) {
+      if (
+        toPin &&
+        previous &&
+        !(
+          registrySourced &&
+          registryI2cConnectionsCanShare(previous.step, step)
+        )
+      ) {
         issues.push(
           issue(
             "block",
             "duplicate-pin",
-            `${displayPin(toPin)} is assigned to both ${previous} and ${connectionId}.`,
+            `${displayPin(toPin)} is assigned to both ${previous.connectionId} and ${connectionId}.`,
             connectionId,
           ),
         );
       } else if (toPin) {
-        usedTargetPins.set(toPin, connectionId);
+        if (!previous) usedTargetPins.set(toPin, { connectionId, step });
       }
     }
 
@@ -485,6 +502,26 @@ function actionWithEndpointLabels(action, fromPrintedPin, toPrintedPin) {
   return `${sentence || "Connect the wire"}. (${fromPrintedPin} → ${toPrintedPin}).`;
 }
 
+function registryI2cConnectionsCanShare(left, right) {
+  const leftSignal = i2cSignal(left);
+  const rightSignal = i2cSignal(right);
+  return Boolean(
+    leftSignal &&
+      leftSignal === rightSignal &&
+      clean(left?.toPartId) === clean(right?.toPartId) &&
+      clean(left?.fromPartId) &&
+      clean(right?.fromPartId) &&
+      clean(left?.fromPartId) !== clean(right?.fromPartId),
+  );
+}
+
+function i2cSignal(step) {
+  const text = `${clean(step?.toElectricalAlias)} ${clean(step?.fromElectricalAlias)}`.toUpperCase();
+  if (text.includes("I2C SDA")) return "SDA";
+  if (text.includes("I2C SCL")) return "SCL";
+  return "";
+}
+
 function normalizeBoardProfile(profile = {}) {
   const supportStatus = ["exactly_supported", "compatible_with_differences", "unverified"].includes(
     profile?.supportStatus,
@@ -509,6 +546,7 @@ function normalizeBoardProfile(profile = {}) {
 
 function normalizePowerPlan(powerPlan = {}, plan = {}, options = {}) {
   const parts = Array.isArray(plan.parts) ? plan.parts : [];
+  const registrySourced = plan.verificationSource === "program_registry";
   const partsById = new Map(parts.map((part) => [clean(part?.id), part]).filter(([partId]) => partId));
   const suppliedLoadEvidence = (Array.isArray(powerPlan?.highCurrentLoads) ? powerPlan.highCurrentLoads : [])
     .map((entry) => normalizeLoadEvidence(entry))
@@ -519,6 +557,10 @@ function normalizePowerPlan(powerPlan = {}, plan = {}, options = {}) {
   const highCurrentParts = parts.filter(
     (part) => {
       if (isStandalonePowerSourcePart(part)) return false;
+      if (registrySourced) {
+        const evidence = evidenceByPartId.get(clean(part?.id));
+        return Boolean(evidence && hasCredibleLoadEvidence(part, evidence));
+      }
       if (HIGH_CURRENT_LOAD_PATTERN.test(partText(part))) return true;
       const evidence = evidenceByPartId.get(clean(part?.id));
       return Boolean(evidence && hasCredibleLoadEvidence(part, evidence));

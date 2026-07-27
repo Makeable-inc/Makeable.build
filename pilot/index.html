@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ef2d83'/%3E%3Cpath d='M18 43V21l14 14 14-14v22' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./styles.css?v=makeable-pilot-20260721-pruned-prompts" />
+    <link rel="stylesheet" href="./styles.css?v=makeable-acacia-20260726" />
     <script src="/config.local.js"></script>
   </head>
   <body>
@@ -20,22 +20,25 @@
         <span>Makeable</span>
         <svg viewBox="0 0 36 32" aria-hidden="true"><path d="M6 23 2 29M17 17l-1 9M27 8l6 2" /></svg>
       </a>
+      <span class="program-badge" id="programBadge" data-program-mode="acacia" data-program-badge hidden>
+        Acacia College
+      </span>
 
       <nav class="workflow-timeline" id="workflowTimeline" aria-label="Build stages">
         <button class="timeline-step is-active" data-workflow-stage="0" type="button">
-          <span class="step-number">1</span><span class="step-note step-note--pink"><img src="images/makeable/icon-chat.svg" alt="" /><strong>Start</strong></span>
+          <span class="step-number">1</span><span class="step-note step-note--pink" data-timeline-label="0"><img src="images/makeable/icon-chat.svg" alt="" /><strong>Start</strong></span>
         </button>
         <button class="timeline-step" data-workflow-stage="1" type="button">
-          <span class="step-number">2</span><span class="step-note step-note--blush"><img src="images/makeable/icon-camera.svg" alt="" /><strong>Check parts</strong></span>
+          <span class="step-number">2</span><span class="step-note step-note--blush" data-timeline-label="1"><img src="images/makeable/icon-camera.svg" alt="" /><strong>Check parts</strong></span>
         </button>
         <button class="timeline-step" data-workflow-stage="2" type="button">
-          <span class="step-number">3</span><span class="step-note step-note--lilac"><img src="images/makeable/icon-code.svg" alt="" /><strong>Build</strong></span>
+          <span class="step-number">3</span><span class="step-note step-note--lilac" data-timeline-label="2"><img src="images/makeable/icon-code.svg" alt="" /><strong>Build</strong></span>
         </button>
         <button class="timeline-step" data-workflow-stage="3" type="button">
-          <span class="step-number">4</span><span class="step-note step-note--mint"><img src="images/makeable/icon-bolt.svg" alt="" /><strong>Test</strong></span>
+          <span class="step-number">4</span><span class="step-note step-note--mint" data-timeline-label="3"><img src="images/makeable/icon-bolt.svg" alt="" /><strong>Test</strong></span>
         </button>
         <button class="timeline-step" data-workflow-stage="4" type="button">
-          <span class="step-number">5</span><span class="step-note step-note--yellow"><img src="images/makeable/icon-globe.svg" alt="" /><strong>Celebrate</strong></span>
+          <span class="step-number">5</span><span class="step-note step-note--yellow" data-timeline-label="4"><img src="images/makeable/icon-globe.svg" alt="" /><strong>Celebrate</strong></span>
         </button>
       </nav>
 
@@ -54,8 +57,8 @@
       <section class="workflow-stage is-active" id="capture" data-stage-index="0">
         <header class="stage-heading stage-heading--centered start-heading">
           <div>
-            <h1>How would you like to <span>start?</span></h1>
-            <p>Start with an idea, or show me the parts you already have.</p>
+            <h1 id="startHeading">How would you like to <span>start?</span></h1>
+            <p id="startSubheading">Start with an idea, or show me the parts you already have.</p>
           </div>
         </header>
 
@@ -79,9 +82,9 @@
             <div class="voice-transcript" id="voiceTranscriptBox" aria-live="polite">Your words will appear here while you talk.</div>
           </article>
 
-          <div class="start-or" aria-hidden="true">or</div>
+          <div class="start-or" data-general-entry aria-hidden="true">or</div>
 
-          <article class="start-path start-path--photo paper-sheet tape-blue" aria-labelledby="photo-path-title">
+          <article class="start-path start-path--photo paper-sheet tape-blue" data-general-entry aria-labelledby="photo-path-title">
             <img class="start-path-icon" src="images/makeable/icon-camera.svg" alt="" />
             <h2 id="photo-path-title">Show me what I have</h2>
             <div class="start-photo-preview" aria-hidden="true"><img src="images/makeable/scan-parts.svg" alt="" /></div>
@@ -89,19 +92,131 @@
             <p>Makeable will suggest a few things you can build.</p>
             <div class="start-photo-status" id="photoFirstStatus" role="status" aria-live="polite">No idea needed yet.</div>
           </article>
+
+          <aside class="acacia-kit-intro paper-sheet tape-blue" id="acaciaKitIntro" hidden aria-labelledby="acacia-kit-intro-title">
+            <span class="section-number">Your Acacia kit</span>
+            <h2 id="acacia-kit-intro-title">Bring the idea. The kit is already known.</h2>
+            <p>
+              Makeable will choose a reliable path using your team’s ESP32-S3 kit,
+              then tell you if an advanced part needs to be borrowed from Acacia.
+            </p>
+            <ul>
+              <li><strong>Beginner</strong><span>Clear rules and guided wiring</span></li>
+              <li><strong>Builder</strong><span>Calibration, an extra sensor, and stronger evidence</span></li>
+              <li><strong>Advanced</strong><span>Multiple signals, edge cases, and shared hardware</span></li>
+            </ul>
+            <small>S$30–50 core team kit target; advanced hardware stays in Acacia’s shared pool. No photo required to begin.</small>
+          </aside>
         </div>
       </section>
 
       <section class="workflow-stage" id="plan" data-stage-index="1" hidden>
         <header class="stage-heading stage-heading--row">
           <div>
-            <h1>Let’s get one<br /><span>useful photo.</span></h1>
-            <p>The labels in this photo become your map later.</p>
+            <h1 id="planHeading">Let’s get one<br /><span>useful photo.</span></h1>
+            <p id="planSubheading">The labels in this photo become your map later.</p>
           </div>
-          <aside class="sticky-note sticky-note--white tape-yellow">Your photo is used only to recognize parts and plan this build.</aside>
+          <aside class="sticky-note sticky-note--white tape-yellow" id="planPrivacyNote">Your photo is used only to recognize parts and plan this build.</aside>
         </header>
 
-        <section class="photo-prep paper-sheet" aria-labelledby="photo-prep-title">
+        <section
+          class="acacia-plan paper-sheet tape-blue"
+          id="acaciaPlanPanel"
+          data-acacia-plan
+          data-plan-feasibility="pending"
+          data-build-route=""
+          hidden
+          aria-labelledby="acacia-plan-title"
+        >
+          <div class="acacia-plan-loading" id="acaciaPlanLoading" data-plan-loading role="status" aria-live="polite">
+            <span class="photo-analysis-spinner" aria-hidden="true"></span>
+            <div>
+              <span class="section-number">Checking the Acacia kit</span>
+              <h2 id="acacia-plan-title">Turning your idea into a build path…</h2>
+              <p id="acaciaRouteStatus">I’m matching the impact you want with hardware Acacia can actually support.</p>
+            </div>
+          </div>
+          <div class="status-strip danger" id="acaciaPlanError" data-plan-error role="alert" hidden></div>
+
+          <div class="acacia-plan-result" id="acaciaPlanResult" data-plan-status="pending" hidden>
+            <header class="acacia-plan-result-heading">
+              <div>
+                <span class="section-number">Your feasible first version</span>
+                <h2 id="acaciaFeasibleTitle" data-plan-title tabindex="-1">Acacia build path</h2>
+                <p id="acaciaFeasibleSummary"></p>
+              </div>
+              <span class="acacia-fit-badge" id="acaciaFitBadge">Kit fit</span>
+            </header>
+
+            <section class="acacia-intent" aria-labelledby="acacia-original-idea-label">
+              <span id="acacia-original-idea-label">Your idea</span>
+              <p id="acaciaOriginalIdea" data-original-intent></p>
+              <div class="acacia-adaptation" id="acaciaAdaptation" hidden>
+                <strong>What Makeable reshaped</strong>
+                <p id="acaciaAdaptationReason" data-reshaped-idea></p>
+                <div class="acacia-preservation-grid">
+                  <div>
+                    <span>Goal kept</span>
+                    <ul id="acaciaPreservedIntent"></ul>
+                  </div>
+                  <div>
+                    <span>Deferred from this version</span>
+                    <ul id="acaciaDeferredFeatures"></ul>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div class="acacia-path-grid">
+              <section class="acacia-route-card" data-technical-route="" aria-labelledby="acacia-route-heading">
+                <span class="section-number">Technical path</span>
+                <h3 id="acacia-route-heading"><span id="acaciaRouteLabel">Rules</span></h3>
+                <p id="acaciaRouteReason"></p>
+                <ul class="acacia-capability-list" id="acaciaCapabilities"></ul>
+              </section>
+
+              <section class="acacia-difficulty-card" id="acaciaDifficultyCard" aria-labelledby="acacia-difficulty-heading">
+                <span class="section-number">Challenge level</span>
+                <h3 id="acacia-difficulty-heading">Make it yours</h3>
+                <p id="acaciaDifficultyReason"></p>
+                <div class="acacia-difficulty-options" role="group" aria-label="Choose challenge level">
+                  <button type="button" data-acacia-difficulty="beginner" data-difficulty-option="beginner" aria-pressed="false">Beginner</button>
+                  <button type="button" data-acacia-difficulty="builder" data-difficulty-option="builder" aria-pressed="false">Builder</button>
+                  <button type="button" data-acacia-difficulty="advanced" data-difficulty-option="advanced" aria-pressed="false">Advanced</button>
+                </div>
+                <small>You can override Makeable’s recommendation.</small>
+              </section>
+            </div>
+
+            <div class="acacia-parts-grid">
+              <section aria-labelledby="acacia-core-parts-heading">
+                <span class="section-number">Already with your team</span>
+                <h3 id="acacia-core-parts-heading">From your team kit</h3>
+                <ul id="acaciaCoreParts" data-part-group="core"></ul>
+              </section>
+              <section aria-labelledby="acacia-shared-parts-heading">
+                <span class="section-number">Only when needed</span>
+                <h3 id="acacia-shared-parts-heading">Borrow from Acacia</h3>
+                <ul id="acaciaSharedParts" data-part-group="shared"></ul>
+                <p class="acacia-no-shared" id="acaciaNoSharedParts">Nothing extra needed for this version.</p>
+              </section>
+            </div>
+
+            <section class="acacia-changes" id="acaciaChangesSection" hidden aria-labelledby="acacia-changes-heading">
+              <h3 id="acacia-changes-heading">What changed to keep it buildable</h3>
+              <ul id="acaciaChanges"></ul>
+            </section>
+
+            <div class="acacia-plan-actions">
+              <button class="paper-button" id="editAcaciaIdeaButton" data-revise-idea type="button">Edit my idea</button>
+              <button class="torn-button torn-button--pink" id="acceptAcaciaRouteButton" data-accept-plan type="button">
+                Build this version
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="photo-prep paper-sheet" data-general-plan data-standard-plan aria-labelledby="photo-prep-title">
           <div>
             <span class="section-number">Before the photo</span>
             <h2 id="photo-prep-title">Make every printed label visible.</h2>
@@ -117,7 +232,7 @@
           </div>
         </section>
 
-        <div class="scan-paper paper-sheet tape-blue">
+        <div class="scan-paper paper-sheet tape-blue" data-general-plan>
           <div class="canvas-frame">
             <canvas id="partsCanvas" aria-label="Your uploaded hardware photo with Makeable annotations"></canvas>
             <img class="scan-empty-art" id="scanEmptyArt" src="images/makeable/scan-parts.svg" alt="A phone framing electronic parts" />
@@ -142,7 +257,7 @@
           <div class="status-strip scan-status" id="transcriptBox" aria-live="polite">Choose one clear photo. Build suggestions will start automatically.</div>
         </div>
 
-        <section class="idea-from-photo paper-sheet" id="ideaFromPhotoPanel" hidden aria-labelledby="idea-from-photo-title">
+        <section class="idea-from-photo paper-sheet" id="ideaFromPhotoPanel" data-general-plan hidden aria-labelledby="idea-from-photo-title">
           <div>
             <span class="section-number">Your build idea</span>
             <h2 id="idea-from-photo-title">Pick the idea that feels useful.</h2>
@@ -151,7 +266,7 @@
           <div class="photo-idea-options" id="photoIdeaOptions"></div>
         </section>
 
-        <div class="recognized-paper paper-sheet">
+        <div class="recognized-paper paper-sheet" data-general-plan>
           <div class="recognized-heading"><span>Parts for this build</span><strong id="partsCountLabel">Waiting for a photo</strong></div>
           <div class="board-confidence" id="boardConfidence" role="status" hidden>
             <span aria-hidden="true">◎</span>
@@ -162,7 +277,7 @@
         <ol class="sr-only" id="wiringList"></ol>
         <div class="sr-only" id="diagnosticsList"></div>
 
-        <div class="scan-tips" aria-label="Photo tips">
+        <div class="scan-tips" data-general-plan aria-label="Photo tips">
           <span><b>☀</b> Use good light</span><span><b>⌁</b> Keep labels readable</span><span><b>▣</b> Shoot from above</span>
         </div>
       </section>
@@ -306,6 +421,6 @@
       <button class="torn-button torn-button--coral" id="stageNextButton" type="button">Continue</button>
     </footer>
 
-    <script type="module" src="./app.js?v=makeable-pilot-20260721-pruned-prompts"></script>
+    <script type="module" src="./app.js?v=makeable-acacia-20260726"></script>
   </body>
 </html>

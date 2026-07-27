@@ -32,6 +32,12 @@ export ARDUINO_DIRECTORIES_USER="${PWD}/${TOOLCHAIN_ROOT}/user"
   --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 "${CLI_PATH}" lib install \
   "Adafruit Unified Sensor" \
+  "Adafruit MPU6050" \
+  "Adafruit BME280 Library" \
+  "BH1750" \
+  "Adafruit VL53L0X" \
+  "Adafruit SGP30 Sensor" \
+  "HX711 Arduino Library" \
   "DHT sensor library" \
   "Adafruit NeoPixel" \
   "ESP32Servo" \

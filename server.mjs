@@ -28,6 +28,12 @@ import {
   forgetWaitlistSession,
   resolveWaitlistSession,
 } from "./lib/waitlist-session.mjs";
+import {
+  ACACIA_API_BODY_MAX_BYTES,
+  acceptAcaciaProposal,
+  createAcaciaProgramResponse,
+  createAcaciaProposal,
+} from "./lib/programs/acacia/service.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
@@ -137,6 +143,48 @@ const server = createServer(async (req, res) => {
       const user = await requireUser(req, res, env);
       if (!user) return;
       return sendJson(res, await accountSummary(user, env));
+    }
+
+    if (
+      localApiPath === "/api/programs/nus-acacia" ||
+      localApiPath === "/api/programs/acacia"
+    ) {
+      if (req.method === "GET") {
+        return sendJson(res, createAcaciaProgramResponse());
+      }
+      res.setHeader("Allow", "GET");
+      return sendJson(res, { error: "Method not allowed" }, 405);
+    }
+
+    if (
+      localApiPath === "/api/programs/nus-acacia/proposals" ||
+      localApiPath === "/api/programs/acacia/proposals"
+    ) {
+      if (req.method !== "POST") {
+        res.setHeader("Allow", "POST");
+        return sendJson(res, { error: "Method not allowed" }, 405);
+      }
+      const user = await requireUser(req, res, env);
+      if (!user) return;
+      const body = await readJsonBody(req, ACACIA_API_BODY_MAX_BYTES);
+      return sendAcaciaServiceResult(res, createAcaciaProposal(body));
+    }
+
+    const acaciaAcceptMatch = localApiPath.match(
+      /^\/api\/programs\/(?:nus-acacia|acacia)\/plans\/([^/]+)\/accept$/,
+    );
+    if (acaciaAcceptMatch) {
+      if (req.method !== "POST") {
+        res.setHeader("Allow", "POST");
+        return sendJson(res, { error: "Method not allowed" }, 405);
+      }
+      const user = await requireUser(req, res, env);
+      if (!user) return;
+      const body = await readJsonBody(req, ACACIA_API_BODY_MAX_BYTES);
+      return sendAcaciaServiceResult(
+        res,
+        acceptAcaciaProposal(acaciaAcceptMatch[1], body),
+      );
     }
 
     if (url.pathname === "/api/deepgram/token" && req.method === "POST") {
@@ -1070,9 +1118,8 @@ async function compileFirmware(req, res, env) {
       String(ARDUINO_COMPILE_JOBS),
       "--fqbn",
       fqbn,
-      "--output-dir",
+      "--build-path",
       outputDir,
-      "--export-binaries",
       sketchDir,
     ];
     const compileResult = await execFileAsync(cliPath, args, {
@@ -1080,7 +1127,7 @@ async function compileFirmware(req, res, env) {
       timeout: COMPILE_TIMEOUT_MS,
       maxBuffer: 24 * 1024 * 1024,
     });
-    const images = await collectFirmwareImages(outputDir, sketchName);
+    const images = await collectFirmwareImages(outputDir, sketchName, profile, env);
     if (!images.length) {
       return sendJson(
         res,
@@ -1096,6 +1143,11 @@ async function compileFirmware(req, res, env) {
       ok: true,
       board: profile.id,
       fqbn: profile.fqbn,
+      flashConfig: {
+        mode: profile.flashMode,
+        frequency: profile.flashFrequency,
+        size: profile.flashSize,
+      },
       images,
       compiler: "arduino-cli",
     });
@@ -1135,26 +1187,80 @@ function findArduinoCli(env) {
   return candidates.find((candidate) => existsSync(candidate)) || "";
 }
 
-async function collectFirmwareImages(outputDir, sketchName) {
+async function collectFirmwareImages(outputDir, sketchName, profile, env) {
   const files = await walkFiles(outputDir);
   const binFiles = files.filter((filePath) => filePath.endsWith(".bin"));
-  const merged = findByPattern(binFiles, [/\.merged\.bin$/i, /\.factory\.bin$/i, /merged/i]);
-  if (merged) return [await firmwareImage(merged, 0x0, "Merged ESP32 firmware")];
+  const bootApp0 =
+    findByPattern(binFiles, [/boot_app0\.bin$/i]) || (await findBootApp0Bin(files, env));
+  const flashArgs = files.find((filePath) => path.basename(filePath) === "flash_args");
+  if (flashArgs) {
+    const manifestImages = await firmwareImagesFromFlashArgs(flashArgs, binFiles, bootApp0, sketchName);
+    if (manifestImages.length) return manifestImages;
+  }
+
   const bootloader = findByPattern(binFiles, [/bootloader.*\.bin$/i]);
   const partitions = findByPattern(binFiles, [/\.partitions\.bin$/i, /partitions.*\.bin$/i]);
-  const bootApp0 = findByPattern(binFiles, [/boot_app0\.bin$/i]) || findBootApp0Bin();
   const app =
     findByPattern(binFiles, [new RegExp(`${sketchName}\\.ino\\.bin$`, "i")]) ||
     findByPattern(binFiles, [/\.ino\.bin$/i]);
 
-  const images = [];
-  if (bootloader) images.push(await firmwareImage(bootloader, 0x1000, "Bootloader"));
-  if (partitions) images.push(await firmwareImage(partitions, 0x8000, "Partition table"));
-  if (bootApp0) images.push(await firmwareImage(bootApp0, 0xe000, "Boot app"));
-  if (app) images.push(await firmwareImage(app, 0x10000, "Application"));
-  if (images.length) return images;
+  if (bootloader && partitions && bootApp0 && app) {
+    const bootloaderAddress = profile?.id === "esp32" ? 0x1000 : 0x0;
+    return Promise.all([
+      firmwareImage(bootloader, bootloaderAddress, "Bootloader"),
+      firmwareImage(partitions, 0x8000, "Partition table"),
+      firmwareImage(bootApp0, 0xe000, "Boot app"),
+      firmwareImage(app, 0x10000, "Application"),
+    ]);
+  }
 
-  return [];
+  const merged = findByPattern(binFiles, [/\.merged\.bin$/i, /\.factory\.bin$/i, /merged/i]);
+  return merged ? [await firmwareImage(merged, 0x0, "Merged ESP32 firmware")] : [];
+}
+
+async function firmwareImagesFromFlashArgs(flashArgsPath, binFiles, bootApp0, sketchName) {
+  const binFileByName = new Map(binFiles.map((filePath) => [path.basename(filePath), filePath]));
+  const entries = [];
+  const seenAddresses = new Set();
+  const flashArgs = await readFile(flashArgsPath, "utf8");
+
+  for (const line of flashArgs.split(/\r?\n/)) {
+    const match = line.trim().match(/^(0x[0-9a-f]+)\s+(.+\.bin)$/i);
+    if (!match) continue;
+    const address = Number.parseInt(match[1], 16);
+    let fileName = match[2].trim();
+    if (
+      (fileName.startsWith('"') && fileName.endsWith('"')) ||
+      (fileName.startsWith("'") && fileName.endsWith("'"))
+    ) {
+      fileName = fileName.slice(1, -1);
+    }
+    if (
+      !Number.isSafeInteger(address) ||
+      address < 0 ||
+      address > 0x10000000 ||
+      path.basename(fileName) !== fileName ||
+      seenAddresses.has(address)
+    ) {
+      return [];
+    }
+    const filePath =
+      binFileByName.get(fileName) ||
+      (fileName.toLowerCase() === "boot_app0.bin" ? bootApp0 : "");
+    if (!filePath) return [];
+    seenAddresses.add(address);
+    entries.push({
+      address,
+      filePath,
+      label: firmwareSegmentLabel(fileName, sketchName),
+    });
+  }
+
+  if (entries.length < 3) return [];
+  entries.sort((left, right) => left.address - right.address);
+  return Promise.all(
+    entries.map(({ filePath, address, label }) => firmwareImage(filePath, address, label)),
+  );
 }
 
 async function walkFiles(dir) {
@@ -1174,13 +1280,54 @@ function findByPattern(files, patterns) {
   return files.find((filePath) => patterns.some((pattern) => pattern.test(path.basename(filePath))));
 }
 
-function findBootApp0Bin() {
-  const home = process.env.HOME || "";
-  const candidates = [
-    path.join(home, "Library/Arduino15/packages/esp32/hardware/esp32/3.3.5/tools/partitions/boot_app0.bin"),
-    path.join(home, "Library/Arduino15/packages/arduino/hardware/esp32/2.0.18-arduino.5/tools/partitions/boot_app0.bin"),
-  ];
+async function findBootApp0Bin(files, env) {
+  const candidates = [];
+  const buildOptionsPath = files.find(
+    (filePath) => path.basename(filePath) === "build.options.json",
+  );
+  if (buildOptionsPath) {
+    try {
+      const buildOptions = JSON.parse(await readFile(buildOptionsPath, "utf8"));
+      for (const hardwareFolder of String(buildOptions.hardwareFolders || "").split(",")) {
+        if (hardwareFolder.trim()) {
+          candidates.push(path.join(hardwareFolder.trim(), "tools/partitions/boot_app0.bin"));
+        }
+      }
+    } catch {
+      // Fall through to the known Arduino data locations below.
+    }
+  }
+
+  const home = env?.HOME || process.env.HOME || "";
+  const dataRoots = [
+    env?.ARDUINO_DIRECTORIES_DATA,
+    path.join(__dirname, ".makeable/toolchain/data"),
+    home ? path.join(home, "Library/Arduino15") : "",
+    home ? path.join(home, ".arduino15") : "",
+    "/opt/arduino/data",
+  ].filter(Boolean);
+  for (const dataRoot of dataRoots) {
+    candidates.push(
+      path.join(
+        dataRoot,
+        "packages/esp32/hardware/esp32/3.3.5/tools/partitions/boot_app0.bin",
+      ),
+      path.join(
+        dataRoot,
+        "packages/arduino/hardware/esp32/2.0.18-arduino.5/tools/partitions/boot_app0.bin",
+      ),
+    );
+  }
+
   return candidates.find((candidate) => existsSync(candidate)) || "";
+}
+
+function firmwareSegmentLabel(fileName, sketchName) {
+  if (/bootloader.*\.bin$/i.test(fileName)) return "Bootloader";
+  if (/partitions.*\.bin$/i.test(fileName)) return "Partition table";
+  if (/boot_app0\.bin$/i.test(fileName)) return "Boot app";
+  if (new RegExp(`^${sketchName}\\.ino\\.bin$`, "i").test(fileName)) return "Application";
+  return "Firmware segment";
 }
 
 async function firmwareImage(filePath, address, label) {
@@ -1562,6 +1709,11 @@ async function readJsonBody(req, maxBytes = MAX_REQUEST_BYTES) {
 
 function sendJson(res, data, status = 200) {
   sendText(res, JSON.stringify(data), "application/json; charset=utf-8", status);
+}
+
+function sendAcaciaServiceResult(res, result) {
+  const { status, ...body } = result;
+  return sendJson(res, body, result.ok ? 200 : status || 500);
 }
 
 function sendText(res, text, contentType, status = 200) {

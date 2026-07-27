@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cliPath = process.env.MAKEABLE_TEST_ARDUINO_CLI;
 
-test("hosted compiler produces a merged ESP32 image and blocks arbitrary targets", { skip: !cliPath }, async (t) => {
+test("hosted compiler produces sparse ESP32 images and blocks arbitrary targets", { skip: !cliPath }, async (t) => {
   const port = 18787;
   const toolchain = path.resolve(root, ".makeable/toolchain");
   const child = spawn(process.execPath, ["server.mjs"], {
@@ -46,11 +46,50 @@ test("hosted compiler produces a merged ESP32 image and blocks arbitrary targets
   const compiled = await compileResponse.json();
   assert.equal(compileResponse.status, 200, JSON.stringify(compiled));
   assert.equal(compiled.board, "esp32");
-  assert.equal(compiled.images.length, 1);
-  assert.equal(compiled.images[0].address, 0);
-  assert.ok(compiled.images[0].size > 100_000);
-  assert.ok(compiled.images[0].dataBase64.length > compiled.images[0].size);
+  assert.deepEqual(
+    compiled.images.map((image) => image.address),
+    [0x1000, 0x8000, 0xe000, 0x10000],
+  );
+  assert.equal(compiled.images.some((image) => /merged|factory/i.test(image.name)), false);
+  assert.ok(compiled.images.reduce((total, image) => total + image.size, 0) < 1_000_000);
+  for (const image of compiled.images) {
+    assert.ok(image.size > 0);
+    assert.ok(image.dataBase64.length > image.size);
+  }
+  assert.deepEqual(compiled.flashConfig, {
+    mode: "dio",
+    frequency: "40m",
+    size: "4MB",
+  });
   assert.equal("stdout" in compiled, false);
+
+  const acaciaResponse = await fetch(`${base}/api/firmware/compile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      boardProfile: "esp32-s3-n16r8",
+      sketch:
+        "void setup() { Serial.begin(115200); }\nvoid loop() { Serial.println(\"ACACIA:BOARD:READY\"); delay(1000); }",
+    }),
+  });
+  const acaciaCompiled = await acaciaResponse.json();
+  assert.equal(acaciaResponse.status, 200, JSON.stringify(acaciaCompiled));
+  assert.equal(acaciaCompiled.board, "esp32-s3-n16r8");
+  assert.equal(
+    acaciaCompiled.fqbn,
+    "esp32:esp32:esp32s3:FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi",
+  );
+  assert.deepEqual(acaciaCompiled.flashConfig, {
+    mode: "dio",
+    frequency: "80m",
+    size: "16MB",
+  });
+  assert.deepEqual(
+    acaciaCompiled.images.map((image) => image.address),
+    [0x0, 0x8000, 0xe000, 0x10000],
+  );
+  assert.equal(acaciaCompiled.images.some((image) => /merged|factory/i.test(image.name)), false);
+  assert.ok(acaciaCompiled.images.reduce((total, image) => total + image.size, 0) < 1_000_000);
 
   const invalidResponse = await fetch(`${base}/api/firmware/compile`, {
     method: "POST",
