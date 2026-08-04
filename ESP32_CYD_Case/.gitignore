@@ -1,0 +1,7 @@
+claude-burner-desktop/node_modules/
+claude-burner-desktop/dist/
+claude-burner-desktop/build/ClaudeBurner.iconset/
+claude-burner-desktop/build/icon-square.png
+firmware/claude-burner-cyd/.pio/
+firmware/claude-burner-cyd/.venv/
+.DS_Store

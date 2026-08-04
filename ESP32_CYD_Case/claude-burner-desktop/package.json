@@ -1,0 +1,90 @@
+{
+  "name": "claude-burner-desktop",
+  "version": "1.0.7",
+  "description": "Claude Burner Tamagotchi bridge for the ESP32 CYD E32R28T display",
+  "main": "src/main.js",
+  "author": "Claude Burner",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "CLAUDE_BURNER_DEV=1 electron .",
+    "test": "node --test test/*.test.js",
+    "build:bridge": "bash scripts/build-bridge.sh",
+    "build:assets": "python3 scripts/build-animation-pack.py",
+    "build:icon": "bash scripts/build-icon.sh",
+    "prepack": "npm run build:bridge && npm run build:assets && npm run build:icon && npm test",
+    "postinstall": "electron-builder install-app-deps",
+    "dist:mac": "npm run prepack && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --arm64"
+  },
+  "dependencies": {
+    "serialport": "^13.0.0"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.claudeburner.desktop",
+    "productName": "Claude Burner",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@serialport/**"
+    ],
+    "files": [
+      "src/**/*",
+      "ui/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/bin/claude-burner-statusline-bridge",
+        "to": "bin/claude-burner-statusline-bridge"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "electronLanguages": [
+        "en"
+      ],
+      "minimumSystemVersion": "13.0",
+      "icon": "build/icon.icns",
+      "extendInfo": {
+        "LSMinimumSystemVersion": "13.0",
+        "NSHumanReadableCopyright": "Claude Burner prototype"
+      }
+    },
+    "dmg": {
+      "title": "Claude Burner ${version}",
+      "backgroundColor": "#090d16",
+      "window": {
+        "width": 620,
+        "height": 420
+      },
+      "contents": [
+        {
+          "x": 170,
+          "y": 205,
+          "type": "file"
+        },
+        {
+          "x": 450,
+          "y": 205,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}

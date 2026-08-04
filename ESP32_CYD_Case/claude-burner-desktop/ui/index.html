@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+    <title>Claude Burner</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true">🔥</div>
+        <div>
+          <p class="eyebrow">DESKTOP COMPANION</p>
+          <h1>Claude Burner</h1>
+        </div>
+        <div class="connection-pill" id="connection-pill"><span></span><b id="connection-label">Finding display</b></div>
+      </header>
+
+      <section class="hero-grid">
+        <div class="display-column">
+          <div class="screen-frame">
+            <div class="screen-bezel">
+              <div class="screen" aria-label="ESP32 display preview">
+                <img id="scene-preview" alt="Ember scene preview">
+                <div class="life-hud">
+                  <div class="hud-copy"><b>LIFE</b><span id="life-value">0%</span><strong id="level-value">LV.1</strong></div>
+                  <div class="life-track"><i id="life-fill"></i></div>
+                </div>
+                <div class="waiting-overlay" id="waiting-overlay">WAITING FOR CLAUDE</div>
+              </div>
+            </div>
+            <div class="screen-foot"><span>CYD // 320×240</span><span>LOCAL GIF · 24 FPS</span></div>
+          </div>
+          <p class="emotion-label"><span>EMBER STATE</span><b id="emotion-value">Dormant</b></p>
+        </div>
+
+        <div class="control-column">
+          <article class="panel status-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">CLAUDE ACTIVITY</p><h2>Five-hour window</h2></div>
+              <span class="plan-chip" id="plan-chip">—</span>
+            </div>
+            <div class="usage-number"><strong id="usage-value">—</strong><span>used</span></div>
+            <div class="usage-track"><i id="usage-fill"></i></div>
+            <div class="usage-meta"><span id="usage-status">Waiting for a Claude response</span><span id="reset-time"></span></div>
+          </article>
+
+          <article class="panel setup-panel" id="setup-panel">
+            <p class="eyebrow">ONE-TIME SETUP</p>
+            <h2>Connect Claude activity</h2>
+            <p>Claude Burner installs a reversible Claude Code status-line bridge. It receives only the usage percentage Claude Code provides; it never reads your credentials or conversation content.</p>
+            <div class="max-choice hidden" id="max-choice">
+              <label><input type="radio" name="max-plan" value="5" checked> Max 5×</label>
+              <label><input type="radio" name="max-plan" value="20"> Max 20×</label>
+            </div>
+            <button class="primary" id="install-bridge">Connect Claude Code</button>
+            <p class="fine-print" id="claude-version"></p>
+          </article>
+
+          <article class="panel live-panel hidden" id="live-panel">
+            <div class="live-row"><span>Bridge</span><b id="bridge-status">Active</b></div>
+            <div class="live-row"><span>Display</span><b id="display-status">Searching…</b></div>
+            <div class="plan-override">
+              <label for="plan-select">Plan</label>
+              <select id="plan-select">
+                <option value="pro">Pro</option>
+                <option value="max5">Max 5×</option>
+                <option value="max20">Max 20×</option>
+              </select>
+              <button id="save-plan">Save plan</button>
+            </div>
+            <div class="button-row">
+              <button id="reconnect-display">Reconnect display</button>
+              <button id="open-frames">Open frame folders</button>
+            </div>
+          </article>
+
+          <article class="panel simulator-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">VISUAL TEST</p><h2>Simulated five-hour usage</h2></div>
+              <b id="sim-output">0.0%</b>
+            </div>
+            <p class="sim-help">Drag the bar, use the arrow keys, or scroll over it. Simulation changes the preview and ESP32 only; your live pet state stays safe.</p>
+            <input id="sim-usage" type="range" min="0" max="100" step="0.1" value="0" aria-label="Simulated five-hour token usage percentage">
+            <div class="sim-scale"><span>0%</span><span>5%</span><span>10%</span><span>100%</span></div>
+            <div class="sim-result">
+              <span id="sim-state">Live mode</span>
+              <strong id="sim-life-output">LIFE 0%</strong>
+              <button id="return-live" disabled>Return to live</button>
+            </div>
+          </article>
+
+          <article class="panel demo-panel hidden" id="demo-panel">
+            <div class="panel-heading"><div><p class="eyebrow">FREE / DEMO MODE</p><h2>Manual LIFE</h2></div><b id="manual-output">0%</b></div>
+            <input id="manual-life" type="range" min="0" max="100" value="0">
+          </article>
+        </div>
+      </section>
+
+      <section class="footer-grid">
+        <article class="mini-panel">
+          <p class="eyebrow">MACOS SECURITY</p>
+          <p>The prototype is unsigned. After copying it to Applications, open it once, then use Privacy &amp; Security → Open Anyway if macOS blocks it.</p>
+          <button id="open-security">Open Privacy &amp; Security</button>
+        </article>
+        <article class="mini-panel rules">
+          <p class="eyebrow">ENERGY RULES</p>
+          <p><b>2h grace</b><span>then LIFE decays</span></p>
+          <p><b>60h cycle</b><span>full power to dormant</span></p>
+          <p><b>3 forms</b><span>at 36 and 69 LIFE</span></p>
+        </article>
+      </section>
+
+      <div class="toast" id="toast" role="status"></div>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,108 @@
+{
+  "lv1_dormant": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 87,
+    "meaningfulTransitions": 82,
+    "medianChangedPixels": 731,
+    "averageChangedPixels": 677.3,
+    "loopSeamChangedPixels": 1
+  },
+  "lv1_exhausted": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 86,
+    "meaningfulTransitions": 80,
+    "medianChangedPixels": 754,
+    "averageChangedPixels": 694.3,
+    "loopSeamChangedPixels": 1
+  },
+  "lv1_sad_puppy": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 88,
+    "meaningfulTransitions": 81,
+    "medianChangedPixels": 870,
+    "averageChangedPixels": 808.8,
+    "loopSeamChangedPixels": 1
+  },
+  "lv1_curious_hopeful": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 96,
+    "meaningfulTransitions": 87,
+    "medianChangedPixels": 829,
+    "averageChangedPixels": 904.8,
+    "loopSeamChangedPixels": 30
+  },
+  "lv2_worried_gloomy": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 94,
+    "meaningfulTransitions": 82,
+    "medianChangedPixels": 1238,
+    "averageChangedPixels": 1147.9,
+    "loopSeamChangedPixels": 6
+  },
+  "lv2_neutral_attentive": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 95,
+    "meaningfulTransitions": 82,
+    "medianChangedPixels": 1349,
+    "averageChangedPixels": 1277.7,
+    "loopSeamChangedPixels": 12
+  },
+  "lv2_energized": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 96,
+    "meaningfulTransitions": 95,
+    "medianChangedPixels": 3298,
+    "averageChangedPixels": 3137.8,
+    "loopSeamChangedPixels": 257
+  },
+  "lv3_tired_concerned": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 96,
+    "meaningfulTransitions": 80,
+    "medianChangedPixels": 3967,
+    "averageChangedPixels": 3682.2,
+    "loopSeamChangedPixels": 1
+  },
+  "lv3_happy_confident": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 96,
+    "meaningfulTransitions": 96,
+    "medianChangedPixels": 5418,
+    "averageChangedPixels": 5214.8,
+    "loopSeamChangedPixels": 287
+  },
+  "lv3_supercharged": {
+    "frames": 96,
+    "durationMs": 2000,
+    "effectiveFps": 48.0,
+    "uniqueFrames": 96,
+    "meaningfulTransitions": 96,
+    "medianChangedPixels": 6529,
+    "averageChangedPixels": 6524.4,
+    "loopSeamChangedPixels": 166
+  },
+  "no_connection": {
+    "frames": 1,
+    "durationMs": 2000,
+    "uniqueFrames": 1,
+    "meaningfulTransitions": 0
+  }
+}
