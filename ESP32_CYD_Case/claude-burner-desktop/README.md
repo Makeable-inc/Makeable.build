@@ -1,4 +1,4 @@
-# Claude Burner 1.0.7
+# Claude Burner 1.0.8
 
 Claude Burner is a persistent three-form Tamagotchi for the 320x240 E32R28T
 ESP32 CYD display. Claude Code activity charges Ember's stored LIFE; inactivity
@@ -6,7 +6,7 @@ degrades its mood, volcano, size, and eventually returns it to a dormant baby.
 
 ## Install the Mac app
 
-1. Open `release/Claude Burner-1.0.7-arm64.dmg`.
+1. Open `release/Claude Burner-1.0.8-arm64.dmg`.
 2. Drag **Claude Burner** to **Applications**.
 3. Because this prototype is intentionally unsigned, Control-click the app and
    choose **Open**. If macOS still blocks it, open **System Settings > Privacy &
@@ -56,15 +56,21 @@ changes remain tiny independent packets.
 
 Each upload uses 12 KB chunks with COBS framing, CRC32, monotonic sequence
 numbers, ACK/NACK recovery, and an end-to-end GIF checksum before playback.
-Device-tuned GIFs run at a true 24 FPS and keep a full 320x240 keyframe followed
-by compact central motion rectangles. Firmware explicitly redraws the complete
-first frame on every loop, then renders each later rectangle as ordered raw
-scanlines. This prevents stale partial-frame pixels from accumulating in the
-middle of the display. The firmware HUD is a protected layer: GIF scanlines are
-split around `(8,8)-(127,34)`, so the LIFE bar is not repainted or flashed at
-the two-second animation boundary. All ten emotion loops have been upload-,
-loop-, and cache-tested on the physical non-PSRAM ESP32 at 24.1-24.6 FPS. The
-largest loop is about 397 KB, and firmware reports frame, loop, and render-time
+Device-tuned GIFs use 72 frames over a seamless three-second loop at a true 24
+FPS. Ember now breathes, bobs, emotes, sways its flame, and blinks while clouds,
+stars, ash, sparks, and foreground plants move according to each emotion. A
+separate 144-frame 48 FPS version gives the desktop app the richer preview.
+
+Each device loop keeps a full 320x240 keyframe followed by bounded motion
+rectangles. Firmware explicitly redraws the complete first frame on every loop,
+then renders each later rectangle as ordered raw scanlines. This prevents stale
+partial-frame pixels from accumulating in the middle of the display. The
+firmware HUD is a protected layer: GIF scanlines are split around
+`(8,8)-(127,34)`, so the LIFE bar is not repainted or flashed at the animation
+boundary. All ten emotion loops have been upload-, loop-, and cache-tested on
+the physical non-PSRAM ESP32 at 24.10-24.28 FPS. The largest loop is about 864
+KB, remains below the 1.2 MB device limit, and completed with a 35.2 ms render
+inside the 41.7 ms frame budget. Firmware reports frame, loop, and render-time
 telemetry in acknowledgements.
 
 The offline artwork's built-in banner at `x=66-254, y=45-68` contains the
@@ -98,5 +104,6 @@ Physical local-GIF test (optional scene names can follow the script):
 
 ```sh
 cd claude-burner-desktop
-BURNER_GIF_HOLD_MS=5000 node scripts/hardware-gif-smoke.js lv1_dormant lv3_supercharged
+BURNER_GIF_HOLD_MS=7000 BURNER_GIF_AUDIT_PATH=assets/audits/hardware-gif-audit.json \
+  node scripts/hardware-gif-smoke.js lv1_dormant lv3_supercharged
 ```

@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const { AnimationPack } = require('../src/animation-pack');
 const { SerialManager } = require('../src/serial-manager');
@@ -52,10 +53,23 @@ async function main() {
       if (playback.framesPlayed == null || playback.framesPlayed < 2) {
         throw new Error(`${scene} did not report local GIF frame playback`);
       }
+      if (playback.loopsCompleted < 1) throw new Error(`${scene} did not complete a local GIF loop`);
+      if (playback.observedFps < 23.8) {
+        throw new Error(`${scene} missed the physical 24 FPS target (${playback.observedFps.toFixed(2)} FPS)`);
+      }
+      if (playback.lastFrameRenderMicros > 42_000) {
+        throw new Error(`${scene} exceeded the 41.67 ms frame budget (${playback.lastFrameRenderMicros} us)`);
+      }
       if (cached.uploaded) throw new Error(`${scene} was reuploaded instead of using the device cache`);
       results.push({ scene, sourceBytes: animation.bytes.length, install, playback, cached });
     }
-    process.stdout.write(`${JSON.stringify({ devicePath, protocol: 2, results }, null, 2)}\n`);
+    const report = { devicePath, protocol: 2, results };
+    if (process.env.BURNER_GIF_AUDIT_PATH) {
+      const auditPath = path.resolve(process.env.BURNER_GIF_AUDIT_PATH);
+      fs.mkdirSync(path.dirname(auditPath), { recursive: true });
+      fs.writeFileSync(auditPath, `${JSON.stringify(report, null, 2)}\n`);
+    }
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   } finally {
     await serial.disconnect().catch(() => {});
   }

@@ -12,24 +12,32 @@ const assetsPath = path.resolve(__dirname, '..', 'assets');
 test('production animation pack contains 48 FPS previews and 24 FPS device loops', () => {
   const pack = new AnimationPack(assetsPath);
   const previewAudit = JSON.parse(fs.readFileSync(path.join(assetsPath, pack.manifest.previewAudit), 'utf8'));
+  const deviceAudit = JSON.parse(fs.readFileSync(path.join(assetsPath, pack.manifest.deviceAudit), 'utf8'));
   assert.equal(pack.fps, 48);
   assert.equal(pack.manifest.frameLoadOrder, 'top-to-bottom');
   for (const scene of Object.keys(pack.manifest.scenes)) {
-    assert.equal(pack.frameCount(scene), 96, scene);
+    assert.equal(pack.frameCount(scene), 144, scene);
     assert.ok(fs.existsSync(path.join(assetsPath, pack.previewFile(scene))), scene);
     assert.ok(fs.existsSync(path.join(assetsPath, pack.manifest.scenes[scene].deviceGif)), scene);
     assert.equal(pack.manifest.scenes[scene].deviceGifFps, 24, scene);
-    assert.equal(pack.manifest.scenes[scene].deviceGifFrames, 48, scene);
-    assert.equal(pack.manifest.scenes[scene].deviceGifDurationMs, 2000, scene);
+    assert.equal(pack.manifest.scenes[scene].deviceGifFrames, 72, scene);
+    assert.equal(pack.manifest.scenes[scene].deviceGifDurationMs, 3000, scene);
     const deviceGif = pack.getDeviceGif(scene);
     assert.ok(deviceGif.bytes.length < 1_400 * 1024, `${scene} exceeds the CYD LittleFS partition`);
     assert.equal(deviceGif.checksum, pack.manifest.scenes[scene].deviceGifCrc32, scene);
     if (scene !== 'no_connection') {
-      assert.equal(previewAudit[scene].frames, 96, scene);
+      assert.equal(previewAudit[scene].frames, 144, scene);
       assert.equal(previewAudit[scene].effectiveFps, 48, scene);
       assert.ok(previewAudit[scene].uniqueFrames >= 80, scene);
       assert.ok(previewAudit[scene].meaningfulTransitions >= 72, scene);
       assert.ok(previewAudit[scene].medianChangedPixels >= 100, scene);
+      assert.equal(deviceAudit[scene].frames, 72, scene);
+      assert.equal(deviceAudit[scene].effectiveFps, 24, scene);
+      assert.ok(deviceAudit[scene].uniqueFrames >= 64, scene);
+      assert.ok(deviceAudit[scene].meaningfulTransitions >= 64, scene);
+      assert.ok(deviceAudit[scene].medianChangedPixels >= 700, scene);
+      assert.ok(deviceAudit[scene].maximumDeltaBoundsPixels <= 56_000, scene);
+      assert.ok(deviceAudit[scene].bytes < 1_200_000, scene);
     }
   }
 });

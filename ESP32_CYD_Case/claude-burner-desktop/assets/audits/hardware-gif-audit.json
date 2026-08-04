@@ -1,0 +1,236 @@
+{
+  "devicePath": "/dev/cu.usbserial-10",
+  "protocol": 2,
+  "results": [
+    {
+      "scene": "lv1_dormant",
+      "sourceBytes": 242404,
+      "install": {
+        "uploaded": true,
+        "bytes": 242404,
+        "chunks": 20,
+        "checksum": 3295197922
+      },
+      "playback": {
+        "elapsedSeconds": 6.904,
+        "framesPlayed": 169,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 6755,
+        "observedFps": 24.188876013904984
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 3295197922
+      }
+    },
+    {
+      "scene": "lv1_exhausted",
+      "sourceBytes": 266573,
+      "install": {
+        "uploaded": true,
+        "bytes": 266573,
+        "chunks": 22,
+        "checksum": 2841571693
+      },
+      "playback": {
+        "elapsedSeconds": 6.962,
+        "framesPlayed": 170,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 25354,
+        "observedFps": 24.13099683998851
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 2841571693
+      }
+    },
+    {
+      "scene": "lv1_sad_puppy",
+      "sourceBytes": 296209,
+      "install": {
+        "uploaded": true,
+        "bytes": 296209,
+        "chunks": 25,
+        "checksum": 384935530
+      },
+      "playback": {
+        "elapsedSeconds": 6.896,
+        "framesPlayed": 169,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 10017,
+        "observedFps": 24.2169373549884
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 384935530
+      }
+    },
+    {
+      "scene": "lv1_curious_hopeful",
+      "sourceBytes": 325302,
+      "install": {
+        "uploaded": true,
+        "bytes": 325302,
+        "chunks": 27,
+        "checksum": 827327069
+      },
+      "playback": {
+        "elapsedSeconds": 6.954,
+        "framesPlayed": 170,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 27160,
+        "observedFps": 24.158757549611735
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 827327069
+      }
+    },
+    {
+      "scene": "lv2_worried_gloomy",
+      "sourceBytes": 403330,
+      "install": {
+        "uploaded": true,
+        "bytes": 403330,
+        "chunks": 33,
+        "checksum": 2336603190
+      },
+      "playback": {
+        "elapsedSeconds": 6.639,
+        "framesPlayed": 162,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 14402,
+        "observedFps": 24.100015062509414
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 2336603190
+      }
+    },
+    {
+      "scene": "lv2_neutral_attentive",
+      "sourceBytes": 446188,
+      "install": {
+        "uploaded": true,
+        "bytes": 446188,
+        "chunks": 37,
+        "checksum": 4023972048
+      },
+      "playback": {
+        "elapsedSeconds": 6.652,
+        "framesPlayed": 163,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 18877,
+        "observedFps": 24.203247143716176
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 4023972048
+      }
+    },
+    {
+      "scene": "lv2_energized",
+      "sourceBytes": 555101,
+      "install": {
+        "uploaded": true,
+        "bytes": 555101,
+        "chunks": 46,
+        "checksum": 2708959577
+      },
+      "playback": {
+        "elapsedSeconds": 6.805,
+        "framesPlayed": 167,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 17763,
+        "observedFps": 24.246877296105804
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 2708959577
+      }
+    },
+    {
+      "scene": "lv3_tired_concerned",
+      "sourceBytes": 415618,
+      "install": {
+        "uploaded": true,
+        "bytes": 415618,
+        "chunks": 34,
+        "checksum": 676611663
+      },
+      "playback": {
+        "elapsedSeconds": 6.612,
+        "framesPlayed": 162,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 20946,
+        "observedFps": 24.198427102238355
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 676611663
+      }
+    },
+    {
+      "scene": "lv3_happy_confident",
+      "sourceBytes": 809691,
+      "install": {
+        "uploaded": true,
+        "bytes": 809691,
+        "chunks": 66,
+        "checksum": 2889613291
+      },
+      "playback": {
+        "elapsedSeconds": 6.796,
+        "framesPlayed": 167,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 26256,
+        "observedFps": 24.27898763978811
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 2889613291
+      }
+    },
+    {
+      "scene": "lv3_supercharged",
+      "sourceBytes": 864243,
+      "install": {
+        "uploaded": true,
+        "bytes": 864243,
+        "chunks": 71,
+        "checksum": 226168323
+      },
+      "playback": {
+        "elapsedSeconds": 6.795,
+        "framesPlayed": 167,
+        "loopsCompleted": 2,
+        "lastFrameRenderMicros": 35231,
+        "observedFps": 24.282560706401767
+      },
+      "cached": {
+        "uploaded": false,
+        "bytes": 0,
+        "chunks": 0,
+        "checksum": 226168323
+      }
+    }
+  ]
+}

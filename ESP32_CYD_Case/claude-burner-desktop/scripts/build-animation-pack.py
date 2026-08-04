@@ -19,17 +19,19 @@ APPROVAL = PROJECT / "ember_growth_visuals" / "approval-v1"
 FINAL = PROJECT / "ember_growth_visuals" / "final-v1"
 APP_ASSETS = DESKTOP / "assets"
 FRAME_FOLDERS = FINAL / "frame_folders_320x240_48fps"
-WIDTH, HEIGHT, FPS, FRAME_COUNT = 320, 240, 48, 96
-DEVICE_FPS, DEVICE_FRAME_COUNT = 24, 48
+WIDTH, HEIGHT, FPS, FRAME_COUNT = 320, 240, 48, 144
+DEVICE_FPS, DEVICE_FRAME_COUNT = 24, 72
 # GIF stores time in centiseconds. Eleven 20 ms frames followed by one 30 ms
-# frame averages exactly 20.833 ms, so each 96-frame preview lasts two seconds.
+# frame averages exactly 20.833 ms, so each 144-frame preview lasts three seconds.
 GIF_FRAME_DURATIONS_MS = tuple(30 if (index + 1) % 12 == 0 else 20 for index in range(FRAME_COUNT))
 # Five 40 ms frames followed by one 50 ms frame averages 41.666 ms, making a
-# two-second, 48-frame device loop exactly 24 FPS within GIF's 10 ms timing unit.
+# three-second, 72-frame device loop exactly 24 FPS within GIF's 10 ms timing unit.
 DEVICE_GIF_FRAME_DURATIONS_MS = tuple(
     50 if (index + 1) % 6 == 0 else 40
     for index in range(DEVICE_FRAME_COUNT)
 )
+LOOP_DURATION_MS = sum(GIF_FRAME_DURATIONS_MS)
+assert LOOP_DURATION_MS == sum(DEVICE_GIF_FRAME_DURATIONS_MS) == 3000
 RICH_DEVICE_SCENES = frozenset({
     "lv1_dormant",
     "lv1_exhausted",
@@ -61,16 +63,33 @@ PREVIEW_BODY_BOUNDS = {
     "lv3_supercharged": (30, 36, 290, 228),
 }
 PREVIEW_MOTION = {
-    "lv1_dormant": (0.024, 0.045),
-    "lv1_exhausted": (0.026, 0.048),
-    "lv1_sad_puppy": (0.024, 0.042),
-    "lv1_curious_hopeful": (0.022, 0.038),
-    "lv2_worried_gloomy": (0.021, 0.036),
-    "lv2_neutral_attentive": (0.019, 0.032),
-    "lv2_energized": (0.016, 0.026),
-    "lv3_tired_concerned": (0.018, 0.032),
-    "lv3_happy_confident": (0.014, 0.022),
-    "lv3_supercharged": (0.012, 0.020),
+    "lv1_dormant": (0.035, 0.065),
+    "lv1_exhausted": (0.038, 0.070),
+    "lv1_sad_puppy": (0.040, 0.070),
+    "lv1_curious_hopeful": (0.045, 0.075),
+    "lv2_worried_gloomy": (0.036, 0.060),
+    "lv2_neutral_attentive": (0.040, 0.065),
+    "lv2_energized": (0.045, 0.070),
+    "lv3_tired_concerned": (0.032, 0.055),
+    "lv3_happy_confident": (0.040, 0.060),
+    "lv3_supercharged": (0.045, 0.065),
+}
+
+# Scene-specific secondary motion. Values deliberately rise with LIFE while
+# low-energy scenes remain readable rather than frozen. Device animation is
+# constrained to one right-sky patch, one central particle column, and one
+# foreground plant cluster so GIF delta rectangles remain bounded.
+MOTION_PROFILES = {
+    "lv1_dormant": dict(cloud=2, twinkles=4, grass=2, particles=1, particle="ash", face_lift=3.0, face_sway=0.0, flame_sway=1, flame_lift=0),
+    "lv1_exhausted": dict(cloud=3, twinkles=5, grass=2, particles=2, particle="ash", face_lift=4.0, face_sway=0.8, flame_sway=2, flame_lift=1),
+    "lv1_sad_puppy": dict(cloud=2, twinkles=4, grass=2, particles=1, particle="ash", face_lift=3.5, face_sway=0.8, flame_sway=3, flame_lift=1),
+    "lv1_curious_hopeful": dict(cloud=3, twinkles=5, grass=2, particles=2, particle="ember", face_lift=4.5, face_sway=1.0, flame_sway=3, flame_lift=2),
+    "lv2_worried_gloomy": dict(cloud=2, twinkles=4, grass=2, particles=2, particle="ash", face_lift=4.0, face_sway=1.6, flame_sway=3, flame_lift=1),
+    "lv2_neutral_attentive": dict(cloud=3, twinkles=5, grass=2, particles=2, particle="ember", face_lift=4.8, face_sway=0.8, flame_sway=4, flame_lift=2),
+    "lv2_energized": dict(cloud=4, twinkles=6, grass=3, particles=5, particle="ember", face_lift=5.8, face_sway=1.2, flame_sway=4, flame_lift=3),
+    "lv3_tired_concerned": dict(cloud=2, twinkles=4, grass=2, particles=2, particle="ash", face_lift=4.2, face_sway=1.0, flame_sway=3, flame_lift=1),
+    "lv3_happy_confident": dict(cloud=4, twinkles=6, grass=3, particles=7, particle="ember", face_lift=6.2, face_sway=1.4, flame_sway=5, flame_lift=3),
+    "lv3_supercharged": dict(cloud=4, twinkles=7, grass=3, particles=8, particle="ember", face_lift=6.8, face_sway=1.8, flame_sway=6, flame_lift=4),
 }
 
 
@@ -151,23 +170,23 @@ def animate(base: Image.Image, key: str) -> list[Image.Image]:
         else cracks.point(lambda value: value // 3)
     )
     amplitude = {
-        "lv1_dormant": 0.12,
-        "lv1_exhausted": 0.14,
-        "lv1_sad_puppy": 0.14,
-        "lv1_curious_hopeful": 0.13,
-        "lv2_worried_gloomy": 0.13,
-        "lv2_neutral_attentive": 0.12,
-        "lv2_energized": 0.075,
-        "lv3_tired_concerned": 0.11,
-        "lv3_happy_confident": 0.045,
-        "lv3_supercharged": 0.035,
+        "lv1_dormant": 0.10,
+        "lv1_exhausted": 0.16,
+        "lv1_sad_puppy": 0.18,
+        "lv1_curious_hopeful": 0.20,
+        "lv2_worried_gloomy": 0.18,
+        "lv2_neutral_attentive": 0.20,
+        "lv2_energized": 0.16,
+        "lv3_tired_concerned": 0.15,
+        "lv3_happy_confident": 0.12,
+        "lv3_supercharged": 0.10,
     }.get(key, 0.10)
     flame_bounds = flame_alpha.getbbox()
     for index in range(FRAME_COUNT):
         phase = index / FRAME_COUNT * math.tau + phase_offset
         frame = base.copy()
 
-        # A smooth two-second fire/face pulse changes only warm pixels. Low-life
+        # A smooth three-second fire/face pulse changes only warm pixels. Low-life
         # scenes get a larger pulse so their tiny flames visibly move after
         # RGB565 quantization; high-energy scenes stay within the USB budget.
         flame_gain = 1.0 + amplitude * math.sin(phase) + amplitude * 0.34 * math.sin(phase * 3)
@@ -183,8 +202,9 @@ def animate(base: Image.Image, key: str) -> list[Image.Image]:
             left, top, right, bottom = flame_bounds
             tip_bottom = min(bottom, top + max(18, (bottom - top) // 2))
             tip_box = (left, top, right, tip_bottom)
-            sway = round(2 * math.sin(phase * 2))
-            lift = -1 if math.sin(phase) > 0.72 else 0
+            profile = MOTION_PROFILES[key]
+            sway = round(profile["flame_sway"] * math.sin(phase * 2))
+            lift = -round(profile["flame_lift"] * max(0.0, math.sin(phase)))
             tip_mask = flame_alpha.crop(tip_box)
             tip = frame.crop(tip_box)
             frame.paste(base.crop(tip_box), (left, top))
@@ -196,7 +216,7 @@ def animate(base: Image.Image, key: str) -> list[Image.Image]:
 def staggered_device_frames(frames: list[Image.Image], bottom: int, rows_per_tick: int = 8) -> list[Image.Image]:
     """Make high-energy motion cheap to draw as top-to-bottom row groups.
 
-    Two warm-up cycles make the returned two-second loop perfectly periodic.
+    Two warm-up cycles make the returned three-second loop periodic.
     Only the central flame/eye region advances on a given tick; the richer GIF
     preview remains untouched.
     """
@@ -214,13 +234,111 @@ def staggered_device_frames(frames: list[Image.Image], bottom: int, rows_per_tic
     return output
 
 
+def feathered_patch_mask(width: int, height: int, feather: int = 8) -> Image.Image:
+    """Soft rectangular mask that hides the wrap seam of a shifted sky patch."""
+    mask = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (feather, feather, width - feather - 1, height - feather - 1),
+        radius=feather,
+        fill=255,
+    )
+    return mask.filter(ImageFilter.GaussianBlur(max(1.0, feather / 2)))
+
+
+def lively_environment_motion(frames: list[Image.Image], key: str, device: bool = False) -> list[Image.Image]:
+    """Add bounded, scene-specific sky, particle, and foreground movement.
+
+    Motion stays in a right-sky patch, a central particle column, and a right
+    foreground cluster. Their combined delta rectangle is small enough for the
+    non-PSRAM ESP32 while making the world visibly alive on a 2.8-inch screen.
+    """
+    if key == "no_connection":
+        return [frame.copy() for frame in frames]
+
+    profile = MOTION_PROFILES[key]
+    compact_supercharged = device and key == "lv3_supercharged"
+    seed = sum((index + 1) * ord(character) for index, character in enumerate(key))
+    cloud_box = (176, 14, 290, 84) if key in BANDWIDTH_CONSTRAINED_SCENES else (166, 14, 306, 88)
+    cloud_mask = feathered_patch_mask(cloud_box[2] - cloud_box[0], cloud_box[3] - cloud_box[1])
+    star_positions = [
+        (
+            142 + (seed + star * 37) % (96 if compact_supercharged else 158),
+            8 + (seed * 3 + star * 23) % 70,
+        )
+        for star in range(profile["twinkles"])
+    ]
+    grass_anchors = [
+        (234 + (seed + blade * 13) % 54, 226 - (blade % 3) * 2, 7 + blade % 4)
+        for blade in range(4)
+    ]
+
+    output: list[Image.Image] = []
+    for index, source in enumerate(frames):
+        phase = index / len(frames) * math.tau
+        frame = source.copy()
+
+        # A slow local sky drift makes clouds and nearby stars breathe without
+        # moving the camera, volcano, character, HUD, or ground line.
+        if not compact_supercharged:
+            cloud_dx = round(profile["cloud"] * math.sin(phase))
+            cloud_dy = round(max(0, profile["cloud"] - 2) * 0.35 * math.sin(phase * 2 + 0.6))
+            cloud = source.crop(cloud_box)
+            shifted_cloud = ImageChops.offset(cloud, cloud_dx, cloud_dy)
+            frame.paste(shifted_cloud, cloud_box[:2], cloud_mask)
+
+        draw = ImageDraw.Draw(frame)
+        # Each star has a different phase, so the sky shimmers instead of
+        # flashing in unison. High-LIFE scenes get an occasional two-pixel cross.
+        for star, (x, y) in enumerate(star_positions):
+            sparkle = 0.5 + 0.5 * math.sin(phase * (2 + star % 2) + star * 1.73)
+            blue = round(118 + 118 * sparkle)
+            color = (round(88 + 112 * sparkle), round(112 + 112 * sparkle), min(255, blue))
+            draw.point((x, y), fill=color)
+            if sparkle > 0.82 and profile["twinkles"] >= 5:
+                draw.point((x - 1, y), fill=color)
+                draw.point((x + 1, y), fill=color)
+                draw.point((x, y - 1), fill=color)
+                draw.point((x, y + 1), fill=color)
+
+        # Deterministic rising ash/embers. Offsetting each particle along the
+        # same closed path keeps the three-second loop seamless.
+        for particle in range(profile["particles"]):
+            progress = (index / len(frames) + particle / max(1, profile["particles"])) % 1.0
+            base_x = 124 + (seed + particle * 31) % 88
+            x = base_x + round((2 + particle % 3) * math.sin(phase * 2 + particle * 1.9))
+            y = round(166 - progress * (92 + particle % 4 * 9))
+            if profile["particle"] == "ember":
+                heat = 0.55 + 0.45 * math.sin(math.pi * progress)
+                color = (255, round(78 + 118 * heat), round(20 + 42 * heat))
+            else:
+                fade = 0.45 + 0.35 * math.sin(math.pi * progress)
+                color = (round(82 * fade), round(88 * fade), round(94 * fade))
+            draw.point((x, y), fill=color)
+            if profile["particle"] == "ember" and particle % 3 == 0:
+                draw.point((x, y + 1), fill=(186, 70, 20))
+
+        # Four tiny foreground blades/leaves bend around fixed roots. This reads
+        # clearly as wind while never shifting Ember or the shared ground line.
+        sway = (0 if compact_supercharged else profile["grass"]) * math.sin(phase * 2 + 0.4)
+        grass_color = (60, 53, 34) if profile["particle"] == "ember" else (43, 48, 40)
+        if not compact_supercharged:
+            for blade, (root_x, root_y, length) in enumerate(grass_anchors):
+                bend = round(sway * (0.55 + blade * 0.12))
+                tip = (root_x + bend, root_y - length)
+                draw.line((root_x, root_y, tip[0], tip[1]), fill=grass_color, width=1)
+                draw.point((tip[0] + (1 if bend >= 0 else -1), tip[1] + 2), fill=grass_color)
+
+        output.append(frame)
+    return output
+
+
 def smoothstep(value: float) -> float:
     value = max(0.0, min(1.0, value))
     return value * value * (3.0 - 2.0 * value)
 
 
 def preview_frames(source: Path, fallback: list[Image.Image]) -> list[Image.Image]:
-    """Resample an approved moving loop into a smooth, two-second 48 FPS loop."""
+    """Resample an approved moving loop into a smooth, three-second 48 FPS loop."""
     if not source.exists():
         return [frame.copy() for frame in fallback]
 
@@ -255,10 +373,12 @@ def preview_frames(source: Path, fallback: list[Image.Image]) -> list[Image.Imag
     return output
 
 
-def cute_preview_motion(frames: list[Image.Image], key: str) -> list[Image.Image]:
+def cute_preview_motion(frames: list[Image.Image], key: str, motion_scale: float = 1.0) -> list[Image.Image]:
     """Add visible, seamless body breathing without moving Ember's ground line."""
     bounds = PREVIEW_BODY_BOUNDS[key]
     width_gain, height_gain = PREVIEW_MOTION[key]
+    width_gain *= motion_scale
+    height_gain *= motion_scale
     left, top, right, bottom = bounds
     body_width = right - left
     body_height = bottom - top
@@ -314,6 +434,7 @@ def cute_device_motion(frames: list[Image.Image], key: str) -> list[Image.Image]
     """
     if key == "no_connection":
         return [frame.copy() for frame in frames]
+    profile = MOTION_PROFILES[key]
     left, top, right, bottom = PREVIEW_BODY_BOUNDS[key]
     body_width = right - left
     body_height = bottom - top
@@ -337,13 +458,14 @@ def cute_device_motion(frames: list[Image.Image], key: str) -> list[Image.Image]
     for index, source in enumerate(frames):
         phase = index / FRAME_COUNT * math.tau
         inhale = 0.5 - 0.5 * math.cos(phase)
-        lift = 2.2 * inhale + 0.25 * math.sin(phase * 2)
+        lift = profile["face_lift"] * inhale + 0.5 * math.sin(phase * 2)
+        sway = profile["face_sway"] * math.sin(phase * (3 if "worried" in key else 2) + 0.35)
         face = source.crop(face_box).convert("RGBA")
         face.putalpha(mask)
         lifted = face.transform(
             face.size,
             Image.Transform.AFFINE,
-            (1.0, 0.0, 0.0, 0.0, 1.0, lift),
+            (1.0, 0.0, sway, 0.0, 1.0, lift),
             resample=Image.Resampling.BICUBIC,
             fillcolor=(0, 0, 0, 0),
         )
@@ -371,7 +493,7 @@ def save_preview_gif(
     if len({frame.tobytes() for frame in indexed}) > 1:
         # Pillow otherwise coalesces subtle pixel-art holds. Alternate the two
         # palette colors nearest the existing bottom-right pixel so the file
-        # retains all 96 timed frames without a visible marker.
+        # retains all timed frames without a visible marker.
         target = frames[0].getpixel(marker_position)
         values = palette.getpalette()[: 256 * 3]
         nearest = sorted(
@@ -407,12 +529,12 @@ def validate_preview_gif(output: Path, animated: bool) -> dict[str, int | float]
         frames.append(image.convert("RGB").copy())
         durations.append(int(image.info.get("duration", 0)))
 
-    if sum(durations) != 2000:
-        raise ValueError(f"{output.name}: expected a 2000 ms loop, got {sum(durations)} ms")
+    if sum(durations) != LOOP_DURATION_MS:
+        raise ValueError(f"{output.name}: expected a {LOOP_DURATION_MS} ms loop, got {sum(durations)} ms")
     if not animated:
         if len(frames) != 1:
             raise ValueError(f"{output.name}: static fallback unexpectedly contains {len(frames)} frames")
-        return {"frames": 1, "durationMs": 2000, "uniqueFrames": 1, "meaningfulTransitions": 0}
+        return {"frames": 1, "durationMs": LOOP_DURATION_MS, "uniqueFrames": 1, "meaningfulTransitions": 0}
     if len(frames) != FRAME_COUNT:
         raise ValueError(f"{output.name}: expected {FRAME_COUNT} frames, got {len(frames)}")
 
@@ -444,6 +566,81 @@ def validate_preview_gif(output: Path, animated: bool) -> dict[str, int | float]
         "meaningfulTransitions": meaningful_transitions,
         "medianChangedPixels": median_changed,
         "averageChangedPixels": round(sum(changes) / len(changes), 1),
+        "loopSeamChangedPixels": changes[-1],
+    }
+
+
+def validate_device_gif(output: Path, animated: bool) -> dict[str, int | float]:
+    """Enforce ESP32 flash/decode bounds and a clearly observable motion floor."""
+    image = Image.open(output)
+    frames: list[Image.Image] = []
+    durations: list[int] = []
+    for index in range(image.n_frames):
+        image.seek(index)
+        frames.append(image.convert("RGB").copy())
+        durations.append(int(image.info.get("duration", 0)))
+
+    if sum(durations) != LOOP_DURATION_MS:
+        raise ValueError(f"{output.name}: device loop duration is {sum(durations)} ms")
+    if output.stat().st_size >= 1_200_000:
+        raise ValueError(f"{output.name}: leaves insufficient LittleFS headroom ({output.stat().st_size} bytes)")
+    if not animated:
+        if len(frames) != 1:
+            raise ValueError(f"{output.name}: static device fallback has {len(frames)} frames")
+        return {
+            "frames": 1,
+            "durationMs": LOOP_DURATION_MS,
+            "bytes": output.stat().st_size,
+            "uniqueFrames": 1,
+            "medianChangedPixels": 0,
+            "maximumDeltaBoundsPixels": 0,
+            "loopSeamChangedPixels": 0,
+        }
+    if len(frames) != DEVICE_FRAME_COUNT:
+        raise ValueError(f"{output.name}: expected {DEVICE_FRAME_COUNT} device frames, got {len(frames)}")
+
+    changes: list[int] = []
+    bounds_areas: list[int] = []
+    for previous, current in zip(frames, frames[1:] + frames[:1]):
+        difference = ImageChops.difference(previous, current)
+        bounds = difference.getbbox()
+        changes.append(
+            0
+            if bounds is None
+            else sum(pixel != (0, 0, 0) for pixel in difference.getdata())
+        )
+        bounds_areas.append(
+            0
+            if bounds is None
+            else (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
+        )
+    unique_frames = len({frame.tobytes() for frame in frames})
+    meaningful_transitions = sum(changed >= 100 for changed in changes)
+    median_changed = sorted(changes)[len(changes) // 2]
+    maximum_changed = max(changes)
+    maximum_regular_change = max(changes[:-1])
+    maximum_bounds = max(bounds_areas)
+    if unique_frames < 64 or meaningful_transitions < 64 or median_changed < 700:
+        raise ValueError(
+            f"{output.name}: device motion is not observable enough "
+            f"({unique_frames} unique, {meaningful_transitions} meaningful, median {median_changed})"
+        )
+    if maximum_bounds > 56_000:
+        raise ValueError(f"{output.name}: delta rectangle {maximum_bounds} pixels risks missing 24 FPS")
+    if changes[-1] > maximum_regular_change * 1.25:
+        raise ValueError(f"{output.name}: loop seam is an outlier ({changes[-1]} changed pixels)")
+    return {
+        "frames": len(frames),
+        "durationMs": sum(durations),
+        "effectiveFps": len(frames) / (sum(durations) / 1000),
+        "bytes": output.stat().st_size,
+        "uniqueFrames": unique_frames,
+        "meaningfulTransitions": meaningful_transitions,
+        "medianChangedPixels": median_changed,
+        "maximumChangedPixels": maximum_changed,
+        "maximumRegularChangedPixels": maximum_regular_change,
+        "medianDeltaBoundsPixels": sorted(bounds_areas)[len(bounds_areas) // 2],
+        "maximumDeltaBoundsPixels": maximum_bounds,
         "loopSeamChangedPixels": changes[-1],
     }
 
@@ -517,6 +714,7 @@ def build() -> None:
     manifest: dict[str, object] = {"version": 1, "width": WIDTH, "height": HEIGHT, "fps": FPS, "frameBytes": WIDTH * HEIGHT * 2, "scenes": {}}
     masters: dict[str, Image.Image] = {}
     preview_audit: dict[str, dict[str, int | float]] = {}
+    device_audit: dict[str, dict[str, int | float]] = {}
 
     for scene in SCENES:
         master = normalize(scene)
@@ -532,6 +730,7 @@ def build() -> None:
             flame_bottom = 170 if scene.key.startswith("lv1_") else 150 if scene.key.startswith("lv2_") else 130
             rows_per_tick = 8 if scene.key.startswith(("lv1_", "lv2_")) else 6
             bandwidth_frames = staggered_device_frames(bandwidth_frames, flame_bottom, rows_per_tick)
+        device_motion_frames = lively_environment_motion(bandwidth_frames, scene.key, device=True)
         approved_preview = FINAL / f"{scene.key}_loop_25fps.gif"
         approved_moving_frames = preview_frames(approved_preview, bandwidth_frames)
         moving_preview_frames = (
@@ -539,22 +738,27 @@ def build() -> None:
             if scene.key == "no_connection"
             else cute_preview_motion(approved_moving_frames, scene.key)
         )
+        moving_preview_frames = lively_environment_motion(moving_preview_frames, scene.key)
         app_preview = previews_dir / f"{scene.key}.gif"
         save_preview_gif(moving_preview_frames, app_preview)
         preview_audit[scene.key] = validate_preview_gif(app_preview, scene.key != "no_connection")
         device_gif_path = device_gifs_dir / f"{scene.key}.gif"
         # The alternating timing-preservation pixel lives inside the central
         # animation rectangle so it never expands a delta frame to 320x240.
-        local_playback_frames = cute_device_motion(bandwidth_frames, scene.key)[::2]
+        device_character_frames = cute_device_motion(device_motion_frames, scene.key)
+        if scene.key.startswith(("lv1_", "lv2_")) and scene.key not in BANDWIDTH_CONSTRAINED_SCENES:
+            device_character_frames = cute_preview_motion(device_character_frames, scene.key, motion_scale=0.65)
+        local_playback_frames = device_character_frames[::2]
         save_preview_gif(
             local_playback_frames,
             device_gif_path,
             marker_position=(160, 100),
             durations=DEVICE_GIF_FRAME_DURATIONS_MS,
         )
+        device_audit[scene.key] = validate_device_gif(device_gif_path, scene.key != "no_connection")
         device_gif = device_gif_path.read_bytes()
         shutil.copy2(app_preview, FINAL / f"{scene.key}_loop_48fps.gif")
-        frames = approved_moving_frames if scene.key in RICH_DEVICE_SCENES else bandwidth_frames
+        frames = moving_preview_frames if scene.key in RICH_DEVICE_SCENES else device_motion_frames
         if scene.key in PROGRESSIVE_APPROVED_SCENES:
             frames = staggered_device_frames(frames, 190, 4)
         folder = FRAME_FOLDERS / scene.key
@@ -585,8 +789,10 @@ def build() -> None:
     manifest["frameLoadOrder"] = "top-to-bottom"
     manifest["previewFrameDurationsMs"] = list(GIF_FRAME_DURATIONS_MS)
     manifest["previewAudit"] = "preview-audit.json"
+    manifest["deviceAudit"] = "device-audit.json"
     (APP_ASSETS / "animation-pack.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (APP_ASSETS / "preview-audit.json").write_text(json.dumps(preview_audit, indent=2) + "\n")
+    (APP_ASSETS / "device-audit.json").write_text(json.dumps(device_audit, indent=2) + "\n")
     write_fallback_header(masters["no_connection"])
     print(f"Built {len(SCENES)} scene loops, {FRAME_COUNT} frames each, at {FPS} FPS")
 

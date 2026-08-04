@@ -1,0 +1,24 @@
+CLAUDE BURNER 1.0.8 — LIVELY THREE-SECOND EMBER LOOPS
+
+1. Flash Claude_Burner_1.0.8_CYD_Firmware.bin to the connected E32R28T/CYD.
+   The currently connected board was flashed and verified during this build.
+2. Open Claude Burner-1.0.8-arm64.dmg and drag Claude Burner to Applications.
+3. This prototype is unsigned. Control-click the app and choose Open. If macOS
+   blocks it, use System Settings > Privacy & Security > Open Anyway.
+
+WHAT CHANGED IN 1.0.8
+- Every emotion now has a longer, seamless three-second animation.
+- Ember breathes, bobs, blinks, sways its flame, and reacts more visibly.
+- Clouds, stars, ash, sparks, and foreground plants now move with each mood.
+- Desktop previews use 144 frames at 48 FPS.
+- ESP32 loops use 72 memory-bounded frames at 24 FPS and remain cached until
+  the emotion changes; LIFE-only updates do not replace the GIF.
+- The protected LIFE HUD and correctly placed NO CONNECTION banner are kept.
+- All ten emotions passed upload, loop, render-budget, and cache-replay checks
+  on the physical connected non-PSRAM CYD at 24.10-24.28 FPS.
+
+FILES
+- Claude Burner-1.0.8-arm64.dmg
+- Claude_Burner_1.0.8_CYD_Firmware.bin
+- INSTALL-1.0.8.txt
+- SHA256SUMS-1.0.8.txt

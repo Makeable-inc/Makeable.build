@@ -1,6 +1,6 @@
 {
   "name": "claude-burner-desktop",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Claude Burner Tamagotchi bridge for the ESP32 CYD E32R28T display",
   "main": "src/main.js",
   "author": "Claude Burner",
@@ -36,6 +36,9 @@
       "src/**/*",
       "ui/**/*",
       "assets/**/*",
+      "!assets/animations/* [0-9]*.zlib",
+      "!assets/device-gifs/* [0-9]*.gif",
+      "!assets/previews/* [0-9]*.gif",
       "package.json"
     ],
     "extraResources": [

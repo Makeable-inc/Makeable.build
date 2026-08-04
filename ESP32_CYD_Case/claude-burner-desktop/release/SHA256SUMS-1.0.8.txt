@@ -1,0 +1,3 @@
+5f3b09d3c52b77e429723a439be9c2030594e68ea8875aa7177c85077e1eb242  Claude Burner-1.0.8-arm64.dmg
+5b6d7a49f6e310dba3459a40fc9c7ca0a90413db048abf8b5ad70ea1dadad6fc  Claude_Burner_1.0.8_CYD_Firmware.bin
+2ec790ac9978a8e9d085124dcc443d23593dfdc3076f6185abdd1d195013e85c  INSTALL-1.0.8.txt
