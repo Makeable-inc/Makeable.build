@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0908" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Ember — turn Claude usage into a living desk pet</title>
+    <meta name="description" content="Ember is Makeable’s first vibe-hardware product: a living desk pet that grows with your Claude activity and lives on a 2.8-inch ESP32 display." />
+    <link rel="canonical" href="https://makeable.build/ember" />
+    <link rel="icon" href="/assets/ember/ember-mark.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Makeable" />
+    <meta property="og:title" content="Ember — your Claude usage, alive" />
+    <meta property="og:description" content="A tiny evolving desk pet powered by your Claude activity. Makeable’s first vibe-hardware product." />
+    <meta property="og:url" content="https://makeable.build/ember" />
+    <meta property="og:image" content="https://makeable.build/assets/ember/ember-og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="627" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ember — your Claude usage, alive" />
+    <meta name="twitter:description" content="A tiny evolving desk pet powered by your Claude activity." />
+    <meta name="twitter:image" content="https://makeable.build/assets/ember/ember-og.png" />
+    <link rel="preload" href="/assets/ember/lv3-supercharged.gif" as="image" fetchpriority="high" media="(prefers-reduced-motion: no-preference)" />
+    <link rel="stylesheet" href="/ember/ember.css" />
+    <script defer src="/ember/ember.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to Ember</a>
+
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="makeable-mark" href="/" aria-label="Makeable home">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M16 2.8 28 9.6v12.8L16 29.2 4 22.4V9.6L16 2.8Z" />
+            <path d="m4 9.6 12 6.8 12-6.8M16 16.4v12.8M10 6.2l12 6.8M22 6.2 10 13" />
+          </svg>
+          <span>Makeable</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="#how-it-works">How it works</a>
+          <a class="site-nav__download" href="/ember/download" data-download-link>Download</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__glow" aria-hidden="true"></div>
+        <div class="hero__inner">
+          <div class="hero__copy">
+            <div class="ember-lockup" aria-label="Ember">
+              <img src="/assets/ember/ember-mark.svg" alt="" width="48" height="48" />
+              <span>Ember</span>
+            </div>
+            <h1 id="hero-title">Turn Claude usage into a living desk pet.</h1>
+            <p class="hero__lede">
+              Ember is Makeable’s first <strong>vibe-hardware</strong> product. It grows
+              with your Claude activity and lives on a 2.8-inch ESP32 display.
+            </p>
+            <div class="hero__actions">
+              <a class="button button--primary" href="/ember/download" aria-label="Download Ember 1.0.12 for Apple silicon Macs" data-download-link>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
+                <span>Download for macOS</span>
+              </a>
+              <a class="button button--secondary" href="#how-it-works">See how Ember grows</a>
+            </div>
+            <p class="hero__compatibility">
+              Apple silicon <span aria-hidden="true">·</span> macOS 13+
+              <span aria-hidden="true">·</span> v1.0.12
+              <span aria-hidden="true">·</span> 191 MB
+            </p>
+          </div>
+
+          <div class="product-stage" aria-label="Ember running on a 2.8-inch ESP32 display">
+            <div class="product-stage__halo" aria-hidden="true"></div>
+            <figure class="cyd">
+              <span class="cyd__screw cyd__screw--tl" aria-hidden="true"></span>
+              <span class="cyd__screw cyd__screw--tr" aria-hidden="true"></span>
+              <span class="cyd__screw cyd__screw--bl" aria-hidden="true"></span>
+              <span class="cyd__screw cyd__screw--br" aria-hidden="true"></span>
+              <div class="cyd__screen">
+                <img
+                  src="/assets/ember/lv3-supercharged.png"
+                  data-animated-src="/assets/ember/lv3-supercharged.gif"
+                  data-still-src="/assets/ember/lv3-supercharged.png"
+                  alt="Supercharged Ember smiling in front of an erupting volcano"
+                  width="320"
+                  height="240"
+                  fetchpriority="high"
+                  decoding="async"
+                />
+                <span class="cyd__glass" aria-hidden="true"></span>
+              </div>
+            </figure>
+            <span class="product-stage__cable" aria-hidden="true"></span>
+            <span class="product-stage__mac" aria-hidden="true"></span>
+            <p class="product-stage__label"><span class="live-dot" aria-hidden="true"></span>Live on ESP32 CYD over USB</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="story" id="how-it-works" aria-labelledby="story-title">
+        <h2 class="visually-hidden" id="story-title">How Ember works</h2>
+        <ol class="story__steps">
+          <li>
+            <span class="story__number">1</span>
+            <div><strong>Use Claude</strong><span>Your activity charges LIFE.</span></div>
+          </li>
+          <li>
+            <span class="story__number">2</span>
+            <div><strong>Ember evolves</strong><span>Mood and form change with you.</span></div>
+          </li>
+          <li>
+            <span class="story__number">3</span>
+            <div><strong>Your desk comes alive</strong><span>The Mac streams it to the display.</span></div>
+          </li>
+        </ol>
+
+        <div class="evolution">
+          <div class="evolution__heading">
+            <h2>Work charges it. Time cools it. Ember remembers.</h2>
+            <p>Build with Claude and Ember grows from a sleepy spark into a volcanic powerhouse. Step away, and it slowly cools back down over the next 60 hours.</p>
+          </div>
+          <div class="evolution__track" aria-label="Ember growth stages">
+            <figure>
+              <div class="evolution__image">
+                <img src="/assets/ember/lv1-dormant.png" data-animated-src="/assets/ember/lv1-dormant.gif" data-still-src="/assets/ember/lv1-dormant.png" alt="Level 1 dormant Ember sleeping beside an inactive volcano" width="320" height="240" loading="lazy" decoding="async" />
+              </div>
+              <figcaption><span>LV.1</span><strong>Resting</strong><small>Cooling down</small></figcaption>
+            </figure>
+            <span class="evolution__arrow" aria-hidden="true">→</span>
+            <figure>
+              <div class="evolution__image">
+                <img src="/assets/ember/lv2-energized.png" data-animated-src="/assets/ember/lv2-energized.gif" data-still-src="/assets/ember/lv2-energized.png" alt="Level 2 energized Ember glowing in front of a warming volcano" width="320" height="240" loading="lazy" decoding="async" />
+              </div>
+              <figcaption><span>LV.2</span><strong>Energized</strong><small>Getting stronger</small></figcaption>
+            </figure>
+            <span class="evolution__arrow" aria-hidden="true">→</span>
+            <figure>
+              <div class="evolution__image evolution__image--hot">
+                <img src="/assets/ember/lv3-supercharged.png" data-animated-src="/assets/ember/lv3-supercharged.gif" data-still-src="/assets/ember/lv3-supercharged.png" alt="Level 3 supercharged Ember celebrating beneath an erupting volcano" width="320" height="240" loading="lazy" decoding="async" />
+              </div>
+              <figcaption><span>LV.3</span><strong>Supercharged</strong><small>Peak energy</small></figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="download" id="download" aria-labelledby="download-title">
+        <div class="download__inner">
+          <div class="download__copy">
+            <p class="download__brand">Ember for macOS</p>
+            <h2 id="download-title">Bring a tiny world to your desk.</h2>
+            <p>Install the app, connect a compatible 2.8-inch ESP32 CYD display by USB, and let Ember take it from there.</p>
+          </div>
+          <div class="download__action">
+            <a class="button button--primary button--large" href="/ember/download" aria-label="Download Ember 1.0.12 for Apple silicon Macs" data-download-link>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
+              <span>Download for macOS</span>
+            </a>
+            <p>Apple silicon · macOS 13+ · version 1.0.12</p>
+            <p class="download__status" role="status" aria-live="polite" data-download-status></p>
+          </div>
+        </div>
+        <div class="requirements" aria-label="Requirements and installation notes">
+          <div><strong>What you need</strong><span>Claude Code 2.1.80+ · compatible ESP32 CYD · USB cable</span></div>
+          <details>
+            <summary>Opening the unsigned prototype</summary>
+            <p>This beta is not notarized yet. Control-click the app and choose Open. If macOS still blocks it, open Privacy &amp; Security and approve Ember there. <a href="https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac" target="_blank" rel="noreferrer">Apple’s official instructions</a>.</p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="makeable-mark makeable-mark--footer" href="/" aria-label="Makeable home">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 2.8 28 9.6v12.8L16 29.2 4 22.4V9.6L16 2.8Z" />
+          <path d="m4 9.6 12 6.8 12-6.8M16 16.4v12.8M10 6.2l12 6.8M22 6.2 10 13" />
+        </svg>
+        <span>Makeable</span>
+      </a>
+      <p>Ember is Makeable’s first vibe-hardware product.</p>
+      <nav aria-label="Legal"><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav>
+    </footer>
+  </body>
+</html>
