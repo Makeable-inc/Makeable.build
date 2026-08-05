@@ -12,6 +12,18 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/ember"
+  to = "/ember/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/ember/download"
+  to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v1.0.12/Claude-Burner-1.0.12-arm64.dmg"
+  status = 302
+  force = true
+
 [[headers]]
   for = "/dashboard/*"
   [headers.values]
@@ -26,3 +38,15 @@
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/ember/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    X-Frame-Options = "DENY"
+
+[[headers]]
+  for = "/assets/ember/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
