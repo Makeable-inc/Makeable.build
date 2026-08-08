@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const params = new URLSearchParams();
     params.set("mode", "payment");
     params.set("success_url", `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}`);
-    params.set("cancel_url", `${origin}/?order=cancelled#top`);
+    params.set("cancel_url", `${origin}/products/ember?order=cancelled#buy`);
     params.set("line_items[0][quantity]", String(quantity));
     if (process.env.AMBER_PRICE_ID) {
       params.set("line_items[0][price]", process.env.AMBER_PRICE_ID);
