@@ -2,8 +2,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as { quantity?: number; color?: string };
     const quantity = Math.max(1, Math.min(5, Math.floor(Number(body.quantity) || 1)));
-    const allowedColors = ["Sage", "Bone White", "Blush"] as const;
-    const color = allowedColors.includes(body.color as (typeof allowedColors)[number]) ? body.color as (typeof allowedColors)[number] : "Sage";
+    const allowedColors = ["Sage Green", "Bone White", "Blush Pink"] as const;
+    const color = allowedColors.includes(body.color as (typeof allowedColors)[number]) ? body.color as (typeof allowedColors)[number] : "Sage Green";
     const secretKey = process.env.STRIPE_SECRET_KEY;
     if (!secretKey) return Response.json({ error: "Pre-orders are not connected yet. Add the Stripe secret key to activate checkout." }, { status: 503 });
 

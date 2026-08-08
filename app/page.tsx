@@ -28,7 +28,7 @@ export default function Home() {
         </div>
         <a className="hero-feature" href="/products/ember" aria-label="View Ember product details">
           <div className="tape">Build 001</div>
-          <img src="/amber-hero.jpg" alt="Three Ember desktop companions in Sage, Bone White, and Blush" />
+          <img src="/amber-hero.jpg" alt="Three Ember desktop companions in Sage Green, Bone White, and Blush Pink" />
           <div className="feature-caption"><div><span>Makeable build 001</span><strong>Ember</strong><p>Your Claude tokens, but cute.</p></div><div className="price">Explore →</div></div>
         </a>
       </section>

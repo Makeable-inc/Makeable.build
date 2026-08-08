@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 
 const emberColors = [
-  { name: "Sage", swatch: "sage" },
+  { name: "Sage Green", swatch: "sage" },
   { name: "Bone White", swatch: "bone-white" },
-  { name: "Blush", swatch: "blush" },
+  { name: "Blush Pink", swatch: "blush" },
 ] as const;
 
 const moods = [
@@ -35,7 +35,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (color: str
 
 export default function EmberProduct() {
   const [quantity, setQuantity] = useState(1);
-  const [selectedColor, setSelectedColor] = useState("Sage");
+  const [selectedColor, setSelectedColor] = useState("Sage Green");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const checkoutAttempt = useRef(crypto.randomUUID());
@@ -72,7 +72,7 @@ export default function EmberProduct() {
 
       <section className="product-hero shell">
         <div className="product-gallery">
-          <div className="product-main-image"><span className="status live">Pre-order open</span><img src="/amber-hero.jpg" alt="Ember in Sage, Bone White, and Blush" /></div>
+          <div className="product-main-image"><span className="status live">Pre-order open</span><img src="/amber-hero.jpg" alt="Ember in Sage Green, Bone White, and Blush Pink" /></div>
           <div className="product-gallery-strip">
             {moods.map(mood => <figure key={mood.name}><img src={mood.image} alt={`${mood.name} Ember animation`} /><figcaption>{mood.name}</figcaption></figure>)}
           </div>
@@ -132,7 +132,7 @@ export default function EmberProduct() {
 
       <section className="faq product-faq shell"><div><span className="scribble coral">Before you preorder</span><h2>Good to know.</h2></div><div><details open><summary>Is Ember an official Anthropic product?<span>+</span></summary><p>No. Ember is an independent Makeable product and is not affiliated with or endorsed by Anthropic.</p></details><details><summary>Does Ember read my conversations or code?<span>+</span></summary><p>No. The local helper uses usage and status signals. It never needs your prompts, responses, source code, filenames, or Claude credentials.</p></details><details><summary>What does the current prototype support?<span>+</span></summary><p>The current helper targets Apple Silicon Macs running macOS 13 or newer with Claude Code 2.1.80 or newer. Compatibility may expand before shipping.</p></details><details><summary>When will Batch 01 ship?<span>+</span></summary><p>Shipping is estimated for December 2026. Makeable will send production updates and confirm your address before fulfillment.</p></details><details><summary>Can I cancel my preorder?<span>+</span></summary><p>Yes. You can request a full refund any time before your Ember ships.</p></details></div></section>
 
-      <section className="product-final-cta"><div className="shell"><span className="scribble">Founding Maker Edition</span><h2>Give your tokens a face.</h2><p>Choose Sage, Bone White, or Blush. Batch 01 is USD 45.</p><a className="button button-primary" href="#buy">Choose your Ember ↑</a></div></section>
+      <section className="product-final-cta"><div className="shell"><span className="scribble">Founding Maker Edition</span><h2>Give your tokens a face.</h2><p>Choose Sage Green, Bone White, or Blush Pink. Batch 01 is USD 45.</p><a className="button button-primary" href="#buy">Choose your Ember ↑</a></div></section>
 
       <footer className="footer shell"><Logo /><p>Anything is Makeable.</p><div><a href="/">All builds</a><a href="mailto:hello@makeable.build">Contact</a></div><small>© 2026 Makeable. Claude is a trademark of Anthropic PBC. Makeable is not affiliated with Anthropic.</small></footer>
     </main>
