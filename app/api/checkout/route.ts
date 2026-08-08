@@ -33,6 +33,9 @@ export async function POST(request: Request) {
     params.set("metadata[checkout_attempt]", requestId);
     params.set("payment_intent_data[metadata][product]", "ember-preorder");
     params.set("payment_intent_data[metadata][checkout_attempt]", requestId);
+    // Ember is a physical product. Managed Payments only supports digital goods,
+    // so use standard Checkout to collect the customer's shipping address.
+    params.set("managed_payments[enabled]", "false");
     const stripeResponse = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
       headers: { Authorization: `Bearer ${secretKey}`, "Content-Type": "application/x-www-form-urlencoded", "Idempotency-Key": requestId },
