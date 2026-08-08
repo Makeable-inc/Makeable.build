@@ -72,7 +72,7 @@ export default function EmberProduct() {
 
       <section className="product-hero shell">
         <div className="product-gallery">
-          <div className="product-main-image"><span className="status live">Pre-order open</span><img src="/ember-hero-v2.png" alt="Ember in Sage Green, Bone White, and Blush Pink showing Cheerful, Excited, and Token Feast artwork" /></div>
+          <div className="product-main-image"><span className="status live">Pre-order open</span><img src="/ember-hero-v3.png" alt="Ember in Sage Green, Bone White, and Blush Pink showing Cheerful, Excited, and Token Feast artwork" /></div>
           <div className="product-gallery-strip">
             {moods.map(mood => <figure key={mood.name}><img src={mood.image} alt={`${mood.name} Ember animation`} /><figcaption>{mood.name}</figcaption></figure>)}
           </div>

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Ember by Makeable",
     description: "Your Claude tokens, but cute.",
-    images: ["/ember-hero-v2.png"],
+    images: ["/ember-hero-v3.png"],
   },
 };
 

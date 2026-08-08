@@ -28,7 +28,7 @@ export default function Home() {
         </div>
         <a className="hero-feature" href="/products/ember" aria-label="View Ember product details">
           <div className="tape">Build 001</div>
-          <img src="/ember-hero-v2.png" alt="Three Ember desktop companions in Sage Green, Bone White, and Blush Pink showing Cheerful, Excited, and Token Feast artwork" />
+          <img src="/ember-hero-v3.png" alt="Three Ember desktop companions in Sage Green, Bone White, and Blush Pink showing Cheerful, Excited, and Token Feast artwork" />
           <div className="feature-caption"><div><span>Makeable build 001</span><strong>Ember</strong><p>Your Claude tokens, but cute.</p></div><div className="price">Explore →</div></div>
         </a>
       </section>
@@ -38,7 +38,7 @@ export default function Home() {
           <div className="section-title"><div><span className="scribble">Pick your next little obsession</span><h2>Things you can make.</h2></div><p>Every kit is one complete project—not a box of mystery components and crossed fingers.</p></div>
           <div className="build-grid">
             <article className="build-card featured-card">
-              <a className="card-media" href="/products/ember"><img src="/ember-hero-v2.png" alt="Three Ember desktop companions" /><span className="status live">Pre-order open</span></a>
+              <a className="card-media" href="/products/ember"><img src="/ember-hero-v3.png" alt="Three Ember desktop companions" /><span className="status live">Pre-order open</span></a>
               <div className="card-body"><span className="difficulty">Beginner · 5-minute setup</span><h3>Ember</h3><p>A cheerful desktop companion that gives your Claude usage a face.</p><div className="card-meta"><span>Pre-assembled</span><strong>USD 45</strong></div><a className="button button-primary card-button" href="/products/ember">View Ember →</a></div>
             </article>
             {upcoming.map(project => <article className="build-card" key={project.name}><div className={`coming-art ${project.tone}`}><span>{project.glyph}</span><small>Product preview coming soon</small><b className="status soon">Coming soon</b></div><div className="card-body"><span className="difficulty">Beginner-friendly</span><h3>{project.name}</h3><p>{project.note}</p><div className="card-meta"><span>In the workshop</span><strong>—</strong></div><button className="button ghost-button" disabled>Coming soon</button></div></article>)}
