@@ -8,12 +8,41 @@ const upcoming = [
   { name: "Pocket Weather Window", note: "Your local forecast, living on your shelf.", tone: "blue", glyph: "☁" },
 ];
 
+const emberColors = [
+  { name: "Sage", swatch: "sage" },
+  { name: "Bone White", swatch: "bone-white" },
+  { name: "Blush", swatch: "blush" },
+] as const;
+
+function ColorPicker({ value, onChange, compact = false }: { value: string; onChange: (color: string) => void; compact?: boolean }) {
+  return (
+    <fieldset className={`color-picker${compact ? " compact" : ""}`}>
+      <legend>Choose a color</legend>
+      <div className="color-options">
+        {emberColors.map((color) => (
+          <button
+            type="button"
+            className="color-option"
+            aria-pressed={value === color.name}
+            onClick={() => onChange(color.name)}
+            key={color.name}
+          >
+            <span className={`color-swatch ${color.swatch}`} aria-hidden="true" />
+            {color.name}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 function Logo() {
   return <img className="brand-logo" src="/makeable-logo-transparent.png" alt="Makeable" />;
 }
 
 export default function Home() {
   const [quantity, setQuantity] = useState(1);
+  const [selectedColor, setSelectedColor] = useState("Sage");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const checkoutAttempt = useRef(crypto.randomUUID());
@@ -25,7 +54,7 @@ export default function Home() {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Idempotency-Key": checkoutAttempt.current },
-        body: JSON.stringify({ quantity }),
+        body: JSON.stringify({ quantity, color: selectedColor }),
       });
       const data = await response.json();
       if (!response.ok || !data.url) throw new Error(data.error || "Checkout could not start.");
@@ -56,7 +85,7 @@ export default function Home() {
         </div>
         <div className="hero-feature">
           <div className="tape">Available now</div>
-          <img src="/amber-hero.jpg" alt="Three Ember desktop companions in sage, cream, and pink" />
+          <img src="/amber-hero.jpg" alt="Three Ember desktop companions in Sage, Bone White, and Blush" />
           <div className="feature-caption"><div><span>Makeable build 001</span><strong>Ember</strong><p>Your Claude tokens, but cute.</p></div><div className="price">USD 45</div></div>
         </div>
       </section>
@@ -67,7 +96,7 @@ export default function Home() {
           <div className="build-grid">
             <article className="build-card featured-card">
               <div className="card-media"><img src="/amber-hero.jpg" alt="Ember desktop companion" /><span className="status live">Pre-order</span></div>
-              <div className="card-body"><span className="difficulty">Beginner · 5-minute setup</span><h3>Ember</h3><p>A cheerful desktop companion that changes mood as your Claude token usage climbs.</p><div className="card-meta"><span>Pre-assembled</span><strong>USD 45</strong></div><button className="button button-primary card-button" onClick={preorder} disabled={loading}>{loading ? "Opening checkout…" : "Pre-order Ember →"}</button></div>
+              <div className="card-body"><span className="difficulty">Beginner · 5-minute setup</span><h3>Ember</h3><p>A cheerful desktop companion that changes mood as your Claude token usage climbs.</p><ColorPicker value={selectedColor} onChange={setSelectedColor} compact /><div className="card-meta"><span>Pre-assembled</span><strong>USD 45</strong></div><button className="button button-primary card-button" onClick={preorder} disabled={loading}>{loading ? "Opening checkout…" : `Pre-order ${selectedColor} →`}</button></div>
             </article>
             {upcoming.map(project => <article className="build-card" key={project.name}><div className={`coming-art ${project.tone}`}><span>{project.glyph}</span><small>Product preview coming soon</small><b className="status soon">Coming soon</b></div><div className="card-body"><span className="difficulty">Beginner-friendly</span><h3>{project.name}</h3><p>{project.note}</p><div className="card-meta"><span>In the workshop</span><strong>—</strong></div><button className="button ghost-button" disabled>Coming soon</button></div></article>)}
           </div>
@@ -75,7 +104,7 @@ export default function Home() {
       </section>
 
       <section className="ember-section shell" id="ember">
-        <div className="ember-copy"><span className="scribble coral">Meet build 001</span><h2>Ember wears your token usage on its face.</h2><p>Connect Ember to Wi-Fi and your Claude usage becomes a tiny living presence on your desk—from quietly hopeful to dramatically overfed.</p><ul><li>Five expressive animated states</li><li>Pre-flashed and ready to connect</li><li>USB-C powered, Wi-Fi connected</li><li>Independent Makeable product</li></ul></div>
+        <div className="ember-copy"><span className="scribble coral">Meet build 001</span><h2>Ember wears your token usage on its face.</h2><p>Connect Ember to Wi-Fi and your Claude usage becomes a tiny living presence on your desk—from quietly hopeful to dramatically overfed.</p><ul><li>Three enclosure colors: Sage, Bone White, and Blush</li><li>Five expressive animated states</li><li>Pre-flashed and ready to connect</li><li>USB-C powered, Wi-Fi connected</li><li>Independent Makeable product</li></ul></div>
         <div className="mood-board"><figure><img src="/ember-cheerful.gif" alt="Ember cheerful animation" /><figcaption>Cheerful</figcaption></figure><figure><img src="/ember-excited.gif" alt="Ember excited animation" /><figcaption>Excited</figcaption></figure><figure><img src="/ember-explosion.gif" alt="Ember explosion animation" /><figcaption>Token feast</figcaption></figure></div>
       </section>
 
@@ -86,7 +115,7 @@ export default function Home() {
         <div className="steps"><article><span>01</span><div className="step-glyph">☝</div><h3>Choose a build</h3><p>Pick a project you actually want on your desk.</p></article><article><span>02</span><div className="step-glyph">▣</div><h3>Open the box</h3><p>Everything is counted, prepared, and ready.</p></article><article><span>03</span><div className="step-glyph">✦</div><h3>Make it work</h3><p>Follow the guide and enjoy the “I made this” moment.</p></article></div>
       </section>
 
-      <section className="preorder-section"><div className="shell preorder-grid"><div><span className="scribble">Founding Maker Edition</span><h2>Make Ember yours.</h2><p>Batch 01 · Estimated shipping December 2026 · Secure checkout with Stripe.</p></div><div className="order-panel"><div className="order-line"><span>Ember preorder</span><strong>USD {45 * quantity}</strong></div><div className="quantity-row"><div className="quantity" aria-label="Quantity selector"><button onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity">−</button><span>{quantity}</span><button onClick={() => setQuantity(Math.min(5, quantity + 1))} aria-label="Increase quantity">+</button></div><button className="button button-primary" onClick={preorder} disabled={loading}>{loading ? "Opening checkout…" : "Continue to checkout →"}</button></div>{error && <p className="checkout-error" role="alert">{error}</p>}<small>Cancel for a full refund before shipping.</small></div></div></section>
+      <section className="preorder-section"><div className="shell preorder-grid"><div><span className="scribble">Founding Maker Edition</span><h2>Make Ember yours.</h2><p>Choose Sage, Bone White, or Blush. Batch 01 · Estimated shipping December 2026 · Secure checkout with Stripe.</p></div><div className="order-panel"><div className="order-line"><span>Ember preorder · {selectedColor}</span><strong>USD {45 * quantity}</strong></div><ColorPicker value={selectedColor} onChange={setSelectedColor} /><div className="quantity-row"><div className="quantity" aria-label="Quantity selector"><button onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity">−</button><span>{quantity}</span><button onClick={() => setQuantity(Math.min(5, quantity + 1))} aria-label="Increase quantity">+</button></div><button className="button button-primary" onClick={preorder} disabled={loading}>{loading ? "Opening checkout…" : "Continue to checkout →"}</button></div>{error && <p className="checkout-error" role="alert">{error}</p>}<small>Your chosen color is saved with your Stripe order. Cancel for a full refund before shipping.</small></div></div></section>
 
       <section className="faq shell"><div><span className="scribble coral">Good questions</span><h2>Before you order.</h2></div><div><details open><summary>Do I need electronics experience?<span>+</span></summary><p>No. Makeable is designed for first-time builders, and Ember arrives assembled and pre-flashed.</p></details><details><summary>Is Ember an official Anthropic product?<span>+</span></summary><p>No. Ember is an independent Makeable product and is not affiliated with or endorsed by Anthropic.</p></details><details><summary>When will Ember ship?<span>+</span></summary><p>Batch 01 is planned for December 2026. We’ll send production updates and confirm your address before fulfillment.</p></details><details><summary>Can I cancel my preorder?<span>+</span></summary><p>Yes. You can request a full refund any time before your order ships.</p></details></div></section>
 

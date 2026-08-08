@@ -1,7 +1,9 @@
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { quantity?: number };
+    const body = await request.json() as { quantity?: number; color?: string };
     const quantity = Math.max(1, Math.min(5, Math.floor(Number(body.quantity) || 1)));
+    const allowedColors = ["Sage", "Bone White", "Blush"] as const;
+    const color = allowedColors.includes(body.color as (typeof allowedColors)[number]) ? body.color as (typeof allowedColors)[number] : "Sage";
     const secretKey = process.env.STRIPE_SECRET_KEY;
     if (!secretKey) return Response.json({ error: "Pre-orders are not connected yet. Add the Stripe secret key to activate checkout." }, { status: 503 });
 
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
       params.set("line_items[0][price_data][currency]", "usd");
       params.set("line_items[0][price_data][unit_amount]", process.env.AMBER_PRICE_CENTS || "4500");
       params.set("line_items[0][price_data][product_data][name]", "Ember by Makeable — Pre-order");
-      params.set("line_items[0][price_data][product_data][description]", "Founding maker edition desktop Claude token companion. Estimated shipping December 2026.");
+      params.set("line_items[0][price_data][product_data][description]", `Founding Maker Edition in ${color}. Estimated shipping December 2026.`);
     }
     params.set("shipping_address_collection[allowed_countries][0]", "US");
     params.set("shipping_address_collection[allowed_countries][1]", "SG");
@@ -30,8 +32,10 @@ export async function POST(request: Request) {
     params.set("customer_creation", "always");
     params.set("payment_intent_data[description]", "Ember pre-order");
     params.set("metadata[product]", "ember-preorder");
+    params.set("metadata[color]", color);
     params.set("metadata[checkout_attempt]", requestId);
     params.set("payment_intent_data[metadata][product]", "ember-preorder");
+    params.set("payment_intent_data[metadata][color]", color);
     params.set("payment_intent_data[metadata][checkout_attempt]", requestId);
     // Ember is a physical product. Managed Payments only supports digital goods,
     // so use standard Checkout to collect the customer's shipping address.
