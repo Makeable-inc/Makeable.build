@@ -366,7 +366,13 @@ async function setScene(scene, suppliedSource) {
 let latest = null;
 let dragging = false;
 let firmwareSelectionPort = null;
+let firmwareSelectionProvision = false;
 let lastFirstConnectPhase = null;
+let planSelectionDirty = false;
+
+function isBusy(button) {
+  return button?.dataset.busy === 'true';
+}
 
 function formatUsageAge(milliseconds) {
   const minutes = Math.max(1, Math.round((Number(milliseconds) || 0) / 60_000));
@@ -398,7 +404,12 @@ function setFirmwareConfirmation(open, firmware = latest?.firmware) {
   panel.hidden = !open;
   panel.setAttribute('aria-hidden', String(!open));
   firmwareSelectionPort = open ? firmware?.port || null : null;
+  firmwareSelectionProvision = Boolean(open && firmware?.provisionRecommended);
   if (open) {
+    el('firmwareConfirmTitle').textContent = firmwareSelectionProvision ? 'Set up this display?' : 'Install firmware update?';
+    el('firmwareConfirmDetail').textContent = firmwareSelectionProvision
+      ? 'This writes the bundled Ember firmware to the confirmed ESP32-2432S028 CYD. Keep the cable connected until verification finishes.'
+      : 'Ember’s display will restart. Keep the USB cable connected until verification finishes. Stored animations are preserved.';
     el('firmwareConfirmPort').textContent = firmwareSelectionPort || 'No display selected';
     el('firmwareConfirmVersion').textContent = firmware?.firmwareVersion ? `v${firmware.firmwareVersion}` : 'Version unavailable';
     panel.focus({ preventScroll: true });
@@ -423,9 +434,10 @@ function renderFirmware(firmware) {
   const progress = clamp(Number(firmware?.progress) || 0, 0, 100);
   el('firmwareProgress').setAttribute('aria-valuenow', String(Math.round(progress)));
   el('firmwareProgressFill').style.width = `${progress}%`;
-  el('scanFirmware').disabled = running;
-  el('flashFirmware').disabled = running || !available;
-  el('reconnect').disabled = running;
+  el('flashFirmware').textContent = firmware?.provisionRecommended ? 'Set up display…' : 'Install update…';
+  el('scanFirmware').disabled = running || isBusy(el('scanFirmware'));
+  el('flashFirmware').disabled = running || !available || isBusy(el('flashFirmware'));
+  el('reconnect').disabled = running || isBusy(el('reconnect'));
   if (running || !available) setFirmwareConfirmation(false);
 }
 
@@ -476,7 +488,7 @@ function renderFirstConnect(firstConnect) {
 function render(snapshot) {
   if (!snapshot) return;
   latest = snapshot;
-  const { state, liveState, connection, claude, bridge, usage, usageHealth, usageProbe, simulation, progression, firmware, firstConnect } = snapshot;
+  const { state, liveState, connection, claude, bridge, usage, usageHealth, usageProbe, simulation, progression, firmware, firstConnect, setup } = snapshot;
   syncCatalog(snapshot);
   const activeScene = sceneKeyForState(state, snapshot.scene);
   const activeEntry = catalogIndex.get(activeScene) || catalogIndex.get('small_moody');
@@ -536,29 +548,44 @@ function render(snapshot) {
     ? 'Demo mode · charging paused'
     : `${chargeMultiplier}× boost · 1% adds ${lifeGainLabel} LIFE`;
 
-  /* setup vs instrument */
-  el('setup').classList.toggle('on', !bridge.installed);
+  /* setup vs instrument — binary, authentication, bridge, and the first
+     reading are separate states. Never claim Claude is connected early. */
+  const setupNeeded = Boolean(setup?.action);
+  el('setup').classList.toggle('on', setupNeeded);
   el('meterbox').style.display = bridge.installed ? '' : 'none';
   const savedMaxPlan = state.plan === 'max5' || state.plan === 'max20';
-  el('maxChoice').classList.toggle('off', claude.plan !== 'max' && !savedMaxPlan);
+  el('maxChoice').classList.toggle('off', setup?.action !== 'install-bridge' || (claude.plan !== 'max' && !savedMaxPlan));
   const savedMultiplier = state.plan === 'max20' ? '20' : state.plan === 'max5' ? '5' : null;
   const savedChoice = savedMultiplier && document.querySelector(`input[name="maxPlan"][value="${savedMultiplier}"]`);
   if (savedChoice) savedChoice.checked = true;
-  el('installBridge').disabled = !(claude.installed && claude.compatible && claude.loggedIn);
+  const setupCopy = {
+    'claude-not-installed': ['Install Claude Code', 'Install Claude Code', 'Claude Code was not found on this Mac.'],
+    'claude-outdated': ['Update Claude Code', 'Open update guide', `Claude Code ${claude.version || ''} is too old for reliable usage sync.`],
+    'claude-signed-out': ['Sign in to Claude', 'Sign in to Claude Code', 'A browser sign-in will open. Return here when it finishes.'],
+    'credential-source': ['Use your Claude plan', 'Sign in with Claude.ai', 'Claude is using a non-subscription credential. Sign in with the Claude.ai plan you want Ember to track.'],
+    'bridge-needed': ['Connect Claude usage', 'Connect usage privately', 'Claude Burner installs a local status-line bridge. It reads only rate-limit percentages and preserves your existing status line.'],
+    'waiting-for-usage': ['Almost ready', 'Check for first reading', 'Open Claude Code and send one message. Anthropic supplies usage data only after the first response.'],
+    'usage-stale': ['Refreshing Claude', 'Check usage again', 'The last verified reading is safe; a fresh one will replace it when Claude Code reports again.'],
+  }[setup?.state] || ['Wake Ember up', 'Connect Claude Code', setup?.message || 'Connect Claude activity to wake Ember.'];
+  el('setupTitle').textContent = setupCopy[0];
+  el('setupDetail').textContent = setup?.message || setupCopy[2];
+  el('installBridge').textContent = setupCopy[1];
+  el('installBridge').dataset.action = setup?.action || '';
+  el('installBridge').disabled = !setup?.action || isBusy(el('installBridge'));
   el('claudeVersion').textContent = claude.installed
-    ? `Claude Code ${claude.version} · ${claude.loggedIn ? 'signed in' : 'not signed in'}`
+    ? `Claude Code ${claude.version} · ${claude.loggedIn ? (claude.subscriptionAuth ? 'subscription signed in' : 'non-subscription credential') : 'signed out'}`
     : 'Claude Code was not found';
 
   /* tune */
   el('bridgeStatus').textContent = bridge.installed ? 'Active, private' : 'Not installed';
   const sourceLabel = usageHealth?.degraded
     ? `Last live reading · ${formatUsageAge(usageHealth.ageMs)}`
-    : usage?.source === 'usage-command'
-      ? 'Live /usage probe'
-      : usage?.sessionId ? 'Live Claude status line' : 'Waiting';
+    : usage && !usage.stale ? 'Live Claude status line' : setup?.state === 'claude-signed-out' ? 'Signed out' : 'Waiting';
   el('usageSource').textContent = usageProbe?.running ? 'Refreshing…' : sourceLabel;
   el('usageSource').title = usageProbe?.lastError || '';
-  el('planSelect').value = state.plan;
+  if (!planSelectionDirty && el('planSelect') !== document.activeElement) {
+    el('planSelect').value = ['pro', 'max5', 'max20'].includes(state.plan) ? state.plan : 'pro';
+  }
   el('demo').classList.toggle('on', state.plan === 'free');
   el('manualLife').value = String(Math.round(life));
   el('manualOut').textContent = `${Math.round(life)}%`;
@@ -570,8 +597,8 @@ function render(snapshot) {
   const planLabel = state.plan === 'max20' ? 'Max 20×' : state.plan === 'max5' ? 'Max 5×' : titleCase(state.plan);
   if (simulation.active) {
     el('status').textContent = `Trying on a future Ember · live LIFE stays at ${Math.round(simulation.liveLife)}%`;
-  } else if (!bridge.installed) {
-    el('status').textContent = 'Connect Claude activity to wake Ember up';
+  } else if (setup?.action && setup?.state !== 'usage-stale') {
+    el('status').textContent = setup.message;
   } else if (!ready) {
     el('status').textContent = staleReason === 'expired-window'
       ? 'Ember is checking for a fresh Claude session'

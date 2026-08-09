@@ -100,8 +100,8 @@
             <section class="setup" id="setup">
               <span class="setup-flame" aria-hidden="true"></span>
               <div>
-                <h2>Wake Ember up</h2>
-                <p>Connect Claude activity so every work session can feed Ember's flame. Claude Burner receives only your usage percentage—never credentials or conversation content.</p>
+                <h2 id="setupTitle">Wake Ember up</h2>
+                <p id="setupDetail">Connect Claude activity so every work session can feed Ember's flame. Claude Burner receives only your usage percentage—never credentials or conversation content.</p>
               </div>
               <div class="choice off" id="maxChoice">
                 <label><input type="radio" name="maxPlan" value="5" checked> Max 5×</label>
@@ -203,8 +203,10 @@
         </section>
 
         <section class="settings-group">
-          <h3>macOS prototype</h3>
-          <p>This build is unsigned. Open it once from Applications, then allow it in Privacy &amp; Security.</p>
+          <h3>Help &amp; diagnostics</h3>
+          <p>Copy a privacy-safe report with app, display, Claude, and firmware state if setup still needs attention.</p>
+          <button class="soft-button wide" id="copyDiagnostics" type="button">Copy diagnostics</button>
+          <p>Privacy &amp; Security is only needed if macOS explicitly blocks this prototype when opening it.</p>
           <button class="soft-button wide" id="openSecurity" type="button">Open Privacy &amp; Security</button>
         </section>
 
