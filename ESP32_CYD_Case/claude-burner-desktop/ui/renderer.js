@@ -1041,28 +1041,55 @@ document.addEventListener('keydown', (event) => {
 
 /* ---------------- actions ---------------- */
 async function perform(button, action) {
+  button.dataset.busy = 'true';
+  button.setAttribute('aria-busy', 'true');
   button.disabled = true;
   try { return await action(); }
   catch (error) { toast(error.message || String(error)); return null; }
-  finally { button.disabled = false; }
+  finally {
+    delete button.dataset.busy;
+    button.removeAttribute('aria-busy');
+    if (latest) render(latest);
+    else button.disabled = false;
+  }
 }
 
 el('installBridge').addEventListener('click', () => perform(el('installBridge'), async () => {
+  const action = el('installBridge').dataset.action;
+  if (action === 'install-claude') {
+    await window.claudeBurner.openClaudeInstall();
+    toast('Opened the official Claude Code installation guide.');
+    return;
+  }
+  if (action === 'sign-in') {
+    await window.claudeBurner.startClaudeLogin();
+    toast('Claude sign-in started. Finish in the browser, then return here.');
+    return;
+  }
+  if (action === 'refresh') {
+    const snapshot = await window.claudeBurner.refreshUsage();
+    render(snapshot);
+    toast(snapshot.usageFresh ? 'Claude usage is live.' : snapshot.setup?.message || 'Waiting for the first Claude usage reading.');
+    return;
+  }
+  if (action !== 'install-bridge') throw new Error('Claude setup is not ready yet.');
   const picked = document.querySelector('input[name="maxPlan"]:checked');
   const result = await window.claudeBurner.installBridge({ maxMultiplier: picked ? Number(picked.value) : null });
   render(result.snapshot);
-  toast('Claude Code connected. Active usage sync starts automatically.');
+  toast(result.snapshot.usageFresh
+    ? 'Claude usage is connected and live.'
+    : 'Usage bridge connected. Send one Claude Code message to receive the first reading.');
 }));
 
 el('refreshUsage').addEventListener('click', () => perform(el('refreshUsage'), async () => {
   const snapshot = await window.claudeBurner.refreshUsage();
   render(snapshot);
   if (snapshot.usageFresh && snapshot.usageProbe?.lastError) {
-    toast('Using the latest valid Claude reading while live refresh retries in the background.');
+    toast(snapshot.usageProbe.lastError);
   } else if (snapshot.usageFresh) {
-    toast('Claude usage refreshed directly from the built-in Usage screen.');
+    toast('Claude usage refreshed from the private status-line bridge.');
   } else {
-    toast('Claude is connected; waiting for the first live Usage reading.');
+    toast(snapshot.setup?.message || snapshot.usageProbe?.lastError || 'Waiting for the first Claude usage reading.');
   }
 }));
 
@@ -1126,7 +1153,12 @@ el('confirmFirmware').addEventListener('click', async () => {
   setFirmwareConfirmation(false);
   button.disabled = true;
   try {
-    const result = await window.claudeBurner.installFirmware({ confirmed: true, port, provision: false });
+    const result = await window.claudeBurner.installFirmware({
+      confirmed: true,
+      port,
+      provision: firmwareSelectionProvision,
+      confirmedBoardFamily: firmwareSelectionProvision ? 'ESP32-2432S028' : null,
+    });
     toast(result.connected === false
       ? 'Firmware verified. Reconnect the USB cable to resume Ember.'
       : `Firmware ${result.firmwareVersion} installed and verified on ${result.port}.`);
@@ -1140,7 +1172,10 @@ el('confirmFirmware').addEventListener('click', async () => {
 el('savePlan').addEventListener('click', () => perform(el('savePlan'), async () => {
   const picked = el('planSelect').value;
   const multiplier = picked === 'max20' ? 20 : picked === 'max5' ? 5 : null;
-  render(await window.claudeBurner.setPlan(picked, multiplier));
+  const plan = picked === 'max20' || picked === 'max5' ? 'max' : picked;
+  const snapshot = await window.claudeBurner.setPlan(plan, multiplier);
+  planSelectionDirty = false;
+  render(snapshot);
   toast(`Plan saved as ${picked === 'max20' ? 'Max 20×' : picked === 'max5' ? 'Max 5×' : 'Pro'}.`);
 }));
 
@@ -1154,8 +1189,13 @@ async function returnToLive(button) {
 el('returnLive').addEventListener('click', () => returnToLive(el('returnLive')));
 el('simBadge').addEventListener('click', () => returnToLive(el('simBadge')));
 
-el('openFrames').addEventListener('click', () => window.claudeBurner.openFrameFolders());
-el('openSecurity').addEventListener('click', () => window.claudeBurner.openPrivacySettings());
+el('planSelect').addEventListener('change', () => { planSelectionDirty = true; });
+el('openFrames').addEventListener('click', () => perform(el('openFrames'), () => window.claudeBurner.openFrameFolders()));
+el('openSecurity').addEventListener('click', () => perform(el('openSecurity'), () => window.claudeBurner.openPrivacySettings()));
+el('copyDiagnostics').addEventListener('click', () => perform(el('copyDiagnostics'), async () => {
+  const result = await window.claudeBurner.copyDiagnostics();
+  toast(`Copied diagnostics (${result.eventCount} recent events).`);
+}));
 
 el('manualLife').addEventListener('input', () => {
   el('manualOut').textContent = `${el('manualLife').value}%`;
