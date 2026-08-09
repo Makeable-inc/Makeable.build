@@ -3,117 +3,277 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; font-src 'self'">
     <title>Claude Burner</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <main class="app-shell">
-      <header class="topbar">
-        <div class="brand-mark" aria-hidden="true">🔥</div>
-        <div>
-          <p class="eyebrow">DESKTOP COMPANION</p>
-          <h1>Claude Burner</h1>
+    <main class="app" id="app">
+      <div class="mood-ambient" id="moodAmbient" aria-hidden="true"></div>
+      <div class="paper-grain" aria-hidden="true"></div>
+
+      <header class="toolbar">
+        <div class="brand-lockup" aria-label="Ember">
+          <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
+            <path class="brand-coal" d="M7.5 28.2c0-8.4 6.1-14.3 14.5-14.3s14.5 5.9 14.5 14.3c0 6.4-5.5 10.2-14.5 10.2S7.5 34.6 7.5 28.2Z"/>
+            <path class="brand-flame" d="M22.4 4.4c4.6 5.1.6 7.2 4.8 11.4 1.4 1.5 1.7 3.3.7 5.3-1.1 2.2-3.3 3.4-5.8 3.4-4.7 0-7.7-2.4-7.7-6.3 0-3.3 2.8-5.4 5.3-8.2.7 2 .9 3.2 2.1 4.2 1.4-2.9-.8-5.4.6-9.8Z"/>
+            <circle cx="16.8" cy="28.2" r="2.1" class="brand-eye"/>
+            <circle cx="27.2" cy="28.2" r="2.1" class="brand-eye"/>
+          </svg>
+          <span>Ember</span>
+          <i class="brand-spark" aria-hidden="true"></i>
         </div>
-        <div class="connection-pill" id="connection-pill"><span></span><b id="connection-label">Finding display</b></div>
+
+        <div class="toolbar-actions">
+          <button class="share-chip" id="shareCardBtn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 8.2V5.8A1.8 1.8 0 0 1 8.3 4h9.9A1.8 1.8 0 0 1 20 5.8v9.9a1.8 1.8 0 0 1-1.8 1.8h-2.4M14.7 9.3l-6.2 6.2m0 0h4.3m-4.3 0v-4.3M4 9.8v8.4A1.8 1.8 0 0 0 5.8 20h8.4"/></svg>
+            Make a brag card
+          </button>
+          <button class="device" id="device" type="button" aria-label="Open display settings">
+            <i aria-hidden="true"></i><span id="deviceLabel">Finding display</span>
+          </button>
+          <button class="gear-btn" id="tuneBtn" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="tune">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.8 3.8 10.4 2h3.2l.6 1.8 1.6.7 1.7-.8 2.3 2.3-.8 1.7.7 1.6 1.8.6v3.2l-1.8.6-.7 1.6.8 1.7-2.3 2.3-1.7-.8-1.6.7-.6 1.8h-3.2l-.6-1.8-1.6-.7-1.7.8L4.2 17l.8-1.7-.7-1.6-1.8-.6V9.9l1.8-.6L5 7.7 4.2 6l2.3-2.3 1.7.8 1.6-.7Z"/><circle cx="12" cy="11.5" r="3.2"/></svg>
+          </button>
+        </div>
       </header>
 
-      <section class="hero-grid">
-        <div class="display-column">
-          <div class="screen-frame">
-            <div class="screen-bezel">
-              <div class="screen" aria-label="ESP32 display preview">
-                <img id="scene-preview" alt="Ember scene preview">
-                <div class="life-hud">
-                  <div class="hud-copy"><b>LIFE</b><span id="life-value">0%</span><strong id="level-value">LV.1</strong></div>
-                  <div class="life-track"><i id="life-fill"></i></div>
+      <div class="body">
+        <div class="content">
+          <div class="toy-board">
+            <section class="life-pod" aria-label="Ember's life">
+              <div class="life-dial" id="lifeDial">
+                <div class="dial-ticks" aria-hidden="true"></div>
+                <div class="dial-face">
+                  <span class="dial-label">Life</span>
+                  <b id="lifeNum">00</b>
+                  <span class="dial-mood" id="lifeState">Moody</span>
                 </div>
-                <div class="waiting-overlay" id="waiting-overlay">WAITING FOR CLAUDE</div>
+                <span class="dial-heart" aria-hidden="true">♥</span>
+              </div>
+              <div class="level-ticket">
+                <strong id="lifeForm">Form 1 of 3</strong>
+                <span id="nextEvolution">Next evolution at 36</span>
+              </div>
+
+              <section class="meterbox" id="meterbox">
+                <div class="scrub">
+                  <div class="line">
+                    <span>Claude burn</span>
+                    <span><b id="usePct">—</b> <span id="resetAt"></span></span>
+                  </div>
+                  <div class="pace" id="progressionPace">Pro-normalized charging</div>
+                  <div class="slider" id="slider" role="slider" tabindex="0"
+                       aria-label="Simulated five-hour usage"
+                       aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="track">
+                      <div class="fill" id="useFill"></div>
+                      <div class="knob" id="knob"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </section>
+
+            <section class="living-stage" aria-label="Ember's current mood">
+              <img class="scene-glow" id="sceneGlow" alt="" aria-hidden="true">
+              <div class="scene-vignette" aria-hidden="true"></div>
+              <img class="scene" id="scene" alt="Ember">
+              <div class="stage-rim" aria-hidden="true"><span></span></div>
+              <button class="badge" id="simBadge" type="button" disabled>Preview · back to live</button>
+              <span class="waiting" id="waiting">Waiting for Claude</span>
+            </section>
+
+            <aside class="moment-card" aria-label="Current Ember moment">
+              <span class="tiny-label">Current spark</span>
+              <blockquote id="momentQuote">Currently larping as a pebble.</blockquote>
+              <div class="moment-meta">
+                <span class="mini-flame" aria-hidden="true"></span>
+                <span id="momentLevel">LV.1 · Moody · 0 SPARK</span>
+              </div>
+              <button class="brag-button" id="makeCardBtn" type="button">
+                <span class="ticket-icon" aria-hidden="true">★</span>
+                Turn this into a card
+              </button>
+            </aside>
+
+            <section class="setup" id="setup">
+              <span class="setup-flame" aria-hidden="true"></span>
+              <div>
+                <h2>Wake Ember up</h2>
+                <p>Connect Claude activity so every work session can feed Ember's flame. Claude Burner receives only your usage percentage—never credentials or conversation content.</p>
+              </div>
+              <div class="choice off" id="maxChoice">
+                <label><input type="radio" name="maxPlan" value="5" checked> Max 5×</label>
+                <label><input type="radio" name="maxPlan" value="20"> Max 20×</label>
+              </div>
+              <div class="act">
+                <button class="soft-button primary" id="installBridge" type="button">Connect Claude Code</button>
+                <span class="foot" id="claudeVersion"></span>
+              </div>
+            </section>
+          </div>
+
+          <section class="unlocks" aria-label="Mood pin collection">
+            <header>
+              <div>
+                <span class="collection-star" aria-hidden="true">✦</span>
+                <b>Mood pins</b>
+                <span class="collection-star" aria-hidden="true">✦</span>
+                <span id="unlockCount" aria-live="polite">1 of 15 collected</span>
+              </div>
+              <nav aria-label="Scroll mood pins">
+                <button class="carousel-btn" id="carouselPrev" type="button" aria-label="Previous mood pins">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4.5-5 5.5 5 5.5"/></svg>
+                </button>
+                <button class="carousel-btn" id="carouselNext" type="button" aria-label="Next mood pins">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4.5 5 5.5-5 5.5"/></svg>
+                </button>
+              </nav>
+            </header>
+            <div class="emotion-strip" id="emotionStrip" role="list" aria-label="Collected size and mood combinations"></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="status" id="status" aria-live="polite">Ember is waking up</div>
+
+      <div class="sheet-backdrop" id="tuneBackdrop" aria-hidden="true"></div>
+      <aside class="tune" id="tune" role="dialog" aria-modal="true" aria-labelledby="tuneTitle" aria-hidden="true">
+        <header class="sheet-header">
+          <div><span>Settings</span><h2 id="tuneTitle">Behind the toy</h2></div>
+          <button class="sheet-close" id="closeTune" type="button" aria-label="Close settings">×</button>
+        </header>
+
+        <section class="settings-group">
+          <h3>Connection</h3>
+          <div class="kv"><span>Claude bridge</span><b id="bridgeStatus">—</b></div>
+          <div class="kv"><span>Usage sync</span><b id="usageSource">—</b></div>
+          <div class="kv"><span>ESP display</span><b id="displayStatus">—</b></div>
+          <label class="select-row"><span>Claude plan</span>
+            <select id="planSelect">
+              <option value="pro">Pro</option>
+              <option value="max5">Max 5×</option>
+              <option value="max20">Max 20×</option>
+            </select>
+          </label>
+          <div class="pair">
+            <button class="soft-button" id="savePlan" type="button">Save plan</button>
+            <button class="soft-button" id="reconnect" type="button">Reconnect display</button>
+          </div>
+          <button class="soft-button wide" id="refreshUsage" type="button">Refresh Claude usage</button>
+          <button class="soft-button wide" id="openFrames" type="button">Open animation folders</button>
+        </section>
+
+        <section class="settings-group firmware-card" aria-labelledby="firmwareHeading">
+          <h3 id="firmwareHeading">Device software</h3>
+          <div class="kv"><span>Status</span><b id="firmwareStatus">Checking…</b></div>
+          <div class="kv"><span>Display</span><b id="firmwarePort">Not found</b></div>
+          <div class="kv"><span>Available version</span><b id="firmwareVersion">—</b></div>
+          <div class="firmware-progress" id="firmwareProgress" role="progressbar" aria-label="Firmware installation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <i id="firmwareProgressFill"></i>
+          </div>
+          <p id="firmwareDetail" role="status" aria-live="polite">Connect the ESP32 CYD with its USB cable.</p>
+          <div class="pair">
+            <button class="soft-button" id="scanFirmware" type="button">Rescan</button>
+            <button class="soft-button primary" id="flashFirmware" type="button" disabled>Install update…</button>
+          </div>
+          <div class="firmware-confirm" id="firmwareConfirm" role="alertdialog" aria-labelledby="firmwareConfirmTitle" aria-describedby="firmwareConfirmDetail" aria-hidden="true" hidden tabindex="-1">
+            <b id="firmwareConfirmTitle">Install firmware?</b>
+            <p id="firmwareConfirmDetail">Ember’s display will restart. Keep the USB cable connected until verification finishes. Stored animations are preserved.</p>
+            <div class="firmware-target"><span id="firmwareConfirmPort">—</span><span id="firmwareConfirmVersion">—</span></div>
+            <div class="pair">
+              <button class="soft-button" id="cancelFirmware" type="button">Cancel</button>
+              <button class="soft-button primary" id="confirmFirmware" type="button">Install safely</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-group demo" id="demo">
+          <h3>Demo mode</h3>
+          <div class="kv"><span>Manual Life</span><b id="manualOut">0%</b></div>
+          <input type="range" id="manualLife" min="0" max="100" value="0" aria-label="Manual Life">
+        </section>
+
+        <section class="settings-group">
+          <h3>How Ember grows</h3>
+          <div class="rule"><b>2 hours</b><span>grace before decay</span></div>
+          <div class="rule"><b>60 hours</b><span>full flame to dormant</span></div>
+          <div class="rule"><b>Three forms</b><span>evolve at 36 and 69 LIFE</span></div>
+        </section>
+
+        <section class="settings-group">
+          <h3>macOS prototype</h3>
+          <p>This build is unsigned. Open it once from Applications, then allow it in Privacy &amp; Security.</p>
+          <button class="soft-button wide" id="openSecurity" type="button">Open Privacy &amp; Security</button>
+        </section>
+
+        <div class="grow"></div>
+        <button class="soft-button primary wide" id="returnLive" type="button" disabled>Return to live usage</button>
+      </aside>
+
+      <div class="first-connect-overlay" id="firstConnectOverlay" aria-hidden="true">
+        <div class="first-connect-backdrop" aria-hidden="true"></div>
+        <section class="first-connect-card" id="firstConnectCard" role="dialog" aria-modal="true" aria-labelledby="firstConnectTitle" aria-describedby="firstConnectMessage" tabindex="-1">
+          <div class="first-connect-mark" aria-hidden="true">🔥</div>
+          <span class="eyebrow">First display setup</span>
+          <h2 id="firstConnectTitle">Put Ember on your CYD</h2>
+          <p id="firstConnectMessage">A compatible ESP32 is connected. Confirm the exact board before Claude Burner installs its included firmware.</p>
+          <div class="first-connect-target">
+            <div><span>Board</span><b id="firstConnectBoard">ESP32-2432S028</b></div>
+            <div><span>USB port</span><b id="firstConnectPort">—</b></div>
+            <div><span>Included firmware</span><b id="firstConnectVersion">—</b></div>
+          </div>
+          <ul class="first-connect-safety">
+            <li>No firmware download is needed—the verified build is inside this app.</li>
+            <li>The app checks the ESP32, MAC, flash capacity, and security state first.</li>
+            <li>Keep this cable connected until the display reboots and verifies.</li>
+          </ul>
+          <div class="first-connect-progress" id="firstConnectProgress" role="progressbar" aria-label="First display setup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="firstConnectProgressFill"></i></div>
+          <p class="first-connect-status" id="firstConnectStatus" role="status" aria-live="polite"></p>
+          <div class="first-connect-actions">
+            <button class="soft-button" id="dismissFirstConnect" type="button">This is not my CYD</button>
+            <button class="soft-button" id="retryFirstConnect" type="button" hidden>Scan again</button>
+            <button class="soft-button primary" id="authorizeFirstConnect" type="button">Confirm CYD &amp; install</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="share-overlay" id="shareOverlay" aria-hidden="true">
+        <div class="share-backdrop" id="shareBackdrop" aria-hidden="true"></div>
+        <section class="share-sheet" id="shareSheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle" tabindex="-1">
+          <header class="share-header">
+            <div><span>Show the receipts</span><h2 id="shareTitle">Make a brag card</h2></div>
+            <button class="sheet-close" id="closeShare" type="button" aria-label="Close brag card maker">×</button>
+          </header>
+          <div class="share-layout">
+            <div class="card-preview-wrap">
+              <canvas id="shareCanvas" width="1200" height="627" role="img" aria-label="Ember brag card preview"></canvas>
+              <span>1200 × 627 PNG · safe for X and LinkedIn</span>
+            </div>
+            <div class="share-controls">
+              <fieldset>
+                <legend>Pick Ember's line</legend>
+                <div class="quote-options" id="quoteOptions" role="radiogroup" aria-label="Brag card quote"></div>
+              </fieldset>
+              <details class="share-details">
+                <summary>Card details</summary>
+                <label><input id="cardShowPlan" type="checkbox"> Show plan</label>
+                <label><input id="cardShowUsage" type="checkbox"> Show five-hour usage</label>
+                <label><input id="cardShowUnlocks" type="checkbox"> Show mood-pin count</label>
+              </details>
+              <p class="share-privacy">Nothing posts automatically. Claude Burner saves your card and copies the caption; you decide when to share it.</p>
+              <div class="share-actions">
+                <button class="soft-button" id="saveCard" type="button">Save PNG</button>
+                <button class="social-button x" id="shareX" type="button"><span aria-hidden="true">𝕏</span> Share on X</button>
+                <button class="social-button linkedin" id="shareLinkedIn" type="button"><span aria-hidden="true">in</span> Share on LinkedIn</button>
               </div>
             </div>
-            <div class="screen-foot"><span>CYD // 320×240</span><span>LOCAL GIF · 24 FPS</span></div>
           </div>
-          <p class="emotion-label"><span>EMBER STATE</span><b id="emotion-value">Dormant</b></p>
-        </div>
+        </section>
+      </div>
 
-        <div class="control-column">
-          <article class="panel status-panel">
-            <div class="panel-heading">
-              <div><p class="eyebrow">CLAUDE ACTIVITY</p><h2>Five-hour window</h2></div>
-              <span class="plan-chip" id="plan-chip">—</span>
-            </div>
-            <div class="usage-number"><strong id="usage-value">—</strong><span>used</span></div>
-            <div class="usage-track"><i id="usage-fill"></i></div>
-            <div class="usage-meta"><span id="usage-status">Waiting for a Claude response</span><span id="reset-time"></span></div>
-          </article>
-
-          <article class="panel setup-panel" id="setup-panel">
-            <p class="eyebrow">ONE-TIME SETUP</p>
-            <h2>Connect Claude activity</h2>
-            <p>Claude Burner installs a reversible Claude Code status-line bridge. It receives only the usage percentage Claude Code provides; it never reads your credentials or conversation content.</p>
-            <div class="max-choice hidden" id="max-choice">
-              <label><input type="radio" name="max-plan" value="5" checked> Max 5×</label>
-              <label><input type="radio" name="max-plan" value="20"> Max 20×</label>
-            </div>
-            <button class="primary" id="install-bridge">Connect Claude Code</button>
-            <p class="fine-print" id="claude-version"></p>
-          </article>
-
-          <article class="panel live-panel hidden" id="live-panel">
-            <div class="live-row"><span>Bridge</span><b id="bridge-status">Active</b></div>
-            <div class="live-row"><span>Display</span><b id="display-status">Searching…</b></div>
-            <div class="plan-override">
-              <label for="plan-select">Plan</label>
-              <select id="plan-select">
-                <option value="pro">Pro</option>
-                <option value="max5">Max 5×</option>
-                <option value="max20">Max 20×</option>
-              </select>
-              <button id="save-plan">Save plan</button>
-            </div>
-            <div class="button-row">
-              <button id="reconnect-display">Reconnect display</button>
-              <button id="open-frames">Open frame folders</button>
-            </div>
-          </article>
-
-          <article class="panel simulator-panel">
-            <div class="panel-heading">
-              <div><p class="eyebrow">VISUAL TEST</p><h2>Simulated five-hour usage</h2></div>
-              <b id="sim-output">0.0%</b>
-            </div>
-            <p class="sim-help">Drag the bar, use the arrow keys, or scroll over it. Simulation changes the preview and ESP32 only; your live pet state stays safe.</p>
-            <input id="sim-usage" type="range" min="0" max="100" step="0.1" value="0" aria-label="Simulated five-hour token usage percentage">
-            <div class="sim-scale"><span>0%</span><span>5%</span><span>10%</span><span>100%</span></div>
-            <div class="sim-result">
-              <span id="sim-state">Live mode</span>
-              <strong id="sim-life-output">LIFE 0%</strong>
-              <button id="return-live" disabled>Return to live</button>
-            </div>
-          </article>
-
-          <article class="panel demo-panel hidden" id="demo-panel">
-            <div class="panel-heading"><div><p class="eyebrow">FREE / DEMO MODE</p><h2>Manual LIFE</h2></div><b id="manual-output">0%</b></div>
-            <input id="manual-life" type="range" min="0" max="100" value="0">
-          </article>
-        </div>
-      </section>
-
-      <section class="footer-grid">
-        <article class="mini-panel">
-          <p class="eyebrow">MACOS SECURITY</p>
-          <p>The prototype is unsigned. After copying it to Applications, open it once, then use Privacy &amp; Security → Open Anyway if macOS blocks it.</p>
-          <button id="open-security">Open Privacy &amp; Security</button>
-        </article>
-        <article class="mini-panel rules">
-          <p class="eyebrow">ENERGY RULES</p>
-          <p><b>2h grace</b><span>then LIFE decays</span></p>
-          <p><b>60h cycle</b><span>full power to dormant</span></p>
-          <p><b>3 forms</b><span>at 36 and 69 LIFE</span></p>
-        </article>
-      </section>
-
-      <div class="toast" id="toast" role="status"></div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </main>
     <script src="renderer.js"></script>
   </body>

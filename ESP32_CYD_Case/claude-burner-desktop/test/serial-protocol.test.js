@@ -22,12 +22,12 @@ const {
   parseAckPayload,
 } = require('../src/serial-protocol');
 
-test('HELLO advertises the conservative 24 FPS device cadence', () => {
+test('HELLO advertises the shared exact 12 FPS device cadence', () => {
   const payload = buildHelloPayload();
-  assert.equal(STREAM_FPS, 24);
+  assert.equal(STREAM_FPS, 12);
   assert.equal(payload.readUInt16LE(0), 320);
   assert.equal(payload.readUInt16LE(2), 240);
-  assert.equal(payload.readUInt32LE(8), 41_667);
+  assert.equal(payload.readUInt32LE(8), 83_333);
 });
 
 test('CRC32 matches the standard check vector', () => {
@@ -136,5 +136,28 @@ test('extended ACK telemetry reports device-local GIF playback', () => {
     framesPlayed: 240,
     loopsCompleted: 2,
     lastFrameRenderMicros: 7123,
+    // A 17-byte ACK predates the draw diagnostic; those fields read as null.
+    lastFrameRuns: null,
+    lastFramePushMicros: null,
+  });
+});
+
+test('25-byte ACK adds the address-window draw diagnostic', () => {
+  const payload = Buffer.alloc(25);
+  payload.writeUInt32LE(91, 0);
+  payload[4] = 0;
+  payload.writeUInt32LE(240, 5);
+  payload.writeUInt32LE(2, 9);
+  payload.writeUInt32LE(7123, 13);
+  payload.writeUInt32LE(2892, 17);
+  payload.writeUInt32LE(14306, 21);
+  assert.deepEqual(parseAckPayload(payload), {
+    acknowledgedSequence: 91,
+    code: 0,
+    framesPlayed: 240,
+    loopsCompleted: 2,
+    lastFrameRenderMicros: 7123,
+    lastFrameRuns: 2892,
+    lastFramePushMicros: 14306,
   });
 });

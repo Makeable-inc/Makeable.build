@@ -25,9 +25,58 @@ class StreamController extends EventEmitter {
       gifUploads: 0,
       gifCacheHits: 0,
       gifBytesUploaded: 0,
+      gifChunkRetries: 0,
       heartbeats: 0,
       activeScene: null,
+      // Device-local render telemetry, lifted out of the extended ACK. This is
+      // the only ground truth for on-device frame cost — everything else is a
+      // guess about SPI bandwidth.
+      render: null,
     };
+    this.renderSamples = [];
+    this.lastFramesPlayed = null;
+    this.lastFramesPlayedAt = null;
+  }
+
+  // The firmware reports lastGifRenderMicros in every ACK (main.cpp
+  // sendAcknowledgement, body+25). Keep a rolling window so a scene change or a
+  // single slow frame can't dominate the reading.
+  recordTelemetry(acknowledgement) {
+    if (!acknowledgement) return;
+    const micros = acknowledgement.lastFrameRenderMicros;
+    if (typeof micros === 'number' && micros > 0) {
+      this.renderSamples.push(micros);
+      if (this.renderSamples.length > 240) this.renderSamples.shift();
+      const sorted = [...this.renderSamples].sort((a, b) => a - b);
+      const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
+      const frameBudgetMicros = Math.round(1_000_000 / (this.animations.fps || 12));
+      this.stats.render = {
+        scene: this.stats.activeScene,
+        samples: sorted.length,
+        lastMicros: micros,
+        minMicros: sorted[0],
+        medianMicros: at(0.5),
+        p95Micros: at(0.95),
+        maxMicros: sorted[sorted.length - 1],
+        frameBudgetMicros,
+        budgetUsedPct: Math.round((at(0.5) / frameBudgetMicros) * 1000) / 10,
+        headroomFps: Math.floor(1_000_000 / Math.max(1, at(0.5))),
+      };
+    }
+
+    const played = acknowledgement.framesPlayed;
+    const now = Date.now();
+    if (typeof played === 'number') {
+      if (this.lastFramesPlayed !== null && played >= this.lastFramesPlayed && this.lastFramesPlayedAt) {
+        const deltaFrames = played - this.lastFramesPlayed;
+        const deltaMs = now - this.lastFramesPlayedAt;
+        if (deltaMs > 500 && deltaFrames > 0 && this.stats.render) {
+          this.stats.render.observedFps = Math.round((deltaFrames / deltaMs) * 1000 * 10) / 10;
+        }
+      }
+      this.lastFramesPlayed = played;
+      this.lastFramesPlayedAt = now;
+    }
   }
 
   start() {
@@ -117,12 +166,16 @@ class StreamController extends EventEmitter {
   async installSelectedGif(scene, state) {
     const { bytes, checksum } = this.animations.getDeviceGif(scene);
     const result = await this.serial.installGif(bytes, checksum, state.life, state.level);
+    if (!result?.activationConfirmed) {
+      throw new Error(`Device did not confirm activation of GIF scene ${scene}`);
+    }
     if (result.uploaded) {
       this.stats.gifUploads += 1;
       this.stats.gifBytesUploaded += result.bytes;
     } else {
       this.stats.gifCacheHits += 1;
     }
+    this.stats.gifChunkRetries += result.chunkRetries || 0;
     this.activeScene = scene;
     this.stats.activeScene = scene;
     this.forceInstall = false;
@@ -142,23 +195,23 @@ class StreamController extends EventEmitter {
       if (deliveryError) throw deliveryError;
 
       const snapshot = this.getSnapshot();
-      const state = snapshot.state;
+      const displayState = snapshot.state;
       if (!snapshot.claudeReady) {
-        await this.setDeviceStatus(StatusCode.WAITING_FOR_CLAUDE, state);
-        await this.serial.sendHeartbeat();
+        await this.setDeviceStatus(StatusCode.WAITING_FOR_CLAUDE, displayState);
+        this.recordTelemetry(await this.serial.sendHeartbeat());
         this.stats.heartbeats += 1;
         this.schedule(HEARTBEAT_INTERVAL_MS);
         return;
       }
 
-      await this.setDeviceStatus(StatusCode.STREAMING, state);
-      const scene = this.animations.sceneForEmotion(state.emotion);
+      await this.setDeviceStatus(StatusCode.STREAMING, displayState);
+      const scene = this.animations.sceneForState(displayState.level, displayState.emotion);
       if (this.forceInstall || scene !== this.activeScene) {
-        await this.installSelectedGif(scene, state);
+        await this.installSelectedGif(scene, displayState);
       } else {
-        await this.updateHud(state);
+        await this.updateHud(displayState);
       }
-      await this.serial.sendHeartbeat();
+      this.recordTelemetry(await this.serial.sendHeartbeat());
       this.stats.heartbeats += 1;
     } catch (error) {
       this.forceInstall = true;

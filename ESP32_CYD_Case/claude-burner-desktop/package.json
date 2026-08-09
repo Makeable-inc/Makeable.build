@@ -1,6 +1,6 @@
 {
   "name": "claude-burner-desktop",
-  "version": "1.0.8",
+  "version": "1.3.0",
   "description": "Claude Burner Tamagotchi bridge for the ESP32 CYD E32R28T display",
   "main": "src/main.js",
   "author": "Claude Burner",
@@ -12,13 +12,24 @@
     "dev": "CLAUDE_BURNER_DEV=1 electron .",
     "test": "node --test test/*.test.js",
     "build:bridge": "bash scripts/build-bridge.sh",
-    "build:assets": "python3 scripts/build-animation-pack.py",
+    "build:firmware": "node scripts/build-firmware.js",
+    "build:firmware-bundle": "node scripts/build-firmware-bundle.js",
+    "build:assets": "python3 scripts/build-approved-emotion-library.py && node scripts/publish-approved-emotion-library.js",
+    "build:assets:character-only-legacy": "python3 scripts/build-character-only-library.py --publish-assets",
+    "build:assets:legacy": "python3 scripts/build-animation-pack.py",
+    "publish:evolution-demo": "node scripts/publish-evolution-demo-pack.js",
+    "publish:emotion-library": "node scripts/publish-approved-emotion-library.js",
     "build:icon": "bash scripts/build-icon.sh",
-    "prepack": "npm run build:bridge && npm run build:assets && npm run build:icon && npm test",
-    "postinstall": "electron-builder install-app-deps",
-    "dist:mac": "npm run prepack && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --arm64"
+    "fix:pty": "bash scripts/fix-node-pty-permissions.sh",
+    "test:hardware:gifs": "node scripts/hardware-gif-smoke.js",
+    "test:hardware:faults": "node scripts/hardware-atomic-install-faults.js",
+    "validate:release-assets": "node scripts/validate-release-assets.js",
+    "prepack": "npm run fix:pty && npm run build:bridge && npm run build:firmware && npm run build:firmware-bundle && npm run validate:release-assets && npm run build:icon && npm test",
+    "postinstall": "electron-builder install-app-deps && npm run fix:pty",
+    "dist:mac": "npm run prepack && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 && node scripts/package-prototype-dmg.js"
   },
   "dependencies": {
+    "node-pty": "^1.1.0",
     "serialport": "^13.0.0"
   },
   "devDependencies": {
@@ -29,22 +40,57 @@
     "appId": "com.claudeburner.desktop",
     "productName": "Claude Burner",
     "asar": true,
+    "afterPack": "scripts/after-pack.js",
     "asarUnpack": [
-      "node_modules/@serialport/**"
+      "node_modules/@serialport/bindings-cpp/build/Release/bindings.node",
+      "node_modules/node-pty/build/Release/pty.node",
+      "node_modules/node-pty/build/Release/spawn-helper"
     ],
     "files": [
       "src/**/*",
       "ui/**/*",
-      "assets/**/*",
-      "!assets/animations/* [0-9]*.zlib",
-      "!assets/device-gifs/* [0-9]*.gif",
-      "!assets/previews/* [0-9]*.gif",
+      "!ui/branding/**/*",
+      "!ui/frames/**/*",
+      "!ui/redesign/**/*",
+      "assets/animation-pack.json",
+      "assets/gifs/small_*.gif",
+      "assets/gifs/medium_*.gif",
+      "assets/gifs/large_*.gif",
+      "assets/scenes/small_*.png",
+      "assets/scenes/medium_*.png",
+      "assets/scenes/large_*.png",
+      "!node_modules/@serialport/bindings-cpp/prebuilds/**",
+      "!node_modules/@serialport/bindings-cpp/src/**",
+      "!node_modules/@serialport/bindings-cpp/*.gyp",
+      "!node_modules/@serialport/bindings-cpp/build/Release/.forge-meta",
+      "!node_modules/node-pty/prebuilds/**",
+      "!node_modules/node-pty/deps/**",
+      "!node_modules/node-pty/third_party/**",
+      "!node_modules/node-pty/src/**",
+      "!node_modules/node-pty/scripts/**",
+      "!node_modules/node-pty/node_modules/**",
+      "!node_modules/node-pty/typings/**",
+      "!node_modules/node-pty/**/*.map",
+      "!node_modules/node-pty/lib/**/*.test.js",
+      "!node_modules/node-pty/binding.gyp",
       "package.json"
     ],
     "extraResources": [
       {
         "from": "build/bin/claude-burner-statusline-bridge",
         "to": "bin/claude-burner-statusline-bridge"
+      },
+      {
+        "from": "build/firmware",
+        "to": "firmware"
+      },
+      {
+        "from": "build/bin/esptool",
+        "to": "bin/esptool"
+      },
+      {
+        "from": "build/licenses/ESPTOOL-GPL-2.0.txt",
+        "to": "licenses/ESPTOOL-GPL-2.0.txt"
       }
     ],
     "mac": {

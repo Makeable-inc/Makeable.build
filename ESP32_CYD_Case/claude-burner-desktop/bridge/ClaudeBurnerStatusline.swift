@@ -6,15 +6,25 @@ struct BridgeConfig: Codable {
     let maxMultiplier: Int?
     let previousCommand: String?
     let snapshotPath: String
+    let snapshotDirectory: String?
 }
 
 struct UsageSnapshot: Codable {
+    let sourceVersion: Int
+    let sessionId: String?
     let plan: String
     let maxMultiplier: Int?
     let fiveHourUsedPct: Double?
     let resetsAt: String?
     let capturedAt: String
     let stale: Bool
+}
+
+func safeFileComponent(_ value: String?) -> String {
+    guard let value, !value.isEmpty else { return "unknown-session" }
+    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+    let cleaned = value.unicodeScalars.map { allowed.contains($0) ? Character(String($0)) : "_" }
+    return String(cleaned.prefix(96))
 }
 
 func iso8601Now() -> String {
@@ -96,16 +106,23 @@ else {
 
 var usedPercentage: Double?
 var resetsAt: String?
+var sessionId: String?
 if
-    let root = try? JSONSerialization.jsonObject(with: input) as? [String: Any],
-    let rateLimits = root["rate_limits"] as? [String: Any],
-    let fiveHour = rateLimits["five_hour"] as? [String: Any]
+    let root = try? JSONSerialization.jsonObject(with: input) as? [String: Any]
 {
-    usedPercentage = doubleValue(fiveHour["used_percentage"])
-    resetsAt = stringValue(fiveHour["resets_at"])
+    sessionId = stringValue(root["session_id"])
+    if
+        let rateLimits = root["rate_limits"] as? [String: Any],
+        let fiveHour = rateLimits["five_hour"] as? [String: Any]
+    {
+        usedPercentage = doubleValue(fiveHour["used_percentage"])
+        resetsAt = stringValue(fiveHour["resets_at"])
+    }
 }
 
 let snapshot = UsageSnapshot(
+    sourceVersion: 2,
+    sessionId: sessionId,
     plan: config.plan,
     maxMultiplier: config.maxMultiplier,
     fiveHourUsedPct: usedPercentage,
@@ -114,6 +131,12 @@ let snapshot = UsageSnapshot(
     stale: usedPercentage == nil || resetsAt == nil
 )
 writeAtomically(snapshot, to: config.snapshotPath)
+if let snapshotDirectory = config.snapshotDirectory {
+    let sessionPath = URL(fileURLWithPath: snapshotDirectory)
+        .appendingPathComponent("\(safeFileComponent(sessionId)).json")
+        .path
+    writeAtomically(snapshot, to: sessionPath)
+}
 
 if let previous = config.previousCommand, let output = runPreviousCommand(previous, input: input) {
     print(output)

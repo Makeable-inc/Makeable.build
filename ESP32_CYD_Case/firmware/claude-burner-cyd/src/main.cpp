@@ -2,7 +2,9 @@
 #include <AnimatedGIF.h>
 #include <LittleFS.h>
 #include <TFT_eSPI.h>
+#include "deferred_commit.h"
 #include "fallback_scene.h"
+#include "link_recovery.h"
 #include "protocol.h"
 
 using namespace BurnerProtocol;
@@ -12,31 +14,58 @@ namespace {
 constexpr uint32_t kSerialBaud = 2000000;
 constexpr uint32_t kConnectionTimeoutMs = 1500;
 constexpr uint8_t kBacklightPin = 21;
+constexpr uint32_t kMaximumGifBytes = 550UL * 1024UL;
+constexpr uint16_t kMaximumValidationFrames = 512;
 constexpr char kActiveGifPath[] = "/active.gif";
 constexpr char kActiveGifMetadataPath[] = "/active.meta";
+constexpr char kIncomingGifPath[] = "/incoming.gif";
+constexpr char kIncomingGifMetadataPath[] = "/incoming.meta";
+constexpr char kRollbackGifPath[] = "/rollback.gif";
+constexpr char kRollbackGifMetadataPath[] = "/rollback.meta";
 constexpr int16_t kHudX = 8;
 constexpr int16_t kHudY = 8;
 constexpr int16_t kHudWidth = 120;
 constexpr int16_t kHudHeight = 27;
 constexpr int16_t kHudRight = kHudX + kHudWidth;
 constexpr int16_t kHudBottom = kHudY + kHudHeight;
+// Cache the distant volcano/smoke boundary. The GIF's first frame is a full
+// keyframe on every loop; without comparison it needlessly rewrites this thin,
+// high-contrast edge while the ILI9341 is scanning it. Twenty KiB is enough to
+// suppress identical summit pixels without the RAM cost of a full framebuffer.
+constexpr int16_t kSummitCacheX = 96;
+constexpr int16_t kSummitCacheY = 0;
+constexpr int16_t kSummitCacheWidth = 128;
+constexpr int16_t kSummitCacheHeight = 80;
+constexpr int16_t kSummitCacheRight = kSummitCacheX + kSummitCacheWidth;
+constexpr int16_t kSummitCacheBottom = kSummitCacheY + kSummitCacheHeight;
 constexpr int16_t kOfflineLabelCenterX = 160;
 constexpr int16_t kOfflineLabelCenterY = 57;
 
 TFT_eSPI display;
 AnimatedGIF gif;
+AnimatedGIF gifValidator;
 File gifReadFile;
+File gifValidationFile;
 File gifUploadFile;
 uint16_t gifLineBuffer[kWidth];
+uint16_t summitCache[kSummitCacheWidth * kSummitCacheHeight];
+bool summitCacheReady = false;
 uint8_t* packetBuffer = nullptr;
 size_t packetLength = 0;
 uint32_t lastPacketAt = 0;
 uint32_t lastSequence = 0;
 uint8_t lastAcknowledgementCode = Okay;
+uint8_t lastAcknowledgementType = Ack;
 bool sequenceStarted = false;
 bool fileSystemReady = false;
 bool gifPlaying = false;
 bool gifUploadInProgress = false;
+bool gifPromotionPending = false;
+DeferredCommitAcknowledgement deferredGifCommit;
+LinkRecoveryState linkRecoveryState;
+bool gifValidationCheckingFirstFrame = false;
+bool gifValidationFirstFrameOkay = false;
+uint16_t gifValidationNextRow = 0;
 uint32_t gifUploadExpectedBytes = 0;
 uint32_t gifUploadExpectedCrc = 0;
 uint32_t gifUploadReceivedBytes = 0;
@@ -45,6 +74,13 @@ uint32_t nextGifFrameAtMicros = 0;
 uint32_t gifFramesPlayed = 0;
 uint32_t gifLoopsCompleted = 0;
 uint32_t lastGifRenderMicros = 0;
+// Diagnostic: how many discrete address-window pushes the last frame cost, and
+// how long was spent inside them. 80MHz only bought 12% over 40MHz, so the cost
+// is CPU-side, not pixel bandwidth — this splits draw from decode.
+uint32_t gifRunsLastFrame = 0;
+uint32_t gifRunsInProgress = 0;
+uint32_t gifPushMicrosLastFrame = 0;
+uint32_t gifPushMicrosInProgress = 0;
 bool haveKeyframe = false;
 bool keyframeInProgress = false;
 uint32_t nextKeyframePixel = 0;
@@ -56,6 +92,9 @@ uint8_t lastHudLife = 255;
 uint8_t lastHudLevel = 0;
 
 void drawHud(uint8_t life, uint8_t level);
+void playGifFrameIfDue();
+void sendAcknowledgement(uint8_t type, uint32_t acknowledgedSequence, uint8_t code);
+bool computeFileCrc(const char* path, uint32_t expectedBytes, uint32_t& checksum);
 
 uint32_t updateCrc32(uint32_t crc, const uint8_t* data, size_t length) {
   while (length--) {
@@ -72,6 +111,13 @@ void* openGifFile(const char* filename, int32_t* size) {
   if (!gifReadFile) return nullptr;
   *size = static_cast<int32_t>(gifReadFile.size());
   return &gifReadFile;
+}
+
+void* openGifValidationFile(const char* filename, int32_t* size) {
+  gifValidationFile = LittleFS.open(filename, FILE_READ);
+  if (!gifValidationFile) return nullptr;
+  *size = static_cast<int32_t>(gifValidationFile.size());
+  return &gifValidationFile;
 }
 
 void closeGifFile(void* handle) {
@@ -98,33 +144,112 @@ int32_t seekGifFile(GIFFILE* fileState, int32_t position) {
   return fileState->iPos;
 }
 
-void pushGifRunOutsideHud(int x, int y, uint16_t* pixels, int width) {
+void discardGifLine(GIFDRAW* draw) {
+  if (!gifValidationCheckingFirstFrame || !gifValidationFirstFrameOkay) return;
+  const int canvasY = draw->iY + draw->y;
+  if (draw->iX != 0
+      || draw->iY != 0
+      || draw->iWidth != kWidth
+      || draw->iHeight != kHeight
+      || canvasY != gifValidationNextRow) {
+    gifValidationFirstFrameOkay = false;
+    return;
+  }
+  ++gifValidationNextRow;
+}
+
+void pushGifRunDirectOutsideHud(int x, int y, uint16_t* pixels, int width) {
   if (width < 1) return;
+  gifRunsInProgress += 1;
+#ifdef BURNER_PROFILE_DRAW
+  const uint32_t pushStarted = micros();
+#endif
   const int right = x + width;
   if (y < kHudY || y >= kHudBottom || right <= kHudX || x >= kHudRight) {
     display.setAddrWindow(x, y, width, 1);
     display.pushPixels(pixels, width);
+  } else {
+    // The LIFE HUD is a persistent firmware layer. Split any GIF scanline that
+    // crosses it instead of painting underneath and redrawing the HUD afterward.
+    // This prevents a one-frame flash at every full frame-zero loop keyframe.
+    if (x < kHudX) {
+      const int leftWidth = min(width, kHudX - x);
+      if (leftWidth > 0) {
+        display.setAddrWindow(x, y, leftWidth, 1);
+        display.pushPixels(pixels, leftWidth);
+      }
+    }
+    if (right > kHudRight) {
+      const int rightX = max(x, static_cast<int>(kHudRight));
+      const int offset = rightX - x;
+      const int rightWidth = right - rightX;
+      if (rightWidth > 0) {
+        display.setAddrWindow(rightX, y, rightWidth, 1);
+        display.pushPixels(pixels + offset, rightWidth);
+      }
+    }
+  }
+#ifdef BURNER_PROFILE_DRAW
+  // Two micros() calls per run costs ~10% at 2,900 runs/frame. Only compile it
+  // in when profiling: build with -D BURNER_PROFILE_DRAW.
+  gifPushMicrosInProgress += micros() - pushStarted;
+#endif
+}
+
+void pushGifRunOutsideHud(int x, int y, uint16_t* pixels, int width) {
+  if (width < 1) return;
+  const int right = x + width;
+  if (y < kSummitCacheY
+      || y >= kSummitCacheBottom
+      || right <= kSummitCacheX
+      || x >= kSummitCacheRight) {
+    pushGifRunDirectOutsideHud(x, y, pixels, width);
     return;
   }
 
-  // The LIFE HUD is a persistent firmware layer. Split any GIF scanline that
-  // crosses it instead of painting underneath and redrawing the HUD afterward.
-  // This prevents a one-frame flash at every full frame-zero loop keyframe.
-  if (x < kHudX) {
-    const int leftWidth = min(width, kHudX - x);
-    if (leftWidth > 0) {
-      display.setAddrWindow(x, y, leftWidth, 1);
-      display.pushPixels(pixels, leftWidth);
+  const int overlapLeft = max(x, static_cast<int>(kSummitCacheX));
+  const int overlapRight = min(right, static_cast<int>(kSummitCacheRight));
+  if (x < overlapLeft) {
+    pushGifRunDirectOutsideHud(x, y, pixels, overlapLeft - x);
+  }
+
+  const int sourceOffset = overlapLeft - x;
+  const int cacheRow = (y - kSummitCacheY) * kSummitCacheWidth;
+  const int cacheOffset = overlapLeft - kSummitCacheX;
+  const int overlapWidth = overlapRight - overlapLeft;
+  if (!summitCacheReady) {
+    memcpy(
+        summitCache + cacheRow + cacheOffset,
+        pixels + sourceOffset,
+        overlapWidth * sizeof(uint16_t));
+    pushGifRunDirectOutsideHud(overlapLeft, y, pixels + sourceOffset, overlapWidth);
+  } else {
+    int offset = 0;
+    while (offset < overlapWidth) {
+      while (offset < overlapWidth
+          && summitCache[cacheRow + cacheOffset + offset] == pixels[sourceOffset + offset]) {
+        ++offset;
+      }
+      const int changedStart = offset;
+      while (offset < overlapWidth
+          && summitCache[cacheRow + cacheOffset + offset] != pixels[sourceOffset + offset]) {
+        summitCache[cacheRow + cacheOffset + offset] = pixels[sourceOffset + offset];
+        ++offset;
+      }
+      const int changedWidth = offset - changedStart;
+      if (changedWidth > 0) {
+        pushGifRunDirectOutsideHud(
+            overlapLeft + changedStart,
+            y,
+            pixels + sourceOffset + changedStart,
+            changedWidth);
+      }
     }
   }
-  if (right > kHudRight) {
-    const int rightX = max(x, static_cast<int>(kHudRight));
-    const int offset = rightX - x;
-    const int rightWidth = right - rightX;
-    if (rightWidth > 0) {
-      display.setAddrWindow(rightX, y, rightWidth, 1);
-      display.pushPixels(pixels + offset, rightWidth);
-    }
+
+  if (overlapRight < right) {
+    const int offset = overlapRight - x;
+    pushGifRunDirectOutsideHud(overlapRight, y, pixels + offset, right - overlapRight);
   }
 }
 
@@ -178,6 +303,7 @@ bool startGifPlayback() {
   if (!fileSystemReady || !LittleFS.exists(kActiveGifPath)) return false;
   gif.begin(GIF_PALETTE_RGB565_BE);
   if (!gif.open(kActiveGifPath, openGifFile, closeGifFile, readGifFile, seekGifFile, drawGifLine)) {
+    if (gifReadFile) gifReadFile.close();
     return false;
   }
   if (gif.getCanvasWidth() != kWidth || gif.getCanvasHeight() != kHeight) {
@@ -188,6 +314,7 @@ bool startGifPlayback() {
   gifFramesPlayed = 0;
   gifLoopsCompleted = 0;
   lastGifRenderMicros = 0;
+  summitCacheReady = false;
   fallbackVisible = false;
   waitingVisible = false;
   // Establish the protected layer before frame zero starts drawing around it.
@@ -196,9 +323,9 @@ bool startGifPlayback() {
   return true;
 }
 
-bool readActiveGifMetadata(uint32_t& bytes, uint32_t& checksum) {
-  if (!fileSystemReady || !LittleFS.exists(kActiveGifMetadataPath)) return false;
-  File metadata = LittleFS.open(kActiveGifMetadataPath, FILE_READ);
+bool readGifMetadata(const char* path, uint32_t& bytes, uint32_t& checksum) {
+  if (!fileSystemReady || !LittleFS.exists(path)) return false;
+  File metadata = LittleFS.open(path, FILE_READ);
   uint8_t data[8];
   const bool valid = metadata && metadata.read(data, sizeof(data)) == sizeof(data);
   metadata.close();
@@ -208,8 +335,8 @@ bool readActiveGifMetadata(uint32_t& bytes, uint32_t& checksum) {
   return true;
 }
 
-bool writeActiveGifMetadata(uint32_t bytes, uint32_t checksum) {
-  File metadata = LittleFS.open(kActiveGifMetadataPath, FILE_WRITE);
+bool writeGifMetadata(const char* path, uint32_t bytes, uint32_t checksum) {
+  File metadata = LittleFS.open(path, FILE_WRITE);
   if (!metadata) return false;
   uint8_t data[8];
   writeU32(data, bytes);
@@ -223,24 +350,239 @@ bool activeGifMatches(uint32_t bytes, uint32_t checksum) {
   if (!fileSystemReady || !LittleFS.exists(kActiveGifPath)) return false;
   uint32_t storedBytes = 0;
   uint32_t storedChecksum = 0;
-  if (!readActiveGifMetadata(storedBytes, storedChecksum)) return false;
+  if (!readGifMetadata(kActiveGifMetadataPath, storedBytes, storedChecksum)) return false;
   File active = LittleFS.open(kActiveGifPath, FILE_READ);
-  const bool matches = active && active.size() == bytes && storedBytes == bytes && storedChecksum == checksum;
+  const bool metadataMatches = active
+    && active.size() == bytes
+    && storedBytes == bytes
+    && storedChecksum == checksum;
   active.close();
-  return matches;
+  if (!metadataMatches) return false;
+  uint32_t actualChecksum = 0;
+  return computeFileCrc(kActiveGifPath, bytes, actualChecksum) && actualChecksum == checksum;
 }
 
 void cancelGifUpload(bool removePartial = true) {
   if (gifUploadFile) gifUploadFile.close();
   gifUploadInProgress = false;
+  gifPromotionPending = false;
   gifUploadExpectedBytes = 0;
   gifUploadReceivedBytes = 0;
   gifUploadExpectedCrc = 0;
   gifUploadRunningCrc = 0xffffffff;
   if (removePartial && fileSystemReady) {
+    LittleFS.remove(kIncomingGifPath);
+    LittleFS.remove(kIncomingGifMetadataPath);
+  }
+}
+
+bool computeFileCrc(const char* path, uint32_t expectedBytes, uint32_t& checksum) {
+  File file = LittleFS.open(path, FILE_READ);
+  if (!file || file.size() != expectedBytes) {
+    file.close();
+    return false;
+  }
+  uint8_t buffer[1024];
+  uint32_t crc = 0xffffffff;
+  uint32_t bytesRead = 0;
+  while (bytesRead < expectedBytes) {
+    const size_t wanted = min<size_t>(sizeof(buffer), expectedBytes - bytesRead);
+    const size_t read = file.read(buffer, wanted);
+    if (read != wanted) {
+      file.close();
+      return false;
+    }
+    crc = updateCrc32(crc, buffer, read);
+    bytesRead += read;
+    delay(0);
+  }
+  file.close();
+  checksum = crc ^ 0xffffffff;
+  return true;
+}
+
+bool validateGifWithDecoder(const char* path) {
+  File staged = LittleFS.open(path, FILE_READ);
+  if (!staged || staged.size() < 6 || staged.size() > kMaximumGifBytes) {
+    staged.close();
+    return false;
+  }
+  staged.close();
+
+  gifValidator.begin(GIF_PALETTE_RGB565_BE);
+  if (!gifValidator.open(
+        path,
+        openGifValidationFile,
+        closeGifFile,
+        readGifFile,
+        seekGifFile,
+        discardGifLine)) {
+    if (gifValidationFile) gifValidationFile.close();
+    return false;
+  }
+  if (gifValidator.getCanvasWidth() != kWidth || gifValidator.getCanvasHeight() != kHeight) {
+    gifValidator.close();
+    return false;
+  }
+
+  uint16_t decodedFrames = 0;
+  bool valid = true;
+  while (true) {
+    gifValidationCheckingFirstFrame = decodedFrames == 0;
+    if (gifValidationCheckingFirstFrame) {
+      gifValidationFirstFrameOkay = true;
+      gifValidationNextRow = 0;
+    }
+    int frameDelayMs = 0;
+    const int result = gifValidator.playFrame(false, &frameDelayMs);
+    const int error = gifValidator.getLastError();
+    if (result < 0 || (error != GIF_SUCCESS && error != GIF_EMPTY_FRAME)) {
+      valid = false;
+      break;
+    }
+    if (gifValidationCheckingFirstFrame
+        && (!gifValidationFirstFrameOkay || gifValidationNextRow != kHeight)) {
+      valid = false;
+      break;
+    }
+    if (error == GIF_SUCCESS) ++decodedFrames;
+    if (result == 0) break;
+    if (decodedFrames >= kMaximumValidationFrames) {
+      valid = false;
+      break;
+    }
+    delay(0);
+  }
+  gifValidationCheckingFirstFrame = false;
+  gifValidator.close();
+  return valid && decodedFrames > 0;
+}
+
+void recoverInterruptedGifPromotion() {
+  if (!fileSystemReady) return;
+
+  // A rollback file exists only between moving the old active GIF aside and
+  // successfully opening the replacement. On boot, prefer the known-good old
+  // file; a later GifBegin can safely retry the staged candidate.
+  if (LittleFS.exists(kRollbackGifPath)) {
     LittleFS.remove(kActiveGifPath);
     LittleFS.remove(kActiveGifMetadataPath);
+    LittleFS.rename(kRollbackGifPath, kActiveGifPath);
+    if (LittleFS.exists(kRollbackGifMetadataPath)) {
+      LittleFS.rename(kRollbackGifMetadataPath, kActiveGifMetadataPath);
+    }
+  } else {
+    LittleFS.remove(kRollbackGifMetadataPath);
   }
+  LittleFS.remove(kIncomingGifPath);
+  LittleFS.remove(kIncomingGifMetadataPath);
+}
+
+bool promoteStagedGif() {
+  if (!gifPromotionPending || gifUploadInProgress) return false;
+
+  uint32_t stagedBytes = 0;
+  uint32_t stagedChecksum = 0;
+  if (!LittleFS.exists(kIncomingGifPath)
+      || !readGifMetadata(kIncomingGifMetadataPath, stagedBytes, stagedChecksum)
+      || stagedBytes != gifUploadExpectedBytes
+      || stagedChecksum != gifUploadExpectedCrc) {
+    cancelGifUpload();
+    if (gifPlaying) gif.reset();
+    return false;
+  }
+
+  const bool hadActiveGif = LittleFS.exists(kActiveGifPath);
+  const bool hadActiveMetadata = LittleFS.exists(kActiveGifMetadataPath);
+  stopGifPlayback();
+  LittleFS.remove(kRollbackGifPath);
+  LittleFS.remove(kRollbackGifMetadataPath);
+
+  if (hadActiveGif && !LittleFS.rename(kActiveGifPath, kRollbackGifPath)) {
+    cancelGifUpload();
+    startGifPlayback();
+    return false;
+  }
+  if (hadActiveMetadata && !LittleFS.rename(kActiveGifMetadataPath, kRollbackGifMetadataPath)) {
+    if (hadActiveGif) LittleFS.rename(kRollbackGifPath, kActiveGifPath);
+    cancelGifUpload();
+    startGifPlayback();
+    return false;
+  }
+  if (!LittleFS.rename(kIncomingGifPath, kActiveGifPath)) {
+    if (hadActiveGif) LittleFS.rename(kRollbackGifPath, kActiveGifPath);
+    if (hadActiveMetadata) LittleFS.rename(kRollbackGifMetadataPath, kActiveGifMetadataPath);
+    cancelGifUpload();
+    startGifPlayback();
+    return false;
+  }
+  if (!LittleFS.rename(kIncomingGifMetadataPath, kActiveGifMetadataPath)) {
+    LittleFS.remove(kActiveGifPath);
+    if (hadActiveGif) LittleFS.rename(kRollbackGifPath, kActiveGifPath);
+    if (hadActiveMetadata) LittleFS.rename(kRollbackGifMetadataPath, kActiveGifMetadataPath);
+    cancelGifUpload();
+    startGifPlayback();
+    return false;
+  }
+
+  gifPromotionPending = false;
+  bool replacementStarted = startGifPlayback();
+  if (replacementStarted) {
+    // Render frame zero while the rollback file still exists. The validated
+    // production GIFs use a full-canvas first frame, whose scanlines are pushed
+    // in top-to-bottom callback order by AnimatedGIF.
+    playGifFrameIfDue();
+    replacementStarted = gifPlaying && gifFramesPlayed > 0;
+  }
+  if (!replacementStarted) {
+    LittleFS.remove(kActiveGifPath);
+    LittleFS.remove(kActiveGifMetadataPath);
+    if (hadActiveGif) LittleFS.rename(kRollbackGifPath, kActiveGifPath);
+    if (hadActiveMetadata) LittleFS.rename(kRollbackGifMetadataPath, kActiveGifMetadataPath);
+    if (startGifPlayback()) playGifFrameIfDue();
+    cancelGifUpload(false);
+    return false;
+  }
+
+  if (LittleFS.exists(kRollbackGifPath) && !LittleFS.remove(kRollbackGifPath)) {
+    // A surviving rollback marker would make boot recovery undo an ACKed
+    // promotion. Treat cleanup failure as promotion failure and restore now.
+    stopGifPlayback();
+    LittleFS.remove(kActiveGifPath);
+    LittleFS.remove(kActiveGifMetadataPath);
+    LittleFS.rename(kRollbackGifPath, kActiveGifPath);
+    if (LittleFS.exists(kRollbackGifMetadataPath)) {
+      LittleFS.rename(kRollbackGifMetadataPath, kActiveGifMetadataPath);
+    }
+    if (startGifPlayback()) playGifFrameIfDue();
+    cancelGifUpload(false);
+    return false;
+  }
+  LittleFS.remove(kRollbackGifMetadataPath);
+  gifUploadExpectedBytes = 0;
+  gifUploadReceivedBytes = 0;
+  gifUploadExpectedCrc = 0;
+  gifUploadRunningCrc = 0xffffffff;
+  haveKeyframe = false;
+  keyframeInProgress = false;
+  return true;
+}
+
+void completePendingGifPromotion() {
+  if (!gifPromotionPending || !deferredGifCommit.pending()) return;
+  const bool promoted = promoteStagedGif();
+  const uint32_t commitSequence = deferredGifCommit.resolve();
+  const uint8_t acknowledgementType = promoted ? Ack : Nack;
+  const uint8_t acknowledgementCode = promoted ? Okay : BadPayload;
+
+  // Cache both success and failure so a delayed duplicate COMMIT receives the
+  // exact same terminal response without re-running validation or promotion.
+  lastPacketAt = millis();
+  lastSequence = commitSequence;
+  lastAcknowledgementType = acknowledgementType;
+  lastAcknowledgementCode = acknowledgementCode;
+  sequenceStarted = true;
+  sendAcknowledgement(acknowledgementType, commitSequence, acknowledgementCode);
 }
 
 uint16_t lifeColor(uint8_t life) {
@@ -292,20 +634,26 @@ void drawHud(uint8_t life, uint8_t level) {
 }
 
 void playGifFrameIfDue() {
-  if (!gifPlaying || gifUploadInProgress) return;
+  if (!gifPlaying) return;
   const uint32_t now = micros();
   if (static_cast<int32_t>(now - nextGifFrameAtMicros) < 0) return;
 
   int frameDelayMs = 0;
   const uint32_t renderStarted = micros();
+  const bool establishingSummitCache = !summitCacheReady;
+  gifRunsInProgress = 0;
+  gifPushMicrosInProgress = 0;
   display.setSwapBytes(false);
   display.startWrite();
   const int result = gif.playFrame(false, &frameDelayMs);
   display.endWrite();
+  gifRunsLastFrame = gifRunsInProgress;
+  gifPushMicrosLastFrame = gifPushMicrosInProgress;
   if (result < 0) {
     stopGifPlayback();
     return;
   }
+  if (establishingSummitCache) summitCacheReady = true;
   lastGifRenderMicros = micros() - renderStarted;
   gifFramesPlayed += 1;
   if (currentLife != lastHudLife || currentLevel != lastHudLevel) {
@@ -313,11 +661,19 @@ void playGifFrameIfDue() {
   }
   if (result == 0) {
     gifLoopsCompleted += 1;
+    if (gifPromotionPending) {
+      // The final frame of the old loop remains on-screen while the filesystem
+      // names are swapped. The replacement starts from frame zero, so there is
+      // no mid-frame tear or partially decoded image.
+      completePendingGifPromotion();
+      return;
+    }
     gif.reset();
   }
 
-  // Device GIFs carry an exact-average 24 FPS 40/50 ms cadence. Frame zero is
-  // deliberately redrawn on every loop so partial rectangles can never drift.
+  // Device GIFs carry their own cadence. The approved full-scene library uses
+  // 40/40/40/40/40/50 ms for exact 24 FPS. Frame zero is still decoded on
+  // every loop, but the summit cache suppresses identical high-contrast pixels.
   const uint32_t duration = static_cast<uint32_t>(max(10, frameDelayMs)) * 1000UL;
   nextGifFrameAtMicros += duration;
   if (static_cast<int32_t>(now - nextGifFrameAtMicros) > static_cast<int32_t>(duration)) {
@@ -340,7 +696,19 @@ void drawNoConnectionLabel() {
 
 void drawNoConnection() {
   stopGifPlayback();
-  if (gifUploadInProgress) cancelGifUpload();
+  const bool hadDeferredCommit = deferredGifCommit.pending();
+  const uint32_t deferredSequence = hadDeferredCommit ? deferredGifCommit.resolve() : 0;
+  if (gifUploadInProgress || gifPromotionPending) cancelGifUpload();
+  if (hadDeferredCommit) {
+    // A true 1.5-second link loss wins over an in-flight loop-boundary swap.
+    // The known-good active GIF remains stored; cache the terminal NACK so a
+    // delayed duplicate COMMIT cannot be mistaken for a successful promotion.
+    lastSequence = deferredSequence;
+    lastAcknowledgementType = Nack;
+    lastAcknowledgementCode = BadPayload;
+    sequenceStarted = true;
+    sendAcknowledgement(Nack, deferredSequence, BadPayload);
+  }
   uint16_t row[kWidth];
   uint32_t pixel = 0;
   size_t cursor = 0;
@@ -370,7 +738,7 @@ void drawNoConnection() {
 
 void drawWaiting() {
   stopGifPlayback();
-  if (gifUploadInProgress) cancelGifUpload();
+  if (gifUploadInProgress || gifPromotionPending) cancelGifUpload();
   display.fillScreen(display.color565(7, 11, 18));
   display.setTextDatum(MC_DATUM);
   display.setTextColor(display.color565(255, 123, 31), display.color565(7, 11, 18));
@@ -389,7 +757,7 @@ void drawWaiting() {
 }
 
 void sendAcknowledgement(uint8_t type, uint32_t acknowledgedSequence, uint8_t code) {
-  constexpr uint32_t acknowledgementBytes = 17;
+  constexpr uint32_t acknowledgementBytes = 25;   // 17 + runs + pushMicros
   uint8_t body[kHeaderBytes + acknowledgementBytes + kCrcBytes];
   body[0] = kVersion;
   body[1] = type;
@@ -403,8 +771,10 @@ void sendAcknowledgement(uint8_t type, uint32_t acknowledgedSequence, uint8_t co
   writeU32(body + 17, gifFramesPlayed);
   writeU32(body + 21, gifLoopsCompleted);
   writeU32(body + 25, lastGifRenderMicros);
-  writeU32(body + 29, crc32(body, 29));
-  uint8_t encoded[48];
+  writeU32(body + 29, gifRunsLastFrame);
+  writeU32(body + 33, gifPushMicrosLastFrame);
+  writeU32(body + 37, crc32(body, 37));
+  uint8_t encoded[64];
   const size_t encodedLength = cobsEncode(body, sizeof(body), encoded, sizeof(encoded) - 1);
   if (encodedLength) {
     encoded[encodedLength] = 0;
@@ -490,21 +860,26 @@ uint8_t beginGifUpload(const uint8_t* payload, uint32_t length) {
   if (length != 14 || !fileSystemReady) return BadPayload;
   const uint32_t bytes = readU32(payload);
   const uint32_t checksum = readU32(payload + 4);
-  if (readU16(payload + 8) != kWidth || readU16(payload + 10) != kHeight || bytes < 6 || bytes > LittleFS.totalBytes()) {
+  if (readU16(payload + 8) != kWidth
+      || readU16(payload + 10) != kHeight
+      || bytes < 6
+      || bytes > kMaximumGifBytes) {
     return BadPayload;
   }
   currentLife = min<uint8_t>(100, payload[12]);
   currentLevel = constrain(payload[13], 1, 3);
 
   if (activeGifMatches(bytes, checksum)) {
-    cancelGifUpload(false);
+    cancelGifUpload();
     if (!gifPlaying && !startGifPlayback()) return BadPayload;
     return GifAlreadyLoaded;
   }
 
-  stopGifPlayback();
   cancelGifUpload();
-  gifUploadFile = LittleFS.open(kActiveGifPath, FILE_WRITE);
+  const size_t freeBytes = LittleFS.totalBytes() - LittleFS.usedBytes();
+  if (freeBytes < bytes + 16U) return BadPayload;
+
+  gifUploadFile = LittleFS.open(kIncomingGifPath, FILE_WRITE);
   if (!gifUploadFile) return BadPayload;
   gifUploadInProgress = true;
   gifUploadExpectedBytes = bytes;
@@ -521,7 +896,10 @@ uint8_t appendGifChunk(const uint8_t* payload, uint32_t length) {
   const uint32_t offset = readU32(payload);
   const size_t chunkBytes = length - 4;
   if (offset != gifUploadReceivedBytes || gifUploadReceivedBytes + chunkBytes > gifUploadExpectedBytes) return BadPayload;
-  if (gifUploadFile.write(payload + 4, chunkBytes) != chunkBytes) return BadPayload;
+  if (gifUploadFile.write(payload + 4, chunkBytes) != chunkBytes) {
+    cancelGifUpload();
+    return BadPayload;
+  }
   gifUploadRunningCrc = updateCrc32(gifUploadRunningCrc, payload + 4, chunkBytes);
   gifUploadReceivedBytes += chunkBytes;
   return Okay;
@@ -531,17 +909,27 @@ uint8_t commitGifUpload(const uint8_t* payload, uint32_t length) {
   if (!gifUploadInProgress || length != 8) return BadPayload;
   const uint32_t bytes = readU32(payload);
   const uint32_t checksum = readU32(payload + 4);
+  gifUploadFile.flush();
   gifUploadFile.close();
   const uint32_t actualChecksum = gifUploadRunningCrc ^ 0xffffffff;
-  const bool valid = bytes == gifUploadExpectedBytes
+  bool valid = bytes == gifUploadExpectedBytes
     && checksum == gifUploadExpectedCrc
     && gifUploadReceivedBytes == gifUploadExpectedBytes
     && actualChecksum == gifUploadExpectedCrc;
   gifUploadInProgress = false;
-  if (!valid || !writeActiveGifMetadata(bytes, checksum) || !startGifPlayback()) {
+
+  uint32_t storedChecksum = 0;
+  valid = valid
+    && computeFileCrc(kIncomingGifPath, bytes, storedChecksum)
+    && storedChecksum == checksum
+    && validateGifWithDecoder(kIncomingGifPath)
+    && writeGifMetadata(kIncomingGifMetadataPath, bytes, checksum);
+  if (!valid) {
     cancelGifUpload();
     return BadPayload;
   }
+
+  gifPromotionPending = true;
   return Okay;
 }
 
@@ -563,12 +951,32 @@ void handlePacket(uint8_t* body, size_t length) {
     sendAcknowledgement(Nack, sequence, BadCrc);
     return;
   }
+
+  const DeferredPacketAction deferredAction = deferredGifCommit.actionFor(
+    sequence,
+    type == Hello,
+    type == GifCommit);
+  if (deferredAction == DeferredPacketAction::SuppressDuplicateCommit) {
+    // The original COMMIT has not reached its loop-boundary terminal state.
+    // Suppress retries rather than ACKing early or executing it twice.
+    lastPacketAt = millis();
+    return;
+  }
+  if (deferredAction == DeferredPacketAction::RejectUntilResolved) {
+    sendAcknowledgement(Nack, sequence, BadSequence);
+    return;
+  }
+  if (deferredAction == DeferredPacketAction::AbandonForHello) {
+    cancelGifUpload();
+    deferredGifCommit.abandon();
+  }
   if (!validSequence(sequence, type)) {
     sendAcknowledgement(Nack, sequence, BadSequence);
     return;
   }
   if (sequenceStarted && sequence == lastSequence) {
-    sendAcknowledgement(Ack, sequence, lastAcknowledgementCode);
+    lastPacketAt = millis();
+    sendAcknowledgement(lastAcknowledgementType, sequence, lastAcknowledgementCode);
     return;
   }
 
@@ -581,31 +989,73 @@ void handlePacket(uint8_t* body, size_t length) {
       break;
     case Keyframe:
       if (!drawKeyframe(payload, payloadLength)) result = BadPayload;
+      else linkRecoveryState.markStreaming();
       break;
     case Delta:
       if (!haveKeyframe) result = NeedKeyframe;
       else if (!drawDelta(payload, payloadLength)) result = BadPayload;
+      else linkRecoveryState.markStreaming();
       break;
     case Heartbeat:
       if (payloadLength != 0) result = BadPayload;
+      else {
+        const HeartbeatRecoveryAction recoveryAction = linkRecoveryState.actionForHeartbeat(
+          fallbackVisible,
+          LittleFS.exists(kActiveGifPath));
+        if (recoveryAction == HeartbeatRecoveryAction::ShowWaitingForClaude) {
+          drawWaiting();
+        } else if (recoveryAction == HeartbeatRecoveryAction::ResumeStreaming) {
+          if (!startGifPlayback()) result = BadPayload;
+          else {
+            playGifFrameIfDue();
+            if (!gifPlaying || gifFramesPlayed == 0) result = BadPayload;
+          }
+        }
+      }
       break;
     case Status:
       if (payloadLength != 4) result = BadPayload;
-      else if (payload[0] == WaitingForClaude) drawWaiting();
-      else if (payload[0] == NoConnection) drawNoConnection();
+      else if (payload[0] == WaitingForClaude) {
+        linkRecoveryState.markWaitingForClaude();
+        drawWaiting();
+      }
+      else if (payload[0] == NoConnection) {
+        linkRecoveryState.markNoConnection();
+        drawNoConnection();
+      }
       else if (payload[0] == Streaming) {
+        linkRecoveryState.markStreaming();
         currentLife = min<uint8_t>(100, payload[1]);
         currentLevel = constrain(payload[2], 1, 3);
+        if (fallbackVisible && LittleFS.exists(kActiveGifPath)) {
+          if (!startGifPlayback()) result = BadPayload;
+          else {
+            playGifFrameIfDue();
+            if (!gifPlaying || gifFramesPlayed == 0) result = BadPayload;
+          }
+        }
       }
       break;
     case GifBegin:
       result = beginGifUpload(payload, payloadLength);
+      if (result == Okay || result == GifAlreadyLoaded) linkRecoveryState.markStreaming();
       break;
     case GifChunk:
       result = appendGifChunk(payload, payloadLength);
       break;
     case GifCommit:
       result = commitGifUpload(payload, payloadLength);
+      if (result == Okay) {
+        if (!deferredGifCommit.begin(sequence)) {
+          cancelGifUpload();
+          result = BadSequence;
+        } else {
+          // Do not resolve this packet until promotion reaches a loop boundary
+          // and frame zero of the replacement has completely decoded/drawn.
+          lastPacketAt = millis();
+          return;
+        }
+      }
       break;
     case HudUpdate:
       if (payloadLength != 2) result = BadPayload;
@@ -624,6 +1074,7 @@ void handlePacket(uint8_t* body, size_t length) {
   if (result == Okay || result == GifAlreadyLoaded) {
     lastPacketAt = millis();
     lastSequence = sequence;
+    lastAcknowledgementType = Ack;
     lastAcknowledgementCode = result;
     sequenceStarted = true;
     sendAcknowledgement(Ack, sequence, result);
@@ -667,6 +1118,7 @@ void setup() {
     display.drawString("MEMORY / FLASH ERROR", 82, 116, 2);
     while (true) delay(1000);
   }
+  recoverInterruptedGifPromotion();
   drawNoConnection();
   lastPacketAt = millis();
 }
@@ -674,6 +1126,11 @@ void setup() {
 void loop() {
   receiveSerial();
   playGifFrameIfDue();
-  if (!fallbackVisible && millis() - lastPacketAt > kConnectionTimeoutMs) drawNoConnection();
+  if (gifPromotionPending && !gifPlaying) completePendingGifPromotion();
+  const uint32_t linkIdleMs = millis() - lastPacketAt;
+  if (!fallbackVisible
+      && linkIdleMs > kConnectionTimeoutMs) {
+    drawNoConnection();
+  }
   delay(0);
 }

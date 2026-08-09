@@ -8,7 +8,7 @@ const FRAME_BYTES = PIXEL_COUNT * 2;
 const KEYFRAME_ROWS_PER_CHUNK = 8;
 const HEADER_BYTES = 12;
 const CRC_BYTES = 4;
-const STREAM_FPS = 24;
+const STREAM_FPS = 12;
 const DELTA_COALESCE_GAP = 16;
 const GIF_CHUNK_BYTES = 12 * 1024;
 
@@ -294,6 +294,10 @@ function parseAckPayload(payload) {
     framesPlayed: payload.length >= 17 ? payload.readUInt32LE(5) : null,
     loopsCompleted: payload.length >= 17 ? payload.readUInt32LE(9) : null,
     lastFrameRenderMicros: payload.length >= 17 ? payload.readUInt32LE(13) : null,
+    // Firmware >= the address-window diagnostic build. Older devices send a
+    // 17-byte ACK and simply report null here.
+    lastFrameRuns: payload.length >= 25 ? payload.readUInt32LE(17) : null,
+    lastFramePushMicros: payload.length >= 25 ? payload.readUInt32LE(21) : null,
   };
 }
 

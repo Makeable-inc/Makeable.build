@@ -20,7 +20,7 @@
 
 [[redirects]]
   from = "/ember/download"
-  to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v1.0.12/Claude-Burner-1.0.12-arm64.dmg"
+  to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v1.3.0/Claude-Burner-1.3.0-arm64.dmg"
   status = 302
   force = true
 

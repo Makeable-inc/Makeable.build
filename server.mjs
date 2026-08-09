@@ -890,12 +890,32 @@ async function serveStatic(url, res) {
     return;
   }
 
+  if (pathname === "/ember/") {
+    res.writeHead(302, {
+      Location: `/ember${search}`,
+      "Cache-Control": "no-store",
+    });
+    res.end();
+    return;
+  }
+
   if (pathname === "/privacy/" || pathname === "/privacy") {
     return serveFile("/privacy/index.html", res);
   }
 
   if (pathname === "/terms/" || pathname === "/terms") {
     return serveFile("/terms/index.html", res);
+  }
+
+  if (pathname === "/ember") {
+    return serveFile("/ember/index.html", res);
+  }
+
+  if (pathname === "/downloads/ember-macos.dmg") {
+    return serveFile(
+      "/ESP32_CYD_Case/claude-burner-desktop/release/Claude Burner-1.0.12-arm64.dmg",
+      res,
+    );
   }
 
   const safePath =
