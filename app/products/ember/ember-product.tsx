@@ -15,17 +15,6 @@ const moods = [
   { name: "Token feast", copy: "Milestones get one gloriously dramatic celebration.", image: "/ember-explosion.gif" },
 ];
 
-const specs = [
-  ["Display", "2.4-inch, 320 × 240 color screen"],
-  ["Approx. size", "76 × 70 × 38 mm"],
-  ["Power + data", "Single USB-C connection"],
-  ["Controls", "Side button + auto brightness"],
-  ["Prototype host", "Apple Silicon Mac · macOS 13+"],
-  ["Claude Code", "Version 2.1.80 or newer"],
-  ["Enclosure", "Matte printed shell + dark bezel"],
-  ["Not included", "Camera, mic, battery, or cloud account"],
-];
-
 const included = [
   ["01", "Ember desktop companion", "Pre-assembled enclosure, display, controller, and expressive light."],
   ["02", "Pre-flashed controller", "The device software is already loaded."],
@@ -79,7 +68,7 @@ export default function EmberProduct() {
       <div className="announcement">Founding Maker Edition · Batch 01</div>
       <nav className="nav shell" aria-label="Primary navigation">
         <a href="/" className="logo-link" aria-label="Makeable home"><Logo /></a>
-        <div className="nav-links"><a href="#overview">Meet Ember</a><a href="#specs">Details</a><a href="#product-faq">FAQ</a></div>
+        <div className="nav-links"><a href="#overview">Why Ember</a><a href="#included">What’s included</a><a href="#product-faq">FAQ</a></div>
         <a className="button button-small" href="#buy">Pre-order Ember</a>
       </nav>
 
@@ -96,10 +85,10 @@ export default function EmberProduct() {
         <aside className="purchase-card" id="buy">
           <span className="scribble">Makeable build 001</span>
           <h1>Ember</h1>
-          <p className="product-tagline">Your Claude tokens, but cute.</p>
+          <p className="product-tagline">Stop babysitting your terminal.</p>
           <div className="product-price"><strong>USD 45</strong><span>Founding Maker Edition</span></div>
-          <p className="product-summary">A palm-sized USB-C companion whose charcoal-and-flame creature reacts to your Claude Code activity—without reading or uploading your prompts or code.</p>
-          <div className="product-pills"><span>Pre-assembled</span><span>Local-only</span><span>USB-C</span></div>
+          <p className="product-summary">Ember turns invisible Claude Code activity into an ambient signal you can read from across your desk—so you know when your agent is working, waiting for you, finished, or approaching a heavy token burn.</p>
+          <div className="product-pills"><span>At-a-glance status</span><span>Attention cue</span><span>Local-only</span></div>
           <ColorPicker value={selectedColor} onChange={setSelectedColor} />
           <div className="product-order-row">
             <div className="quantity" aria-label="Quantity selector"><button onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity">−</button><span>{quantity}</span><button onClick={() => setQuantity(Math.min(5, quantity + 1))} aria-label="Increase quantity">+</button></div>
@@ -112,16 +101,17 @@ export default function EmberProduct() {
 
       <section className="product-overview" id="overview">
         <div className="shell overview-layout">
-          <div className="overview-copy"><span className="scribble coral">A usage meter with a soul</span><h2>Invisible work becomes a tiny living presence.</h2><p>Ember turns Claude Code activity into glanceable moods: curious when input is needed, focused while tools run, joyful after success, and peacefully asleep when you step away.</p></div>
+          <div className="overview-copy"><span className="scribble coral">An ambient status light with a soul</span><h2>Your agent works in the background. Ember keeps you in the loop.</h2><p>Let Claude run while you write, review, plan, or step away. Ember makes the moments that matter visible without pulling you back into the terminal.</p></div>
           <div className="mood-compact">{moods.map(mood => <article key={mood.name}><img src={mood.image} alt={`${mood.name} Ember animation`} /><div><h3>{mood.name}</h3><p>{mood.copy}</p></div></article>)}</div>
+          <div className="value-grid"><article><span>01</span><h3>Stop checking the terminal</h3><p>See whether Claude is working, waiting for input, or done with a task from across the desk.</p></article><article><span>02</span><h3>Protect your focus</h3><p>Stay with your current task. Ember gives you a physical cue only when your attention is useful again.</p></article><article><span>03</span><h3>Feel token pressure sooner</h3><p>Usage intensity becomes a visible mood, helping heavy Claude Code users pace long sessions before a limit becomes a surprise.</p></article></div>
           <div className="privacy-inline"><div><strong>Private by design.</strong><span>The local helper sends only small usage and mood signals over USB.</span></div><div className="privacy-chips"><span>No prompts</span><span>No source code</span><span>No credentials</span></div></div>
         </div>
       </section>
 
-      <section className="product-details" id="specs">
-        <div className="shell details-layout">
-          <div><div className="compact-heading"><span className="scribble coral">The useful details</span><h2>Small, local, and desk-ready.</h2><p>Prototype specifications may receive small production refinements before Batch 01 ships.</p></div><div className="spec-grid compact-spec-grid">{specs.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></div>
-          <div className="inside-compact"><span className="scribble">Inside Batch 01</span><h2>Everything Ember needs.</h2><ol>{included.map(([number, title, copy]) => <li key={number}><b>{number}</b><span><strong>{title}</strong><small>{copy}</small></span></li>)}</ol></div>
+      <section className="product-included" id="included">
+        <div className="shell included-layout">
+          <div className="included-copy"><span className="scribble coral">Ready out of the box</span><h2>No parts hunt. No setup spiral.</h2><p>Batch 01 arrives prepared for one job: giving your Claude Code workflow a calm, glanceable presence on your desk.</p></div>
+          <div className="inside-compact"><span className="scribble">Inside Batch 01</span><h2>Everything you need.</h2><ol>{included.map(([number, title, copy]) => <li key={number}><b>{number}</b><span><strong>{title}</strong><small>{copy}</small></span></li>)}</ol></div>
         </div>
       </section>
 

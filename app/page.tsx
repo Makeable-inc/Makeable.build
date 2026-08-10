@@ -15,7 +15,7 @@ const flow = [
 export default function Home() {
   return (
     <main id="top">
-      <div className="announcement">Build 001 is here · Meet Ember</div>
+      <div className="announcement">Build 001 is here · Claude status at a glance</div>
       <nav className="nav shell" aria-label="Primary navigation">
         <a href="#top" className="logo-link" aria-label="Makeable home"><Logo /></a>
         <div className="nav-links"><a href="#builds">Builds</a><a href="#how">How Makeable works</a><a href="#faq">FAQ</a></div>
@@ -33,7 +33,7 @@ export default function Home() {
         <a className="hero-feature" href="/products/ember" aria-label="View Ember product details">
           <div className="tape">Build 001</div>
           <img src="/ember-hero-v3.png" alt="Three Ember desktop companions in Sage Green, Bone White, and Blush Pink" />
-          <div className="feature-caption"><div><span>Founding Maker Edition</span><strong>Ember</strong><p>Your Claude tokens, but cute.</p></div><div className="price">Explore →</div></div>
+          <div className="feature-caption"><div><span>Founding Maker Edition</span><strong>Ember</strong><p>Know when Claude needs you.</p></div><div className="price">Explore →</div></div>
         </a>
       </section>
 
@@ -43,7 +43,7 @@ export default function Home() {
           <div className="build-grid compact-build-grid">
             <article className="build-card featured-card">
               <a className="card-media" href="/products/ember"><img src="/ember-hero-v3.png" alt="Three Ember desktop companions" /><span className="status live">Pre-order open</span></a>
-              <div className="card-body"><span className="difficulty">Beginner · 5-minute setup</span><h3>Ember</h3><p>A cheerful desktop companion that gives your Claude usage a face.</p><div className="card-meta"><span>Pre-assembled</span><strong>USD 45</strong></div><a className="button button-primary card-button" href="/products/ember">View Ember →</a></div>
+              <div className="card-body"><span className="difficulty">For Claude Code workflows</span><h3>Ember</h3><p>An ambient companion that shows when your agent is working, waiting, finished, or burning through tokens—without another dashboard.</p><div className="card-meta"><span>Pre-assembled</span><strong>USD 45</strong></div><a className="button button-primary card-button" href="/products/ember">See why Ember →</a></div>
             </article>
             {upcoming.map(project => <article className="build-card upcoming-card" key={project.name}><div className={`coming-art ${project.tone}`}><span>{project.glyph}</span><b className="status soon">Coming soon</b></div><div className="card-body"><span className="difficulty">In the workshop</span><h3>{project.name}</h3><p>{project.note}</p></div></article>)}
           </div>
