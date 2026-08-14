@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.URL || "http://localhost:3000"),
   title: "A Moment in Motion",
   description: "A cinematic, scroll-controlled product story.",
   openGraph: {

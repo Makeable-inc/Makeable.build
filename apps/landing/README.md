@@ -1,8 +1,8 @@
 # Makeable Ember landing page
 
 This package contains the scroll-controlled Ember product story used by the
-public Makeable landing page. It is isolated from the repository's existing
-application so Netlify can build and deploy only this site.
+public Makeable landing page. It exports a static frontend which the
+repository-level Netlify build combines with Makeable's existing pages.
 
 ## Run locally
 
@@ -15,14 +15,13 @@ Node.js 24 is required.
 
 ## Deploy on Netlify
 
-Connect the repository and select `codex/landing` as the deploy branch. Set
-the Netlify base directory to `apps/landing`. Netlify will then use this
-package's `netlify.toml`, install only the landing dependencies, and deploy the
-Next.js output without building the existing root application.
+Connect the repository and deploy `main` from the repository root. The root
+`netlify.toml` builds this package, combines it with the legacy public routes,
+and deploys the existing Netlify functions.
 
-- Base directory: `apps/landing`
-- Build command: `npm run build`
-- Publish directory: `.next`
+- Base directory: leave blank (repository root)
+- Build command: supplied by `netlify.toml`
+- Publish directory: `dist`
 
 ## Production checkout
 

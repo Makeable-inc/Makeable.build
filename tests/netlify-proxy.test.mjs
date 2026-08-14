@@ -125,6 +125,49 @@ test("landing acquisition routes are reserved locally instead of reaching the AW
   assert.equal(fetchCalls, 0);
 });
 
+test("Ember checkout is handled locally and creates a Stripe Checkout session", async (t) => {
+  installEnvironment(t, { STRIPE_SECRET_KEY: "sk_test_local" });
+  let stripeRequest;
+  globalThis.fetch = async (url, options) => {
+    stripeRequest = { url: String(url), options };
+    return Response.json({ url: "https://checkout.stripe.test/session" });
+  };
+
+  const response = await handler(
+    new Request(`${productionOrigin}/api/checkout`, { method: "POST" }),
+  );
+  const result = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(result, { url: "https://checkout.stripe.test/session" });
+  assert.equal(stripeRequest.url, "https://api.stripe.com/v1/checkout/sessions");
+  assert.equal(stripeRequest.options.headers.Authorization, "Bearer sk_test_local");
+  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4500");
+  assert.equal(stripeRequest.options.body.get("success_url"), `${productionOrigin}/?checkout=success`);
+});
+
+test("Ember checkout fails closed when Stripe is unavailable or the method is unsupported", async (t) => {
+  installEnvironment(t, { STRIPE_SECRET_KEY: "" });
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Stripe should not be called");
+  };
+
+  const unavailable = await handler(
+    new Request(`${productionOrigin}/api/checkout`, { method: "POST" }),
+  );
+  const unsupported = await handler(
+    new Request(`${productionOrigin}/api/checkout`, { method: "GET" }),
+  );
+
+  assert.equal(unavailable.status, 503);
+  assert.deepEqual(await unavailable.json(), { error: "Pre-orders are opening soon." });
+  assert.equal(unsupported.status, 405);
+  assert.equal(unsupported.headers.get("Allow"), "POST");
+  assert.equal(fetchCalls, 0);
+});
+
 test("waitlist browser confirmation routes are private, resettable, and never proxied", async (t) => {
   installEnvironment(t);
   let fetchCalls = 0;

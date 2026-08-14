@@ -41,6 +41,10 @@ export default async function handler(req, context = {}) {
       return jsonResponse(await resolvedPublicConfig(env));
     }
 
+    if (localApiPath === "/api/checkout") {
+      return await createEmberCheckout(req, env);
+    }
+
     if (localApiPath === "/api/dashboard/session") {
       return await dashboardSession(req, env);
     }
@@ -129,6 +133,7 @@ function getEnv() {
     "WAITLIST_WEBHOOK_SECRET",
     "DASHBOARD_ACCESS_KEY",
     "DASHBOARD_SESSION_SECRET",
+    "STRIPE_SECRET_KEY",
   ];
   return Object.fromEntries(keys.map((key) => [key, envValue(key)]));
 }
@@ -141,6 +146,53 @@ function normalizedLocalApiPath(pathname) {
   let normalized = pathname.replace(/\/+$/, "");
   if (normalized.endsWith(".html")) normalized = normalized.slice(0, -5);
   return normalized;
+}
+
+async function createEmberCheckout(req, env) {
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "POST",
+      "Cache-Control": "no-store",
+    });
+  }
+  if (!env.STRIPE_SECRET_KEY) {
+    return jsonResponse({ error: "Pre-orders are opening soon." }, 503, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const origin = new URL(req.url).origin;
+  const body = new URLSearchParams({
+    mode: "payment",
+    "line_items[0][price_data][currency]": "usd",
+    "line_items[0][price_data][unit_amount]": "4500",
+    "line_items[0][price_data][product_data][name]": "Makeable Ember — Build 001",
+    "line_items[0][price_data][product_data][description]":
+      "Snap-fit desk pet kit with USB-C power and a living display.",
+    "line_items[0][quantity]": "1",
+    success_url: `${origin}/?checkout=success`,
+    cancel_url: `${origin}/?checkout=cancelled`,
+    integration_identifier: "makeable_ember_qtmsvkwp",
+  });
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Stripe-Version": "2026-06-24.dahlia",
+    },
+    body,
+  });
+  const checkout = await response.json();
+
+  if (!response.ok || !checkout?.url) {
+    return jsonResponse(
+      { error: checkout?.error?.message || "Unable to create checkout." },
+      502,
+      { "Cache-Control": "no-store" },
+    );
+  }
+  return jsonResponse({ url: checkout.url }, 200, { "Cache-Control": "no-store" });
 }
 
 async function dashboardSession(req, env) {

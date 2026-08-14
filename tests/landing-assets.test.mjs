@@ -1,58 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const dist = path.join(root, "dist");
 
-test("the public landing bundle contains every referenced local asset", async () => {
-  await import(`../scripts/build-static.mjs?landing-test=${Date.now()}`);
-  const landingHtml = await readFile(path.join(root, "dist", "index.html"), "utf8");
-  const landingCss = await readFile(
-    path.join(root, "dist", "styles", "landing-v2.css"),
-    "utf8",
-  );
+test("the deployed homepage is the Moment in Motion experience", async () => {
+  const html = await readFile(path.join(dist, "index.html"), "utf8");
+  assert.match(html, /A Moment in Motion/);
+  assert.match(html, /_next\/static/);
+  await access(path.join(dist, "build-catalogue-page.png"));
+  await access(path.join(dist, "makeable-logo.png"));
+});
 
-  const htmlReferences = [...landingHtml.matchAll(/(?:src|href)="(\/(?:assets|styles)\/[^"?#]+)[^\"]*"/g)]
-    .map((match) => match[1]);
-  const cssReferences = [...landingCss.matchAll(/url\("\.\.\/(assets\/[^"?#]+)[^\"]*"\)/g)]
-    .map((match) => `/${match[1]}`);
-  const dynamicReferences = ["/assets/icons/lucide/check.svg"];
-  const references = [...new Set([...htmlReferences, ...cssReferences, ...dynamicReferences])];
+test("both optimized animation sequences are included in the deployment", async () => {
+  const desktopFrames = await readdir(path.join(dist, "frames-v2"));
+  const mobileFrames = await readdir(path.join(dist, "frames-mobile"));
+  assert.equal(desktopFrames.filter((name) => name.endsWith(".webp")).length, 301);
+  assert.equal(mobileFrames.filter((name) => name.endsWith(".webp")).length, 300);
+  await access(path.join(dist, "frames-v2", "frame_301.webp"));
+  await access(path.join(dist, "frames-mobile", "frame_300.webp"));
+});
 
-  assert.ok(references.length >= 10);
-  for (const reference of references) {
-    await access(path.join(root, "dist", reference));
+test("all existing public pages remain in the combined deployment", async () => {
+  for (const routeFile of [
+    "privacy/index.html",
+    "terms/index.html",
+    "ember/index.html",
+    "dashboard/index.html",
+    "pilot-app.html",
+  ]) {
+    await access(path.join(dist, routeFile));
   }
-});
-
-test("the landing bundle does not expose the pilot or builder source entrypoints", async () => {
-  const landingScript = await readFile(path.join(root, "landing.js"), "utf8");
-  assert.doesNotMatch(landingScript, /makeable\.pilot|\/build\/new|intent:\s*["']pilot/);
-  await assert.rejects(access(path.join(root, "dist", "app.js")));
-  await assert.rejects(access(path.join(root, "dist", "styles.css")));
-});
-
-test("Google signup uses the SDK-rendered button flow", async () => {
-  const landingScript = await readFile(path.join(root, "landing.js"), "utf8");
-  const landingHtml = await readFile(path.join(root, "index.html"), "utf8");
-  assert.match(landingScript, /accounts\.id\.renderButton\(/);
-  assert.doesNotMatch(landingScript, /accounts\.id\.prompt\(/);
-  assert.match(landingScript, /GOOGLE_SUBMISSION_ATTEMPTS = 3/);
-  assert.match(landingScript, /googleSubmissionInFlight/);
-  assert.match(landingScript, /new AbortController\(\)/);
-  assert.match(landingScript, /fetch\("\/api\/waitlist\/status"/);
-  assert.match(
-    landingScript,
-    /if \(config\.googleClientId && googleSlot\) void initializeWaitlistExperience\(\)/,
-  );
-  assert.match(landingScript, /cache: "no-store"/);
-  assert.match(landingScript, /You’re already on the waitlist!/);
-  assert.match(landingScript, /content\.dataset\.waitlistState = waitlistState/);
-  assert.match(landingScript, /googleSlot\.dataset\.waitlistState = waitlistState/);
-  assert.match(landingScript, /document\.createElement\(confirmed \? "div" : "button"\)/);
-  assert.doesNotMatch(landingScript, /localStorage|sessionStorage|document\.cookie/);
-  assert.match(landingHtml, /verified email to Makeable’s early-access/);
-  assert.match(landingHtml, /How we use your data/);
 });

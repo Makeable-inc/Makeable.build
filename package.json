@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "build": "node --check app.js && node --check pilot/app.js && node --check landing.js && node --check dashboard/app.js && node --check lib/acquisition.mjs && node --check lib/dashboard-auth.mjs && node --check lib/waitlist-report.mjs && node --check lib/waitlist-storage.mjs && node --check lib/waitlist-session.mjs && node --check scripts/waitlist-admin.mjs && node --check server.mjs && node --check netlify/functions/api.mjs && node --test tests/board-profiles.test.mjs tests/server-import.test.mjs",
+    "build": "npm --prefix apps/landing ci && npm --prefix apps/landing run build && node --check app.js && node --check pilot/app.js && node --check dashboard/app.js && node --check lib/acquisition.mjs && node --check lib/dashboard-auth.mjs && node --check lib/waitlist-report.mjs && node --check lib/waitlist-storage.mjs && node --check lib/waitlist-session.mjs && node --check scripts/waitlist-admin.mjs && node --check server.mjs && node --check netlify/functions/api.mjs && node --test tests/board-profiles.test.mjs tests/server-import.test.mjs && node scripts/build-static.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "test:compiler": "MAKEABLE_TEST_ARDUINO_CLI=$PWD/.makeable/toolchain/bin/arduino-cli node --test tests/compiler.integration.test.mjs",
     "toolchain:install": "bash scripts/install-arduino-toolchain.sh",

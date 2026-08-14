@@ -31,19 +31,17 @@ test("the production landing and pilot stay packaged as self-contained experienc
   }
 
   const landingHtml = await readFile(path.join(root, "dist", "index.html"), "utf8");
-  assert.match(landingHtml, /Build the/);
-  assert.match(landingHtml, /thing in/);
-  assert.match(landingHtml, /your head\./);
-  assert.match(landingHtml, /Makeable is an AI hardware prototyping studio/);
-  assert.match(landingHtml, /<link rel="canonical" href="https:\/\/makeable\.build\/" \/>/);
-  assert.match(landingHtml, /<script type="module" src="\/landing\.js"><\/script>/);
+  assert.match(landingHtml, /A Moment in Motion/);
+  assert.match(landingHtml, /Scroll to explore Ember/);
+  assert.match(landingHtml, /Browse more builds/);
+  assert.match(landingHtml, /_next\/static/);
   for (const relativePath of [
-    "landing.js",
-    "styles/landing-v2.css",
     "styles/legal.css",
     "assets/fonts/fredoka/fredoka.woff2",
     "assets/icons/google-g.svg",
     "assets/landing/desk-parts.jpeg",
+    "frames-v2/frame_301.webp",
+    "frames-mobile/frame_300.webp",
     "robots.txt",
     "sitemap.xml",
     "privacy/index.html",
@@ -66,8 +64,6 @@ test("the production landing and pilot stay packaged as self-contained experienc
   assert.match(privacyHtml, /mohammedkhambhati2020@gmail\.com/);
   assert.match(termsHtml, /Early access, not a finished product/);
   assert.match(termsHtml, /acceptable-use rules/);
-  assert.match(landingHtml, /href="\/privacy\/"/);
-  assert.match(landingHtml, /href="\/terms\/"/);
 
   await assert.rejects(access(path.join(root, "dist", "app.js")));
   await assert.rejects(access(path.join(root, "dist", "styles.css")));

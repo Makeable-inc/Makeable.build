@@ -1,7 +1,10 @@
 [build]
   publish = "dist"
   functions = "netlify/functions"
-  command = "node --check app.js && node --check landing.js && node --check dashboard/app.js && node --check lib/acquisition.mjs && node --check lib/dashboard-auth.mjs && node --check lib/waitlist-report.mjs && node --check lib/waitlist-storage.mjs && node --check lib/waitlist-session.mjs && node --check scripts/waitlist-admin.mjs && node --check server.mjs && node --check netlify/functions/api.mjs && node --test tests/server-import.test.mjs && node scripts/build-static.mjs"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "24"
 
 [functions]
   node_bundler = "esbuild"
@@ -50,3 +53,18 @@
   for = "/assets/ember/*"
   [headers.values]
     Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/frames-v2/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/frames-mobile/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
