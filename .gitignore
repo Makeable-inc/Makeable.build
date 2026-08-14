@@ -3,6 +3,13 @@
 config.local.js
 .DS_Store
 node_modules/
+/.next/
+/.vinext/
+/.wrangler/
+/out/
+/outputs/
+/work/
+tsconfig.tsbuildinfo
 tmp/
 .circuitcodex/
 .makeable/
