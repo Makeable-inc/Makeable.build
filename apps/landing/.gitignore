@@ -3,11 +3,15 @@
 config.local.js
 .DS_Store
 node_modules/
+/.next/
+/out/
+/outputs/
+/work/
+tsconfig.tsbuildinfo
 tmp/
 .circuitcodex/
 .makeable/
 .netlify/
-dist/
 data/
 .claude/
 __pycache__/
