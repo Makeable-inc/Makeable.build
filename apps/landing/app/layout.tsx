@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.URL || "http://localhost:3000"),
-  title: "A Moment in Motion",
+  title: "Makeable",
   description: "A cinematic, scroll-controlled product story.",
   openGraph: {
     title: "Some Things Deserve a Moment",
