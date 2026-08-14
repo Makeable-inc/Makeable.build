@@ -1,17 +1,38 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import Lenis from "lenis";
 import gsap from "gsap";
+
+type EmberColor = "sage" | "bone" | "blush";
+
+const emberColors: Array<{ id: EmberColor; label: string }> = [
+  { id: "sage", label: "Sage" },
+  { id: "bone", label: "Bone" },
+  { id: "blush", label: "Blush" },
+];
+
+const workbenchStories = [
+  { id: "desk", tone: "cobalt", caption: "A tiny companion for the daily desk.", review: "It keeps my workday moving.", author: "Sam · Product designer" },
+  { id: "build", tone: "clay", caption: "A first build, assembled one piece at a time.", review: "The build felt playful, not intimidating.", author: "Jamie · First-time maker" },
+  { id: "night", tone: "midnight", caption: "Ember settling into a late-night setup.", review: "It gives my desk a little personality.", author: "Mina · Developer" },
+  { id: "studio", tone: "sage", caption: "A new home beside the studio plants.", review: "I made it myself, so it actually feels like mine.", author: "Theo · Creative technologist" },
+  { id: "weekend", tone: "blush", caption: "A weekend build ready to come alive.", review: "The perfect small project for a slow Saturday.", author: "Ari · Weekend builder" },
+];
 
 export default function Home() {
   const storyRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const catalogueRef = useRef<HTMLElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
-  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const [activeScene, setActiveScene] = useState(0);
+  const [flippedStories, setFlippedStories] = useState<string[]>([]);
+  const [selectedColor, setSelectedColor] = useState<EmberColor>("bone");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [buildEmail, setBuildEmail] = useState("");
+  const [buildNotice, setBuildNotice] = useState("");
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -45,6 +66,11 @@ export default function Home() {
     let transitioning = false;
     let touchStartY = 0;
     const keyframes = [0, 72, 156, 282];
+
+    const atSceneBoundary = (direction: number) => (
+      (direction > 0 && currentScene === keyframes.length - 1)
+      || (direction < 0 && currentScene === 0)
+    );
 
     const activateScene = (nextScene: number) => {
       if (transitioning || nextScene === currentScene || nextScene < 0 || nextScene >= keyframes.length) return;
@@ -163,26 +189,34 @@ export default function Home() {
     for (let worker = 0; worker < 8; worker++) void loadNext();
 
     const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) < 6) return;
+      const direction = Math.sign(event.deltaY);
+      if (!transitioning && atSceneBoundary(direction)) return;
       event.preventDefault();
       event.stopPropagation();
-      if (Math.abs(event.deltaY) < 6) return;
-      activateScene(currentScene + Math.sign(event.deltaY));
+      activateScene(currentScene + direction);
     };
     const onTouchStart = (event: TouchEvent) => {
       touchStartY = event.touches[0]?.clientY ?? 0;
     };
     const onTouchMove = (event: TouchEvent) => {
+      const currentY = event.touches[0]?.clientY ?? touchStartY;
+      const direction = Math.sign(touchStartY - currentY);
+      if (!transitioning && atSceneBoundary(direction)) return;
       event.preventDefault();
       event.stopPropagation();
     };
     const onTouchEnd = (event: TouchEvent) => {
       const endY = event.changedTouches[0]?.clientY ?? touchStartY;
       const distance = touchStartY - endY;
-      if (Math.abs(distance) >= 28) activateScene(currentScene + Math.sign(distance));
+      const direction = Math.sign(distance);
+      if (Math.abs(distance) < 28 || (!transitioning && atSceneBoundary(direction))) return;
+      activateScene(currentScene + direction);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       const direction = ["ArrowDown", "PageDown", " "].includes(event.key) ? 1 : ["ArrowUp", "PageUp"].includes(event.key) ? -1 : 0;
       if (!direction) return;
+      if (!transitioning && atSceneBoundary(direction)) return;
       event.preventDefault();
       activateScene(currentScene + direction);
     };
@@ -211,9 +245,20 @@ export default function Home() {
     setCheckoutBusy(true);
     setCheckoutError("");
     try {
-      const response = await fetch("/api/checkout", { method: "POST" });
-      const result = await response.json() as { url?: string; error?: string };
-      if (!response.ok || !result.url) throw new Error(result.error || "Checkout is unavailable right now.");
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color: selectedColor }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const result = contentType.includes("application/json")
+        ? await response.json() as { url?: string; error?: string }
+        : {};
+      if (!response.ok || !result.url) {
+        throw new Error(result.error || (response.status === 404
+          ? "Checkout is available on the deployed site."
+          : "Checkout is unavailable right now."));
+      }
       window.location.assign(result.url);
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : "Checkout is unavailable right now.");
@@ -221,9 +266,31 @@ export default function Home() {
     }
   };
 
+  const showOtherBuilds = () => {
+    catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const moveCarousel = (direction: number) => {
+    const rail = carouselRef.current;
+    if (!rail) return;
+    rail.scrollBy({ left: direction * Math.min(rail.clientWidth * 0.82, 720), behavior: "smooth" });
+  };
+
+  const toggleStory = (storyId: string) => {
+    setFlippedStories((current) => current.includes(storyId)
+      ? current.filter((id) => id !== storyId)
+      : [...current, storyId]);
+  };
+
+  const handleBuildInterest = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBuildEmail("");
+    setBuildNotice("Email updates are opening soon — preview the builder in the meantime.");
+  };
+
   return (
     <main>
-      <section className={`scroll-story ${catalogueOpen ? "is-leaving" : ""}`} id="experience" ref={storyRef}>
+      <section className="scroll-story" id="experience" ref={storyRef}>
         <div className="experience">
           <div className="film-frame">
             <canvas ref={canvasRef} aria-label="Product reveal controlled by scrolling" />
@@ -236,21 +303,43 @@ export default function Home() {
           </div>
           <div className={`product-ui ${activeScene === 3 ? "is-visible" : ""}`} aria-hidden={activeScene !== 3}>
             <img className="makeable-logo" src="/makeable-logo.png" alt="Makeable" />
-            <button className="browse-builds" type="button" onClick={() => setCatalogueOpen(true)}>Browse more builds <span>↗</span></button>
             <aside className="ember-card" aria-label="Ember preorder details">
-              <small>Build 001 · Pre-order</small>
-              <h1>Ember</h1>
+              <small>Build 001</small>
+              <div className="ember-title-row">
+                <h1 aria-label="Feed Ember Tokens."><span>Feed</span><span>Ember</span><span>Tokens.</span></h1>
+                <span className="ember-star" aria-hidden="true">✦</span>
+              </div>
               <p>A desk pet that grows with every Claude and Codex token you burn.</p>
-              <div className="ember-features"><span>Snap-fit kit</span><span>USB-C powered</span><span>Living display</span></div>
-              <button type="button" onClick={startCheckout} disabled={checkoutBusy}>{checkoutBusy ? "Opening checkout…" : "Pre-order · $45"}</button>
+              <fieldset className="color-picker">
+                <legend>Choose a color</legend>
+                <div className="color-options">
+                  {emberColors.map((color) => (
+                    <button
+                      className={`color-option color-${color.id}`}
+                      type="button"
+                      key={color.id}
+                      aria-pressed={selectedColor === color.id}
+                      onClick={() => setSelectedColor(color.id)}
+                    >
+                      <span aria-hidden="true" />
+                      {color.label}
+                      {selectedColor === color.id && <b aria-hidden="true">✓</b>}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <strong className="ember-price">$45</strong>
+              <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
+                {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
+              </button>
+              <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
               {checkoutError && <p className="checkout-error" role="status">{checkoutError}</p>}
             </aside>
           </div>
         </div>
       </section>
 
-      <section className={`catalogue ${catalogueOpen ? "is-open" : ""}`} aria-hidden={!catalogueOpen}>
-        <button className="catalogue-back" type="button" onClick={() => setCatalogueOpen(false)} aria-label="Return to the Ember story">← Back</button>
+      <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
           <img className="catalogue-sheet" src="/build-catalogue-page.png" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
           <button
@@ -265,6 +354,118 @@ export default function Home() {
           {checkoutError && <p className="catalogue-checkout-error" role="status">{checkoutError}</p>}
         </div>
       </section>
+
+      <section className="workbench" aria-labelledby="workbench-title">
+        <header className="workbench-header">
+          <div>
+            <span>Community stories</span>
+            <h2 id="workbench-title">From the workbench.</h2>
+          </div>
+          <nav aria-label="Move through workbench stories">
+            <button type="button" onClick={() => moveCarousel(-1)} aria-label="Previous stories">←</button>
+            <button type="button" onClick={() => moveCarousel(1)} aria-label="Next stories">→</button>
+          </nav>
+        </header>
+
+        <div className="workbench-rail" ref={carouselRef}>
+          <article className="workbench-intro">
+            <span aria-hidden="true">✦</span>
+            <h3>From the<br />workbench.</h3>
+            <p>Builds in the wild.</p>
+            <small>New desk stories, always rolling →</small>
+          </article>
+
+          {workbenchStories.map((story, index) => {
+            const isFlipped = flippedStories.includes(story.id);
+            return (
+              <button
+                className={`story-card story-${story.tone} ${isFlipped ? "is-flipped" : ""}`}
+                type="button"
+                key={story.id}
+                aria-pressed={isFlipped}
+                aria-label={isFlipped ? `Show photo placeholder: ${story.caption}` : `Read review: ${story.caption}`}
+                onClick={() => toggleStory(story.id)}
+              >
+                <span className="story-card-inner">
+                  <span className="story-face story-front">
+                    <span className="placeholder-scene" aria-hidden="true">
+                      <i className="placeholder-glow" />
+                      <i className="placeholder-ember"><b /></i>
+                    </span>
+                    <span className="story-caption"><b>Photo placeholder {String(index + 1).padStart(2, "0")}</b>{story.caption}</span>
+                    <small>Click to read the story ↗</small>
+                  </span>
+                  <span className="story-face story-back">
+                    <b className="quote-mark" aria-hidden="true">“</b>
+                    <strong>{story.review}</strong>
+                    <small>{story.author}</small>
+                    <em>Click to return ↙</em>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="workbench-rule" aria-hidden="true"><span /><i /></div>
+      </section>
+
+      <section className="make-build-feature" id="make-a-build" aria-labelledby="make-build-title">
+        <div className="make-build-copy">
+          <span>Feature 02 · Coming soon</span>
+          <h2 id="make-build-title">Make your<br />own build.<sup>✦</sup></h2>
+          <p>Start with an idea, shape the plan, and turn it into a build worth sharing.</p>
+          <form className="build-interest" onSubmit={handleBuildInterest}>
+            <label htmlFor="build-email">Enter your email for Make a Build updates</label>
+            <div>
+              <input
+                id="build-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="Enter your email"
+                value={buildEmail}
+                onChange={(event) => setBuildEmail(event.target.value)}
+                required
+              />
+              <button type="submit" aria-label="Join the Make a Build updates list">→</button>
+            </div>
+          </form>
+          {buildNotice && <p className="build-notice" role="status">{buildNotice}</p>}
+          <a className="preview-build-button" href="/pilot">Preview Make a Build <span aria-hidden="true">✦</span></a>
+        </div>
+        <div className="make-build-visual">
+          <img
+            src="/make-your-own-build-cutout.png"
+            alt="Three-step Makeable blueprint: start with your idea, get a plan, then realize and share the finished build"
+          />
+        </div>
+      </section>
+
+      <footer className="site-footer">
+        <div className="footer-main">
+          <div className="footer-brand">
+            <div className="footer-logo-crop"><img src="/makeable-logo.png" alt="Makeable" /></div>
+            <strong>Anything is makeable.</strong>
+          </div>
+          <nav className="footer-links" aria-label="Footer navigation">
+            <a href="#builds">Builds</a>
+            <a href="#experience">Parts Kits and</a>
+            <a href="#make-a-build">Make a Build</a>
+            <a href="#experience">Pre-order Status</a>
+          </nav>
+          <div className="footer-socials" aria-label="Makeable social channels">
+            <span className="footer-social"><img src="/social-tiktok.svg" alt="" aria-hidden="true" /><span>TikTok</span></span>
+            <span className="footer-social"><img src="/social-youtube.svg" alt="" aria-hidden="true" /><span>YouTube</span></span>
+            <span className="footer-social"><img src="/social-facebook.svg" alt="" aria-hidden="true" /><span>Facebook</span></span>
+            <span className="footer-social"><img src="/social-linkedin.svg" alt="" aria-hidden="true" /><span>LinkedIn</span></span>
+            <span className="footer-social"><img src="/social-instagram.svg" alt="" aria-hidden="true" /><span>Instagram</span></span>
+            <span className="footer-social"><img src="/social-x.svg" alt="" aria-hidden="true" /><span>X</span></span>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© Makeable 2025</span>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -162,14 +162,24 @@ async function createEmberCheckout(req, env) {
   }
 
   const origin = new URL(req.url).origin;
+  const allowedColors = new Set(["sage", "bone", "blush"]);
+  let selectedColor = "bone";
+  try {
+    const requestBody = await req.json();
+    if (allowedColors.has(requestBody?.color)) selectedColor = requestBody.color;
+  } catch {
+    // Preserve the default color for requests without a JSON body.
+  }
+  const colorLabel = selectedColor[0].toUpperCase() + selectedColor.slice(1);
   const body = new URLSearchParams({
     mode: "payment",
     "line_items[0][price_data][currency]": "usd",
     "line_items[0][price_data][unit_amount]": "4500",
-    "line_items[0][price_data][product_data][name]": "Makeable Ember — Build 001",
+    "line_items[0][price_data][product_data][name]": `Makeable Ember — ${colorLabel} — Build 001`,
     "line_items[0][price_data][product_data][description]":
       "Snap-fit desk pet kit with USB-C power and a living display.",
     "line_items[0][quantity]": "1",
+    "metadata[ember_color]": selectedColor,
     success_url: `${origin}/?checkout=success`,
     cancel_url: `${origin}/?checkout=cancelled`,
     integration_identifier: "makeable_ember_qtmsvkwp",
