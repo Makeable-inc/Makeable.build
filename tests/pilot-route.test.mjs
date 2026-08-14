@@ -31,7 +31,7 @@ test("the production landing and pilot stay packaged as self-contained experienc
   }
 
   const landingHtml = await readFile(path.join(root, "dist", "index.html"), "utf8");
-  assert.match(landingHtml, /A Moment in Motion/);
+  assert.match(landingHtml, /<title>Makeable<\/title>/);
   assert.match(landingHtml, /Scroll to explore Ember/);
   assert.match(landingHtml, /Show me other builds\./);
   assert.match(landingHtml, /From the workbench\./i);
