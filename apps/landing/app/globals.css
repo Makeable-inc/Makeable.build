@@ -10,8 +10,9 @@
 
 :root { --paper: #eee5d8; --ink: #10264b; --red: #d93652; --display: "Fredoka", "Arial Rounded MT Bold", ui-rounded, system-ui, sans-serif; }
 * { box-sizing: border-box; }
-html { scroll-behavior: auto; background: var(--paper); }
-body { margin: 0; background: var(--paper); color: var(--ink); font-family: Arial, Helvetica, sans-serif; overflow-x: hidden; }
+html { width: 100%; max-width: 100%; overflow-x: clip; scroll-behavior: auto; background: var(--paper); }
+body, main { width: 100%; max-width: 100%; overflow-x: clip; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
 .scroll-story { position: relative; height: 400svh; background: #07162e; }
 .experience { position: sticky; top: 0; height: 100svh; background: #07162e; color: white; overflow: hidden; }
 .film-frame { position: absolute; inset: clamp(.75rem, 2vw, 1.6rem); overflow: hidden; background: #d9cec0; }
@@ -49,7 +50,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .product-ui { position: absolute; z-index: 7; inset: clamp(.75rem, 2vw, 1.6rem); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .45s ease, visibility .45s; }
 .product-ui.is-visible { opacity: 1; visibility: visible; pointer-events: auto; }
 .makeable-logo { position: absolute; left: clamp(1rem, 3vw, 2.5rem); top: clamp(1rem, 3vw, 2.5rem); width: clamp(9.5rem, 15vw, 15rem); height: auto; object-fit: contain; filter: drop-shadow(0 1px 12px rgba(255,248,238,.72)); }
-.ember-card { position: absolute; right: clamp(1rem, 4.5vw, 5rem); top: 50%; width: clamp(20rem, 31vw, 28rem); max-height: calc(100svh - clamp(4rem, 10vh, 7rem)); padding: clamp(1rem, 1.6vw, 1.55rem); transform: translateY(-50%); overflow-y: auto; border: 0; background: transparent; color: #0b1117; text-shadow: 0 1px 12px rgba(246,238,227,.28); scrollbar-width: thin; container-type: inline-size; }
+.ember-card { position: absolute; right: clamp(1rem, 4.5vw, 5rem); top: 50%; width: clamp(20rem, 31vw, 28rem); padding: clamp(1rem, 1.6vw, 1.55rem); transform: translateY(-50%); overflow: visible; border: 0; background: transparent; color: #0b1117; text-shadow: 0 1px 12px rgba(246,238,227,.28); container-type: inline-size; }
 .ember-card small { color: #df1749; font: 900 clamp(.62rem, .82vw, .78rem)/1 monospace; letter-spacing: .06em; text-transform: uppercase; }
 .ember-title-row { display: flex; align-items: center; gap: clamp(.7rem, 1.2vw, 1.15rem); margin: .55rem 0 .65rem; }
 .ember-card h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: clamp(2.55rem, 4.1vw, 4.8rem); line-height: .9; letter-spacing: -.02em; text-transform: uppercase; }
@@ -68,15 +69,15 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .color-sage > span { background: #a9c5ad; }
 .color-bone > span { background: #e8dfd1; box-shadow: inset 0 0 0 3px rgba(11,17,23,.08); }
 .color-blush > span { background: #e7a6ad; }
-.ember-price-row { display: flex; width: 100%; flex-wrap: nowrap; align-items: center; gap: 1.05cqw; margin: clamp(.85rem, 1.3vw, 1.2rem) 0 .4rem; overflow: visible; white-space: nowrap; }
+.ember-price-row { display: flex; width: 100%; max-width: 100%; min-width: 0; flex-wrap: nowrap; align-items: center; gap: .72cqw; margin: clamp(.85rem, 1.3vw, 1.2rem) 0 .4rem; overflow: visible; white-space: nowrap; }
 .ember-price-row > * { flex: 0 0 auto; }
-.ember-price { display: inline-block; font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-size: 6.4cqw; line-height: 1; letter-spacing: -.01em; white-space: nowrap; }
+.ember-price { display: inline-block; font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-size: clamp(1.55rem, 5.7cqw, 2rem); line-height: 1; letter-spacing: -.01em; white-space: nowrap; }
 .ember-price sup { margin-right: .05em; font-size: .55em; font-weight: 700; vertical-align: .35em; }
-.ember-price-was { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 3.9cqw; line-height: 1; color: rgba(11, 17, 23, .8); opacity: 1; text-decoration-line: line-through; text-decoration-color: #b5402e; text-decoration-thickness: 2px; white-space: nowrap; }
+.ember-price-was { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: clamp(.82rem, 3.25cqw, 1.05rem); line-height: 1; color: rgba(11, 17, 23, .8); opacity: 1; text-decoration-line: line-through; text-decoration-color: #b5402e; text-decoration-thickness: 2px; white-space: nowrap; }
 .ember-price-was sup { margin-right: .02em; font-size: .85em; font-weight: 400; vertical-align: 0; }
-.price-arrow { color: #0b1117; font-size: 2.6cqw; }
-.discount-tag { align-self: center; padding: .5em .78em; border-radius: .48em; background: #cf6138; color: #fff; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: 2.75cqw; font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .035em; text-transform: uppercase; white-space: nowrap; box-shadow: none; text-shadow: none; }
-.stock-note { display: inline-flex; align-items: center; gap: .34em; color: #bd5038; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: 3.45cqw; font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .035em; text-transform: uppercase; white-space: nowrap; text-shadow: none; }
+.price-arrow { color: #0b1117; font-size: clamp(.62rem, 2.15cqw, .8rem); }
+.discount-tag { align-self: center; padding: .48em .66em; border-radius: .48em; background: #cf6138; color: #fff; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: clamp(.54rem, 2.22cqw, .7rem); font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap; box-shadow: none; text-shadow: none; }
+.stock-note { display: inline-flex; min-width: 0; align-items: center; gap: .26em; color: #bd5038; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: clamp(.56rem, 2.5cqw, .76rem); font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; text-shadow: none; }
 .stock-flame { display: inline-block; font-size: 1.18em; line-height: .8; transform: translateY(-.03em); }
 .ember-card button { width: 100%; cursor: pointer; text-transform: uppercase; letter-spacing: .045em; }
 .preorder-button { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: clamp(.85rem, 1.25vw, 1.05rem); border: 0; border-radius: .38rem; background: #df1749; color: #fff; font-size: clamp(.75rem, 1vw, 1rem); font-weight: 900; }
