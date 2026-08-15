@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
+import { Fredoka } from "next/font/google";
 import "./globals.css";
+
+// Makeable brand display face — matches the wordmark and --display in the main site styles.css
+const fredoka = Fredoka({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.URL || "http://localhost:3000"),
@@ -29,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={fredoka.variable}>
       <body>{children}</body>
     </html>
   );

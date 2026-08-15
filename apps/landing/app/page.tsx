@@ -3,6 +3,18 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import Lenis from "lenis";
 import gsap from "gsap";
+import BuildBlueprint from "./BuildBlueprint";
+
+// The Makeable star: eight-pointed and hand-drawn, traced from the wordmark, so the
+// uneven point lengths are deliberate. Never swap in a symmetrical asterisk.
+// Pink on light backgrounds, white on a coloured fill — it inherits from its parent.
+function BrandStar() {
+  return (
+    <svg className="brand-star" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">
+      <path d="M63.8 0 63.3 35.6 98.4 27.5 70.9 49.3 100 61.7 66.5 66 70 100 52 74 43.2 88.7 38.5 71.2 8.5 85.6 28.6 57.5 0 42.5 31.5 40 22.7 9.6 46.3 30.6Z" />
+    </svg>
+  );
+}
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
@@ -506,9 +518,11 @@ export default function Home() {
 
       <section className="make-build-feature" id="make-a-build" aria-labelledby="make-build-title">
         <div className="make-build-copy">
-          <span>Feature 02 · Coming soon</span>
-          <h2 id="make-build-title">Make your<br />own build.<sup>✦</sup></h2>
-          <p>Start with an idea, shape the plan, and turn it into a build worth sharing.</p>
+          <span>Feature 02 • Coming soon</span>
+          <h2 id="make-build-title">
+            Make your<br />own build.
+            <sup><BrandStar /></sup>
+          </h2>
           <form className="build-interest" onSubmit={handleBuildInterest}>
             <label htmlFor="build-email">Enter your email for Make a Build updates</label>
             <div>
@@ -528,13 +542,12 @@ export default function Home() {
             </div>
           </form>
           {buildNotice && <p className="build-notice" role="status">{buildNotice}</p>}
-          <a className="preview-build-button" href="/pilot">Preview Make a Build <span aria-hidden="true">✦</span></a>
+          <a className="preview-build-button" href="/pilot">
+            Preview Make a Build <BrandStar />
+          </a>
         </div>
         <div className="make-build-visual">
-          <img
-            src="/make-your-own-build-cutout.png"
-            alt="Three-step Makeable blueprint: start with your idea, get a plan, then realize and share the finished build"
-          />
+          <BuildBlueprint />
         </div>
       </section>
 

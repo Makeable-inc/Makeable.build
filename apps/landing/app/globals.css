@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
-:root { --paper: #eee5d8; --ink: #10264b; --red: #d93652; }
+:root {
+  --paper: #eee5d8; --ink: #10264b; --red: #d93652;
+
+  /* Makeable brand tokens. --ink is deep navy, not the cobalt: blue fills use --mk-blue. */
+  --font-display-stack: var(--font-display), "Arial Rounded MT Bold", ui-rounded, system-ui, sans-serif;
+  --mk-blue: #0c4e9c; --mk-red: #df1749; --mk-green: #397552; --mk-pink: #e02d6c;
+  --mk-paper: #eee5d8; --mk-paper-section: #f6eee4; --mk-ink: #10264b; --mk-heading: #101417;
+}
 * { box-sizing: border-box; }
 html { scroll-behavior: auto; background: var(--paper); }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: Arial, Helvetica, sans-serif; overflow-x: hidden; }
@@ -118,27 +125,34 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .workbench-rule span, .workbench-rule i { position: absolute; top: 50%; width: .65rem; height: .65rem; transform: translateY(-50%); border: 1px solid #101417; border-radius: 50%; background: #d7aa68; }
 .workbench-rule span { left: 0; }
 .workbench-rule i { right: 0; }
-.make-build-feature { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(17rem, .68fr) minmax(0, 1.55fr); align-items: center; gap: clamp(2rem, 5vw, 6rem); min-height: 76svh; padding: clamp(4.5rem, 8vw, 8rem) max(2rem, calc((100vw - 1500px) / 2)); border-top: 1px solid rgba(16,20,23,.12); border-bottom: 1px solid rgba(16,20,23,.12); background: #efe6dd; color: #101417; }
+.make-build-feature { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(19rem, .66fr) minmax(0, 1.8fr); align-items: center; gap: clamp(1.75rem, 3.5vw, 4rem); padding: clamp(3rem, 4.6vw, 5rem) max(2rem, calc((100vw - 1560px) / 2)); border-top: 1px solid rgba(16,20,23,.12); border-bottom: 1px solid rgba(16,20,23,.12); background: var(--mk-paper-section); color: var(--mk-heading); }
 .make-build-copy { position: relative; z-index: 2; }
-.make-build-copy > span { color: #df1749; font: 850 clamp(.62rem, .78vw, .76rem)/1 monospace; letter-spacing: .08em; text-transform: uppercase; }
-.make-build-copy h2 { margin: 1rem 0 1.15rem; font-family: Arial, Helvetica, sans-serif; font-size: clamp(3rem, 5.4vw, 6.3rem); font-weight: 400; line-height: .82; letter-spacing: -.065em; text-transform: uppercase; }
-.make-build-copy h2 sup { position: relative; top: -.35em; margin-left: .15em; color: #df1749; font-size: .28em; }
-.make-build-copy > p { max-width: 31rem; margin: 0 0 1.5rem; font-size: clamp(.9rem, 1.1vw, 1.08rem); line-height: 1.45; }
-.build-interest { max-width: 29rem; }
+.make-build-copy > span { display: block; color: var(--mk-red); font-family: var(--font-display-stack); font-size: clamp(.74rem, .92vw, .95rem); font-weight: 600; line-height: 1; letter-spacing: .045em; text-transform: uppercase; }
+.make-build-copy h2 { margin: .85rem 0 1.35rem; font-family: var(--font-display-stack); font-size: clamp(2.4rem, 3.9vw, 4.3rem); font-weight: 600; line-height: .9; letter-spacing: -.012em; text-transform: uppercase; white-space: nowrap; }
+.make-build-copy h2 sup { position: relative; top: -1.2em; margin-left: .06em; color: var(--mk-pink); font-size: .4em; vertical-align: baseline; }
+.brand-star { display: inline-block; width: 1em; height: 1em; vertical-align: middle; }
+.build-interest { max-width: 24.5rem; }
 .build-interest > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-.build-interest > div { display: grid; grid-template-columns: 1fr 3.4rem; gap: .45rem; }
-.build-interest input { width: 100%; min-width: 0; padding: 1rem 1.1rem; border: 1px solid rgba(16,20,23,.52); border-radius: .45rem; background: rgba(255,252,247,.58); color: #101417; font: 700 .92rem/1 Arial, sans-serif; }
-.build-interest input:focus-visible { outline: 3px solid rgba(223,23,73,.32); outline-offset: 2px; border-color: #df1749; }
-.build-interest button { display: grid; place-items: center; border: 0; border-radius: .45rem; background: #df1749; color: #fff; cursor: pointer; font-size: 1.75rem; transition: transform .2s ease, filter .2s ease; }
+.build-interest > div { display: grid; grid-template-columns: 1fr 3rem; gap: .5rem; }
+.build-interest input { width: 100%; min-width: 0; padding: .95rem 1rem; border: 1px solid rgba(16,20,23,.34); border-radius: .5rem; background: #fdfbf7; color: #101417; font: 400 .95rem/1 Arial, sans-serif; }
+.build-interest input::placeholder { color: #6f6a64; }
+.build-interest input:focus-visible { outline: 3px solid rgba(223,23,73,.32); outline-offset: 2px; border-color: var(--mk-red); }
+.build-interest button { display: grid; place-items: center; border: 0; border-radius: .5rem; background: var(--mk-red); color: #fff; cursor: pointer; font-size: 1.55rem; transition: transform .2s ease, filter .2s ease; }
 .build-interest button:hover { filter: brightness(1.08); transform: translateX(2px); }
 .build-interest button:disabled { cursor: wait; opacity: .7; transform: none; }
 .button-spinner { width: 1rem; height: 1rem; border: 2px solid rgba(255,255,255,.42); border-top-color: #fff; border-radius: 50%; animation: spin .75s linear infinite; }
 .build-notice { margin: .65rem 0 0 !important; color: #8b1736; font-size: .76rem !important; font-weight: 700; }
-.preview-build-button { display: flex; align-items: center; justify-content: center; gap: .75rem; max-width: 29rem; margin-top: .75rem; padding: 1rem 1.25rem; border-radius: .45rem; background: #df1749; color: #fff; text-decoration: none; text-transform: uppercase; font-size: .88rem; font-weight: 900; letter-spacing: .045em; transition: transform .2s ease, filter .2s ease; }
+/* Scaled up 1.2× against the email row, which it now matches in width. */
+.preview-build-button { display: flex; align-items: center; justify-content: center; gap: .84rem; max-width: 24.5rem; margin-top: .75rem; padding: 1.14rem 1.5rem; border-radius: .6rem; background: var(--mk-red); color: #fff; text-decoration: none; text-transform: uppercase; font-family: var(--font-display-stack); font-size: 1.14rem; font-weight: 600; letter-spacing: .045em; transition: transform .2s ease, filter .2s ease; }
 .preview-build-button:hover { filter: brightness(1.08); transform: translateY(-2px); }
-.preview-build-button span { font-size: 1.25rem; }
+/* Star matched to the label's cap height, nudged up to sit on the optical centre
+   of all-caps text (whose glyphs ride above the line box's descender space). */
+/* 1.15em of the enlarged label lands the star at 1.5× its previous drawn size. */
+.preview-build-button .brand-star { flex: 0 0 auto; width: 1.15em; height: 1.15em; position: relative; top: -.05em; }
 .make-build-visual { position: relative; min-width: 0; }
-.make-build-visual img { display: block; width: 100%; height: auto; filter: drop-shadow(0 1.2rem 1.3rem rgba(58,42,27,.18)); }
+.blueprint { display: block; width: 100%; height: auto; overflow: visible; }
+/* One plain sans across the whole sheet — the drawing carries it, not the type. */
+.blueprint { font-family: Arial, Helvetica, sans-serif; }
 .site-footer { position: relative; z-index: 2; padding: clamp(1.4rem, 2.2vw, 2.25rem) max(2rem, calc((100vw - 1500px) / 2)) 1rem; background: #f5eee5; color: #101417; }
 .footer-main { display: grid; grid-template-columns: minmax(10rem, 1fr) auto; align-items: center; gap: clamp(1.5rem, 3vw, 3.5rem); }
 .footer-brand { display: grid; width: 11rem; justify-items: center; gap: .45rem; }
@@ -213,9 +227,9 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
   .workbench-rail { grid-auto-columns: min(78vw, 19rem); gap: .75rem; padding: 0 .75rem 1.25rem; }
   .workbench-intro, .story-card { min-height: 26rem; }
   .workbench-rule { width: calc(100% - 1.5rem); }
-  .make-build-feature { grid-template-columns: 1fr; gap: 2.5rem; min-height: auto; padding: 4.5rem 1.25rem; }
-  .make-build-copy h2 { font-size: clamp(3.2rem, 17vw, 5rem); }
-  .make-build-copy > p, .build-interest, .preview-build-button { max-width: none; }
+  .make-build-feature { grid-template-columns: 1fr; gap: 2rem; min-height: auto; padding: 3rem 1.25rem; }
+  .make-build-copy h2 { font-size: clamp(2.6rem, 13vw, 4rem); }
+  .build-interest, .preview-build-button { max-width: none; }
   .make-build-visual { margin: 0 -.65rem; }
   .site-footer { padding: 3.5rem 1.25rem 1.5rem; }
   .footer-main { grid-template-columns: 1fr; align-items: start; gap: 2.25rem; }
