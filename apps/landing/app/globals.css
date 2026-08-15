@@ -38,7 +38,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .ember-hotspot span { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); padding: .8rem 1.1rem; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; color: #fff; background: rgba(7,22,46,.72); text-transform: uppercase; white-space: nowrap; font: 700 .62rem/1 monospace; letter-spacing: .16em; opacity: 0; transition: opacity .25s ease; }
 .ember-hotspot:hover span, .ember-hotspot:focus-visible span { opacity: 1; }
 .hint { position: absolute; z-index: 4; right: clamp(1.5rem, 4vw, 4rem); bottom: 2.8rem; margin: 0; text-transform: uppercase; font: 700 .55rem/1 monospace; letter-spacing: .2em; opacity: .72; }
-.product-ui { position: fixed; z-index: 7; inset: clamp(.75rem, 2vw, 1.6rem); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .45s ease, visibility .45s; }
+.product-ui { position: absolute; z-index: 7; inset: clamp(.75rem, 2vw, 1.6rem); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .45s ease, visibility .45s; }
 .product-ui.is-visible { opacity: 1; visibility: visible; pointer-events: auto; }
 .makeable-logo { position: absolute; left: clamp(1rem, 3vw, 2.5rem); top: clamp(1rem, 3vw, 2.5rem); width: clamp(9.5rem, 15vw, 15rem); height: auto; object-fit: contain; filter: drop-shadow(0 1px 12px rgba(255,248,238,.72)); }
 .ember-card { position: absolute; right: clamp(1rem, 4.5vw, 5rem); top: 50%; width: clamp(20rem, 31vw, 28rem); max-height: calc(100svh - clamp(4rem, 10vh, 7rem)); padding: clamp(1rem, 1.6vw, 1.55rem); transform: translateY(-50%); overflow-y: auto; border: 0; background: transparent; color: #0b1117; text-shadow: 0 1px 12px rgba(246,238,227,.28); scrollbar-width: thin; }

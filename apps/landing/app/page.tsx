@@ -106,6 +106,7 @@ export default function Home() {
       if (transitioning || currentScene !== keyframes.length - 1) return;
       transitioning = true;
       currentScene = keyframes.length;
+      setActiveScene(-1);
 
       lenis.scrollTo(catalogue.offsetTop, {
         duration: 2.2,
@@ -119,14 +120,11 @@ export default function Home() {
       });
     };
 
-    const onCatalogueRequest = () => activateCatalogue();
-
     const activateScene = (nextScene: number) => {
       if (transitioning || nextScene === currentScene || nextScene < 0 || nextScene >= keyframes.length) return;
-      const returningToPointFour = currentScene === keyframes.length && nextScene === keyframes.length - 1;
       transitioning = true;
       currentScene = nextScene;
-      if (!returningToPointFour) setActiveScene(-1);
+      setActiveScene(-1);
 
       const scrollRange = Math.max(0, story.offsetHeight - window.innerHeight);
       const sceneRange = scrollRange * 0.84;
@@ -292,7 +290,6 @@ export default function Home() {
     story.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
     story.addEventListener("touchend", onTouchEnd, { passive: true });
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("makeable:show-catalogue", onCatalogueRequest);
 
     return () => {
       disposed = true;
@@ -304,7 +301,6 @@ export default function Home() {
       story.removeEventListener("touchmove", onTouchMove, true);
       story.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("makeable:show-catalogue", onCatalogueRequest);
       gsap.ticker.remove(tick);
       lenis.destroy();
     };
@@ -336,7 +332,7 @@ export default function Home() {
   };
 
   const showOtherBuilds = () => {
-    window.dispatchEvent(new Event("makeable:show-catalogue"));
+    catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const moveCarousel = (direction: number) => {
@@ -392,44 +388,43 @@ export default function Home() {
             <span>Scroll to explore Ember</span>
             <i aria-hidden="true">↓</i>
           </div>
+          <div className={`product-ui ${activeScene === 3 ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={activeScene !== 3}>
+            <img className="makeable-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
+            <aside className="ember-card" aria-label="Ember preorder details">
+              <small>Build 001</small>
+              <div className="ember-title-row">
+                <h1 aria-label="Feed Ember Tokens."><span>Feed</span><span>Ember</span><span>Tokens.</span></h1>
+                <span className="ember-star" aria-hidden="true">✦</span>
+              </div>
+              <p>A desk pet that grows with every Claude and Codex token you burn.</p>
+              <fieldset className="color-picker">
+                <legend>Choose a color</legend>
+                <div className="color-options">
+                  {emberColors.map((color) => (
+                    <button
+                      className={`color-option color-${color.id}`}
+                      type="button"
+                      key={color.id}
+                      aria-pressed={selectedColor === color.id}
+                      onClick={() => setSelectedColor(color.id)}
+                    >
+                      <span aria-hidden="true" />
+                      {color.label}
+                      {selectedColor === color.id && <b aria-hidden="true">✓</b>}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <strong className="ember-price">$45</strong>
+              <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
+                {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
+              </button>
+              <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
+              {checkoutError && <p className="checkout-error" role="status">{checkoutError}</p>}
+            </aside>
+          </div>
         </div>
       </section>
-
-      <div className={`product-ui ${activeScene === 3 || activeScene === 4 ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={activeScene !== 3 && activeScene !== 4}>
-        <img className="makeable-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
-        <aside className="ember-card" aria-label="Ember preorder details">
-          <small>Build 001</small>
-          <div className="ember-title-row">
-            <h1 aria-label="Feed Ember Tokens."><span>Feed</span><span>Ember</span><span>Tokens.</span></h1>
-            <span className="ember-star" aria-hidden="true">✦</span>
-          </div>
-          <p>A desk pet that grows with every Claude and Codex token you burn.</p>
-          <fieldset className="color-picker">
-            <legend>Choose a color</legend>
-            <div className="color-options">
-              {emberColors.map((color) => (
-                <button
-                  className={`color-option color-${color.id}`}
-                  type="button"
-                  key={color.id}
-                  aria-pressed={selectedColor === color.id}
-                  onClick={() => setSelectedColor(color.id)}
-                >
-                  <span aria-hidden="true" />
-                  {color.label}
-                  {selectedColor === color.id && <b aria-hidden="true">✓</b>}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <strong className="ember-price">$45</strong>
-          <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
-            {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
-          </button>
-          <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
-          {checkoutError && <p className="checkout-error" role="status">{checkoutError}</p>}
-        </aside>
-      </div>
 
       <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
