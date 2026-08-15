@@ -1,5 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import { OAuth2Client } from "google-auth-library";
+import { createHash } from "node:crypto";
 import { createGoogleWaitlistResult } from "../../lib/acquisition.mjs";
 import {
   clearDashboardSessionCookie,
@@ -43,6 +44,10 @@ export default async function handler(req, context = {}) {
 
     if (localApiPath === "/api/checkout") {
       return await createEmberCheckout(req, env);
+    }
+
+    if (localApiPath === "/api/build-interest") {
+      return await saveBuildInterest(req, context);
     }
 
     if (localApiPath === "/api/dashboard/session") {
@@ -173,6 +178,11 @@ async function createEmberCheckout(req, env) {
   const colorLabel = selectedColor[0].toUpperCase() + selectedColor.slice(1);
   const body = new URLSearchParams({
     mode: "payment",
+    customer_creation: "always",
+    billing_address_collection: "required",
+    "phone_number_collection[enabled]": "true",
+    "name_collection[individual][enabled]": "true",
+    "name_collection[individual][optional]": "false",
     "line_items[0][price_data][currency]": "usd",
     "line_items[0][price_data][unit_amount]": "4500",
     "line_items[0][price_data][product_data][name]": `Makeable Ember — ${colorLabel} — Build 001`,
@@ -203,6 +213,68 @@ async function createEmberCheckout(req, env) {
     );
   }
   return jsonResponse({ url: checkout.url }, 200, { "Cache-Control": "no-store" });
+}
+
+async function saveBuildInterest(req, context) {
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "POST",
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const body = await readLimitedJsonRequest(req, 4 * 1024);
+  if (
+    !body
+    || typeof body !== "object"
+    || Array.isArray(body)
+    || Object.keys(body).some((key) => key !== "email")
+  ) {
+    return jsonResponse({ error: "Enter a valid email address." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+  const email = normalizeSignupEmail(body.email);
+  if (!email) {
+    return jsonResponse({ error: "Enter a valid email address." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const record = {
+    email,
+    name: "",
+    source: "make-a-build",
+    createdAt: new Date().toISOString(),
+  };
+  const key = `build-interest-${createHash("sha256").update(email).digest("hex")}`;
+  try {
+    const store = getStore({
+      name: waitlistStoreNameForFunctionContext(context),
+      consistency: "strong",
+    });
+    const payload = new Blob([JSON.stringify(record)], { type: "application/json" });
+    const write = await store.set(key, payload, { onlyIfNew: true });
+    const stored = await store.get(key, { type: "json", consistency: "strong" });
+    if (!stored || stored.email !== email || stored.source !== "make-a-build") {
+      throw new Error("Build-interest record could not be verified after storage");
+    }
+    return jsonResponse({ ok: true, created: write?.modified !== false }, 200, {
+      "Cache-Control": "no-store",
+    });
+  } catch (error) {
+    console.error("Build-interest storage failed", error);
+    return jsonResponse({ error: "Your email could not be saved. Please try again." }, 502, {
+      "Cache-Control": "no-store",
+    });
+  }
+}
+
+function normalizeSignupEmail(value) {
+  if (typeof value !== "string") return "";
+  const email = value.trim().toLowerCase();
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "";
+  return email;
 }
 
 async function dashboardSession(req, env) {

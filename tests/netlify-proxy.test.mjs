@@ -143,7 +143,30 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   assert.equal(stripeRequest.url, "https://api.stripe.com/v1/checkout/sessions");
   assert.equal(stripeRequest.options.headers.Authorization, "Bearer sk_test_local");
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4500");
+  assert.equal(stripeRequest.options.body.get("customer_creation"), "always");
+  assert.equal(stripeRequest.options.body.get("billing_address_collection"), "required");
+  assert.equal(stripeRequest.options.body.get("phone_number_collection[enabled]"), "true");
+  assert.equal(stripeRequest.options.body.get("name_collection[individual][enabled]"), "true");
   assert.equal(stripeRequest.options.body.get("success_url"), `${productionOrigin}/?checkout=success`);
+});
+
+test("Make a Build interest endpoint validates email before durable storage", async (t) => {
+  installEnvironment(t);
+  const malformed = await handler(
+    new Request(`${productionOrigin}/api/build-interest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "not-an-email" }),
+    }),
+  );
+  const unsupported = await handler(
+    new Request(`${productionOrigin}/api/build-interest`, { method: "GET" }),
+  );
+
+  assert.equal(malformed.status, 400);
+  assert.deepEqual(await malformed.json(), { error: "Enter a valid email address." });
+  assert.equal(unsupported.status, 405);
+  assert.equal(unsupported.headers.get("Allow"), "POST");
 });
 
 test("Ember checkout fails closed when Stripe is unavailable or the method is unsupported", async (t) => {

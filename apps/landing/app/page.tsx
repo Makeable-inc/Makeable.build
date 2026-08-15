@@ -13,11 +13,42 @@ const emberColors: Array<{ id: EmberColor; label: string }> = [
 ];
 
 const workbenchStories = [
-  { id: "desk", tone: "cobalt", caption: "A tiny companion for the daily desk.", review: "It keeps my workday moving.", author: "Sam · Product designer" },
-  { id: "build", tone: "clay", caption: "A first build, assembled one piece at a time.", review: "The build felt playful, not intimidating.", author: "Jamie · First-time maker" },
-  { id: "night", tone: "midnight", caption: "Ember settling into a late-night setup.", review: "It gives my desk a little personality.", author: "Mina · Developer" },
-  { id: "studio", tone: "sage", caption: "A new home beside the studio plants.", review: "I made it myself, so it actually feels like mine.", author: "Theo · Creative technologist" },
-  { id: "weekend", tone: "blush", caption: "A weekend build ready to come alive.", review: "The perfect small project for a slow Saturday.", author: "Ari · Weekend builder" },
+  {
+    id: "desk",
+    tone: "cobalt",
+    image: "/workbench-01.webp",
+    alt: "Ember glowing beneath a coding monitor beside a keyboard and phone",
+    caption: "Ember keeping watch while the next build takes shape.",
+    review: "Seeing Ember beside my code makes the work feel a little more alive.",
+    author: "Makeable builder · Night shift",
+  },
+  {
+    id: "focus",
+    tone: "clay",
+    image: "/workbench-02.webp",
+    alt: "Ember centered in a focused developer desk setup",
+    caption: "A focused desk setup, with Ember glowing between screen and keyboard.",
+    review: "It turns long build sessions into something warmer and more personal.",
+    author: "Makeable builder · Daily desk",
+  },
+  {
+    id: "night",
+    tone: "midnight",
+    image: "/workbench-03.webp",
+    alt: "Ember plugged in during a late-night coding session",
+    caption: "Ember plugged in and glowing through a late-night coding session.",
+    review: "The tiny screen gives my workspace its own character.",
+    author: "Makeable builder · After hours",
+  },
+  {
+    id: "prototype",
+    tone: "sage",
+    image: "/workbench-04.webp",
+    alt: "Ember on a busy two-monitor prototype workbench",
+    caption: "From first prompt to physical companion, all on one workbench.",
+    review: "It feels like a piece of the project crossed over into the real world.",
+    author: "Makeable builder · Prototype desk",
+  },
 ];
 
 export default function Home() {
@@ -33,6 +64,7 @@ export default function Home() {
   const [checkoutError, setCheckoutError] = useState("");
   const [buildEmail, setBuildEmail] = useState("");
   const [buildNotice, setBuildNotice] = useState("");
+  const [buildBusy, setBuildBusy] = useState(false);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -79,7 +111,8 @@ export default function Home() {
       setActiveScene(-1);
 
       const scrollRange = Math.max(0, story.offsetHeight - window.innerHeight);
-      lenis.scrollTo(story.offsetTop + (nextScene / (keyframes.length - 1)) * scrollRange, {
+      const sceneRange = scrollRange * 0.84;
+      lenis.scrollTo(story.offsetTop + (nextScene / (keyframes.length - 1)) * sceneRange, {
         duration: 1.25,
         easing: (value: number) => 1 - Math.pow(1 - value, 4),
       });
@@ -282,10 +315,32 @@ export default function Home() {
       : [...current, storyId]);
   };
 
-  const handleBuildInterest = (event: FormEvent<HTMLFormElement>) => {
+  const handleBuildInterest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setBuildEmail("");
-    setBuildNotice("Email updates are opening soon — preview the builder in the meantime.");
+    setBuildBusy(true);
+    setBuildNotice("");
+    try {
+      const response = await fetch("/api/build-interest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: buildEmail }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const result = contentType.includes("application/json")
+        ? await response.json() as { ok?: boolean; error?: string }
+        : {};
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || (response.status === 404
+          ? "Email signup is available on the deployed site."
+          : "We could not save your email right now."));
+      }
+      setBuildEmail("");
+      setBuildNotice("You’re on the list — we’ll share Make a Build updates with you.");
+    } catch (error) {
+      setBuildNotice(error instanceof Error ? error.message : "We could not save your email right now.");
+    } finally {
+      setBuildBusy(false);
+    }
   };
 
   return (
@@ -301,8 +356,8 @@ export default function Home() {
             <span>Scroll to explore Ember</span>
             <i aria-hidden="true">↓</i>
           </div>
-          <div className={`product-ui ${activeScene === 3 ? "is-visible" : ""}`} aria-hidden={activeScene !== 3}>
-            <img className="makeable-logo" src="/makeable-logo.png" alt="Makeable" />
+          <div className={`product-ui ${activeScene === 3 ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={activeScene !== 3}>
+            <img className="makeable-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
             <aside className="ember-card" aria-label="Ember preorder details">
               <small>Build 001</small>
               <div className="ember-title-row">
@@ -383,16 +438,13 @@ export default function Home() {
                 type="button"
                 key={story.id}
                 aria-pressed={isFlipped}
-                aria-label={isFlipped ? `Show photo placeholder: ${story.caption}` : `Read review: ${story.caption}`}
+                aria-label={isFlipped ? `Show photo: ${story.caption}` : `Read review: ${story.caption}`}
                 onClick={() => toggleStory(story.id)}
               >
                 <span className="story-card-inner">
                   <span className="story-face story-front">
-                    <span className="placeholder-scene" aria-hidden="true">
-                      <i className="placeholder-glow" />
-                      <i className="placeholder-ember"><b /></i>
-                    </span>
-                    <span className="story-caption"><b>Photo placeholder {String(index + 1).padStart(2, "0")}</b>{story.caption}</span>
+                    <img className="story-photo" src={story.image} alt={story.alt} />
+                    <span className="story-caption"><b>Workbench {String(index + 1).padStart(2, "0")}</b>{story.caption}</span>
                     <small>Click to read the story ↗</small>
                   </span>
                   <span className="story-face story-back">
@@ -427,7 +479,9 @@ export default function Home() {
                 onChange={(event) => setBuildEmail(event.target.value)}
                 required
               />
-              <button type="submit" aria-label="Join the Make a Build updates list">→</button>
+              <button type="submit" disabled={buildBusy} aria-label="Join the Make a Build updates list">
+                {buildBusy ? <span className="button-spinner" aria-hidden="true" /> : "→"}
+              </button>
             </div>
           </form>
           {buildNotice && <p className="build-notice" role="status">{buildNotice}</p>}
@@ -444,7 +498,7 @@ export default function Home() {
       <footer className="site-footer">
         <div className="footer-main">
           <div className="footer-brand">
-            <div className="footer-logo-crop"><img src="/makeable-logo.png" alt="Makeable" /></div>
+            <img className="footer-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
             <strong>Anything is makeable.</strong>
           </div>
           <nav className="footer-links" aria-label="Footer navigation">
@@ -463,7 +517,7 @@ export default function Home() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© Makeable 2025</span>
+          <span>@Makeable 2026</span>
         </div>
       </footer>
     </main>

@@ -227,11 +227,18 @@ test("owner export returns only verified records and formula-safe CSV", async ()
     email: "second@example.com",
     name: "=HYPERLINK(\"https://example.com\")",
   });
+  store.values.set("build-interest-1", {
+    email: "builder@example.com",
+    name: "",
+    source: "make-a-build",
+    createdAt: record.createdAt,
+  });
 
   const records = await readVerifiedWaitlist(store);
-  assert.equal(records.length, 2);
+  assert.equal(records.length, 3);
   const csv = waitlistCsv(records);
   assert.match(csv, /^email,name,source,created_at\n/);
   assert.match(csv, /"'=HYPERLINK\(""https:\/\/example\.com""\)"/);
+  assert.match(csv, /builder@example\.com/);
   assert.doesNotMatch(csv, /attacker/);
 });
