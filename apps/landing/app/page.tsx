@@ -392,44 +392,44 @@ export default function Home() {
             <span>Scroll to explore Ember</span>
             <i aria-hidden="true">↓</i>
           </div>
+
+          <div className={`product-ui ${activeScene === 3 || activeScene === 4 ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={activeScene !== 3 && activeScene !== 4}>
+            <img className="makeable-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
+            <aside className="ember-card" aria-label="Ember preorder details">
+              <small>Build 001</small>
+              <div className="ember-title-row">
+                <h1 aria-label="Feed Ember Tokens."><span>Feed</span><span>Ember</span><span>Tokens.</span></h1>
+                <span className="ember-star" aria-hidden="true">✦</span>
+              </div>
+              <p>A desk pet that grows with every Claude and Codex token you burn.</p>
+              <fieldset className="color-picker">
+                <legend>Choose a color</legend>
+                <div className="color-options">
+                  {emberColors.map((color) => (
+                    <button
+                      className={`color-option color-${color.id}`}
+                      type="button"
+                      key={color.id}
+                      aria-pressed={selectedColor === color.id}
+                      onClick={() => setSelectedColor(color.id)}
+                    >
+                      <span aria-hidden="true" />
+                      {color.label}
+                      {selectedColor === color.id && <b aria-hidden="true">✓</b>}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <strong className="ember-price">$45</strong>
+              <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
+                {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
+              </button>
+              <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
+              {checkoutError && <p className="checkout-error" role="status">{checkoutError}</p>}
+            </aside>
+          </div>
         </div>
       </section>
-
-      <div className={`product-ui ${activeScene === 3 || activeScene === 4 ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={activeScene !== 3 && activeScene !== 4}>
-        <img className="makeable-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
-        <aside className="ember-card" aria-label="Ember preorder details">
-          <small>Build 001</small>
-          <div className="ember-title-row">
-            <h1 aria-label="Feed Ember Tokens."><span>Feed</span><span>Ember</span><span>Tokens.</span></h1>
-            <span className="ember-star" aria-hidden="true">✦</span>
-          </div>
-          <p>A desk pet that grows with every Claude and Codex token you burn.</p>
-          <fieldset className="color-picker">
-            <legend>Choose a color</legend>
-            <div className="color-options">
-              {emberColors.map((color) => (
-                <button
-                  className={`color-option color-${color.id}`}
-                  type="button"
-                  key={color.id}
-                  aria-pressed={selectedColor === color.id}
-                  onClick={() => setSelectedColor(color.id)}
-                >
-                  <span aria-hidden="true" />
-                  {color.label}
-                  {selectedColor === color.id && <b aria-hidden="true">✓</b>}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <strong className="ember-price">$45</strong>
-          <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
-            {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
-          </button>
-          <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
-          {checkoutError && <p className="checkout-error" role="status">{checkoutError}</p>}
-        </aside>
-      </div>
 
       <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
