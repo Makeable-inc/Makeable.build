@@ -139,7 +139,6 @@ function getEnv() {
     "DASHBOARD_ACCESS_KEY",
     "DASHBOARD_SESSION_SECRET",
     "STRIPE_SECRET_KEY",
-    "STRIPE_ALLOWED_SHIPPING_COUNTRIES",
   ];
   return Object.fromEntries(keys.map((key) => [key, envValue(key)]));
 }
@@ -169,14 +168,21 @@ async function createEmberCheckout(req, env) {
 
   const origin = new URL(req.url).origin;
   const allowedColors = new Set(["sage", "bone", "blush"]);
+  const checkoutMarkets = {
+    US: { currency: "usd", unitAmount: "4999" },
+    SG: { currency: "sgd", unitAmount: "5999" },
+  };
   let selectedColor = "bone";
+  let selectedMarket = "US";
   try {
     const requestBody = await req.json();
     if (allowedColors.has(requestBody?.color)) selectedColor = requestBody.color;
+    if (Object.hasOwn(checkoutMarkets, requestBody?.market)) selectedMarket = requestBody.market;
   } catch {
-    // Preserve the default color for requests without a JSON body.
+    // Preserve the default color and market for requests without a JSON body.
   }
   const colorLabel = selectedColor[0].toUpperCase() + selectedColor.slice(1);
+  const market = checkoutMarkets[selectedMarket];
   const body = new URLSearchParams({
     mode: "payment",
     customer_creation: "always",
@@ -184,20 +190,20 @@ async function createEmberCheckout(req, env) {
     "phone_number_collection[enabled]": "true",
     "name_collection[individual][enabled]": "true",
     "name_collection[individual][optional]": "false",
-    "line_items[0][price_data][currency]": "usd",
-    "line_items[0][price_data][unit_amount]": "4500",
+    "line_items[0][price_data][currency]": market.currency,
+    "line_items[0][price_data][unit_amount]": market.unitAmount,
     "line_items[0][price_data][product_data][name]": `Makeable Ember — ${colorLabel} — Build 001`,
     "line_items[0][price_data][product_data][description]":
       "Snap-fit desk pet kit with USB-C power and a living display.",
     "line_items[0][quantity]": "1",
     "metadata[ember_color]": selectedColor,
+    "metadata[market]": selectedMarket,
     success_url: `${origin}/?checkout=success`,
     cancel_url: `${origin}/?checkout=cancelled`,
     integration_identifier: "makeable_ember_qtmsvkwp",
   });
-  for (const country of stripeShippingCountries(env)) {
-    body.append("shipping_address_collection[allowed_countries][]", country);
-  }
+  body.append("shipping_address_collection[allowed_countries][]", "US");
+  body.append("shipping_address_collection[allowed_countries][]", "SG");
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
@@ -217,15 +223,6 @@ async function createEmberCheckout(req, env) {
     );
   }
   return jsonResponse({ url: checkout.url }, 200, { "Cache-Control": "no-store" });
-}
-
-function stripeShippingCountries(env) {
-  const configured = String(env.STRIPE_ALLOWED_SHIPPING_COUNTRIES || "")
-    .split(",")
-    .map((country) => country.trim().toUpperCase())
-    .filter((country) => /^[A-Z]{2}$/.test(country));
-
-  return [...new Set(configured.length ? configured : ["SG", "US", "CA", "GB", "AU", "NZ"])];
 }
 
 async function saveBuildInterest(req, context) {

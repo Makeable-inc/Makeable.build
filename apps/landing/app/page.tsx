@@ -5,6 +5,7 @@ import Lenis from "lenis";
 import gsap from "gsap";
 
 type EmberColor = "sage" | "bone" | "blush";
+type EmberMarket = "US" | "SG";
 
 const emberColors: Array<{ id: EmberColor; label: string }> = [
   { id: "sage", label: "Sage" },
@@ -60,11 +61,17 @@ export default function Home() {
   const [activeScene, setActiveScene] = useState(0);
   const [flippedStories, setFlippedStories] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState<EmberColor>("bone");
+  const [selectedMarket, setSelectedMarket] = useState<EmberMarket>("US");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [buildEmail, setBuildEmail] = useState("");
   const [buildNotice, setBuildNotice] = useState("");
   const [buildBusy, setBuildBusy] = useState(false);
+  useEffect(() => {
+    const locale = navigator.language.toUpperCase();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (locale.endsWith("-SG") || timeZone === "Asia/Singapore") setSelectedMarket("SG");
+  }, []);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -119,6 +126,8 @@ export default function Home() {
         },
       });
     };
+
+    const onCatalogueRequest = () => activateCatalogue();
 
     const activateScene = (nextScene: number) => {
       if (transitioning || nextScene === currentScene || nextScene < 0 || nextScene >= keyframes.length) return;
@@ -290,6 +299,7 @@ export default function Home() {
     story.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
     story.addEventListener("touchend", onTouchEnd, { passive: true });
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("makeable:show-catalogue", onCatalogueRequest);
 
     return () => {
       disposed = true;
@@ -301,6 +311,7 @@ export default function Home() {
       story.removeEventListener("touchmove", onTouchMove, true);
       story.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("makeable:show-catalogue", onCatalogueRequest);
       gsap.ticker.remove(tick);
       lenis.destroy();
     };
@@ -313,7 +324,7 @@ export default function Home() {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ color: selectedColor }),
+        body: JSON.stringify({ color: selectedColor, market: selectedMarket }),
       });
       const contentType = response.headers.get("content-type") || "";
       const result = contentType.includes("application/json")
@@ -332,7 +343,7 @@ export default function Home() {
   };
 
   const showOtherBuilds = () => {
-    catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.dispatchEvent(new Event("makeable:show-catalogue"));
   };
 
   const moveCarousel = (direction: number) => {
@@ -415,7 +426,7 @@ export default function Home() {
                   ))}
                 </div>
               </fieldset>
-              <strong className="ember-price">$45</strong>
+              <strong className="ember-price">USD $49.99</strong>
               <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
                 {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
               </button>
@@ -434,9 +445,9 @@ export default function Home() {
             type="button"
             onClick={startCheckout}
             disabled={checkoutBusy}
-            aria-label={checkoutBusy ? "Opening Stripe checkout" : "Pre-order Ember for 45 dollars"}
+            aria-label={checkoutBusy ? "Opening Stripe checkout" : "Pre-order Ember for 49 dollars and 99 cents USD"}
           >
-            <span>{checkoutBusy ? "Opening checkout…" : "Pre-order Ember · $45"}</span>
+            <span>{checkoutBusy ? "Opening checkout…" : "Pre-order · USD $49.99"}</span>
           </button>
           {checkoutError && <p className="catalogue-checkout-error" role="status">{checkoutError}</p>}
         </div>

@@ -142,16 +142,43 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   assert.deepEqual(result, { url: "https://checkout.stripe.test/session" });
   assert.equal(stripeRequest.url, "https://api.stripe.com/v1/checkout/sessions");
   assert.equal(stripeRequest.options.headers.Authorization, "Bearer sk_test_local");
-  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4500");
+  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][currency]"), "usd");
+  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4999");
   assert.equal(stripeRequest.options.body.get("customer_creation"), "always");
   assert.equal(stripeRequest.options.body.get("billing_address_collection"), "required");
   assert.deepEqual(
     stripeRequest.options.body.getAll("shipping_address_collection[allowed_countries][]"),
-    ["SG", "US", "CA", "GB", "AU", "NZ"],
+    ["US", "SG"],
   );
   assert.equal(stripeRequest.options.body.get("phone_number_collection[enabled]"), "true");
   assert.equal(stripeRequest.options.body.get("name_collection[individual][enabled]"), "true");
   assert.equal(stripeRequest.options.body.get("success_url"), `${productionOrigin}/?checkout=success`);
+});
+
+test("Ember checkout uses fixed Singapore pricing for Singapore orders", async (t) => {
+  installEnvironment(t, { STRIPE_SECRET_KEY: "sk_test_local" });
+  let stripeRequest;
+  globalThis.fetch = async (url, options) => {
+    stripeRequest = { url: String(url), options };
+    return Response.json({ url: "https://checkout.stripe.test/session" });
+  };
+
+  const response = await handler(
+    new Request(`${productionOrigin}/api/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color: "sage", market: "SG" }),
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][currency]"), "sgd");
+  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "5999");
+  assert.equal(stripeRequest.options.body.get("metadata[market]"), "SG");
+  assert.deepEqual(
+    stripeRequest.options.body.getAll("shipping_address_collection[allowed_countries][]"),
+    ["US", "SG"],
+  );
 });
 
 test("Make a Build interest endpoint validates email before durable storage", async (t) => {
