@@ -14,7 +14,7 @@
 .ds-card:hover .ds-card-inner, .ds-card:focus-visible .ds-card-inner, .ds-card.is-flipped .ds-card-inner { transform: rotateY(180deg); }
 .ds-face { position: absolute; inset: 0; overflow: hidden; border-radius: .5rem; backface-visibility: hidden; box-shadow: 0 .6rem 1.15rem rgba(45,30,18,.15); }
 .ds-front img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.ds-handle { position: absolute; left: .5rem; bottom: .5rem; padding: .26rem .45rem; border-radius: .28rem; background: rgba(251,245,236,.92); color: #10264b; font: 700 .58rem/1 Arial, Helvetica, sans-serif; letter-spacing: .01em; }
+.ds-handle { position: absolute; left: .5rem; bottom: .5rem; padding: .26rem .45rem; border-radius: .28rem; background: rgba(251,245,236,.92); color: #10264b; font: 600 .58rem/1 var(--display); letter-spacing: .01em; }
 .ds-back { display: flex; flex-direction: column; justify-content: center; padding: clamp(1rem, 1.35vw, 1.3rem); transform: rotateY(180deg); background: #0c4e9c; color: #fff; }
 .ds-red .ds-back { background: #df1749; }
 .ds-green .ds-back { background: #397552; }

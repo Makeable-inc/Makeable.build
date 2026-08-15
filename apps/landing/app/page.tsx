@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import Lenis from "lenis";
 import gsap from "gsap";
 import SeenOnRealDesks from "./SeenOnRealDesks";
+import BuildBlueprint from "./BuildBlueprint";
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
@@ -14,12 +15,21 @@ const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "blush", label: "Blush", stock: 10 },
 ];
 
+function BrandStar() {
+  return (
+    <svg className="brand-star" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">
+      <path d="M63.8 0 63.3 35.6 98.4 27.5 70.9 49.3 100 61.7 66.5 66 70 100 52 74 43.2 88.7 38.5 71.2 8.5 85.6 28.6 57.5 0 42.5 31.5 40 22.7 9.6 46.3 30.6Z" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const storyRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const catalogueRef = useRef<HTMLElement>(null);
   const [ready, setReady] = useState(false);
   const [activeScene, setActiveScene] = useState(0);
+  const [productPresentationVisible, setProductPresentationVisible] = useState(false);
   const [selectedColor, setSelectedColor] = useState<EmberColor>("bone");
   const [selectedMarket, setSelectedMarket] = useState<EmberMarket>("US");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
@@ -94,6 +104,7 @@ export default function Home() {
       if (transitioning || nextScene === currentScene || nextScene < 0 || nextScene >= keyframes.length) return;
       transitioning = true;
       currentScene = nextScene;
+      if (nextScene < keyframes.length - 1) setProductPresentationVisible(false);
       setActiveScene(-1);
 
       const scrollRange = Math.max(0, story.offsetHeight - window.innerHeight);
@@ -113,6 +124,7 @@ export default function Home() {
           scheduleDraw();
         },
         onComplete: () => {
+          if (nextScene === keyframes.length - 1) setProductPresentationVisible(true);
           setActiveScene(nextScene);
           transitioning = false;
         },
@@ -341,6 +353,35 @@ export default function Home() {
         <div className="experience">
           <div className="film-frame">
             <canvas ref={canvasRef} aria-label="Product reveal controlled by scrolling" />
+            <div
+              className="ember-color-artworks"
+              aria-hidden="true"
+              style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }}
+            >
+              {emberColors.map((color) => (
+                <picture
+                  className={`ember-color-artwork ${productPresentationVisible && selectedColor === color.id ? "is-visible" : ""}`}
+                  key={color.id}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "block",
+                    opacity: productPresentationVisible && selectedColor === color.id ? 1 : 0,
+                    visibility: productPresentationVisible && selectedColor === color.id ? "visible" : "hidden",
+                    transform: "scale(1.004)",
+                    transition: "opacity .5s cubic-bezier(.22, 1, .36, 1), visibility .5s",
+                  }}
+                >
+                  <source media="(max-width: 900px)" srcSet={`/ember-${color.id}-mobile.webp`} />
+                  <img
+                    src={`/ember-${color.id}-desktop.webp`}
+                    alt=""
+                    decoding="async"
+                    style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                </picture>
+              ))}
+            </div>
             <div className={`loader ${ready ? "is-ready" : ""}`}><span /></div>
             <div className="film-shade" />
           </div>
@@ -348,7 +389,7 @@ export default function Home() {
             <span>Scroll to explore Ember</span>
             <i aria-hidden="true">↓</i>
           </div>
-          <div className={`product-ui ${activeScene === 3 ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={activeScene !== 3}>
+          <div className={`product-ui ${productPresentationVisible ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={!productPresentationVisible}>
             <img className="makeable-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
             <aside className="ember-card" aria-label="Ember preorder details">
               <small>Build 001</small>
@@ -415,9 +456,11 @@ export default function Home() {
 
       <section className="make-build-feature" id="make-a-build" aria-labelledby="make-build-title">
         <div className="make-build-copy">
-          <span>Feature 02 · Coming soon</span>
-          <h2 id="make-build-title">Make your<br />own build.<sup>✦</sup></h2>
-          <p>Start with an idea, shape the plan, and turn it into a build worth sharing.</p>
+          <span>Feature 02 • Coming soon</span>
+          <h2 id="make-build-title">
+            Make your<br />own build.
+            <sup><BrandStar /></sup>
+          </h2>
           <form className="build-interest" onSubmit={handleBuildInterest}>
             <label htmlFor="build-email">Enter your email for Make a Build updates</label>
             <div>
@@ -437,13 +480,12 @@ export default function Home() {
             </div>
           </form>
           {buildNotice && <p className="build-notice" role="status">{buildNotice}</p>}
-          <a className="preview-build-button" href="/pilot">Preview Make a Build <span aria-hidden="true">✦</span></a>
+          <a className="preview-build-button" href="/pilot">
+            Preview Make a Build <BrandStar />
+          </a>
         </div>
         <div className="make-build-visual">
-          <img
-            src="/make-your-own-build-cutout.png"
-            alt="Three-step Makeable blueprint: start with your idea, get a plan, then realize and share the finished build"
-          />
+          <BuildBlueprint />
         </div>
       </section>
 
