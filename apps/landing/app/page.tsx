@@ -8,6 +8,7 @@ import BuildBlueprint from "./BuildBlueprint";
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
+type SequenceMode = "desktop" | "mobile";
 
 const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "sage", label: "Sage", stock: 5 },
@@ -28,6 +29,7 @@ export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const catalogueRef = useRef<HTMLElement>(null);
   const [ready, setReady] = useState(false);
+  const [sequenceMode, setSequenceMode] = useState<SequenceMode | null>(null);
   const [activeScene, setActiveScene] = useState(0);
   const [productPresentationVisible, setProductPresentationVisible] = useState(false);
   const [selectedColor, setSelectedColor] = useState<EmberColor>("bone");
@@ -45,6 +47,27 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const updateSequenceMode = () => {
+      const mobile = window.matchMedia("(max-width: 900px)").matches
+        || (navigator.maxTouchPoints > 0 && window.innerWidth <= 1180);
+      const nextMode: SequenceMode = mobile ? "mobile" : "desktop";
+      setSequenceMode((currentMode) => currentMode === nextMode ? currentMode : nextMode);
+    };
+
+    updateSequenceMode();
+    window.addEventListener("resize", updateSequenceMode);
+    window.addEventListener("orientationchange", updateSequenceMode);
+    return () => {
+      window.removeEventListener("resize", updateSequenceMode);
+      window.removeEventListener("orientationchange", updateSequenceMode);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sequenceMode) return;
+    setReady(false);
+    setProductPresentationVisible(false);
+
     const lenis = new Lenis({
       duration: 1.25,
       smoothWheel: true,
@@ -62,8 +85,7 @@ export default function Home() {
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) return;
 
-    const isMobile = window.matchMedia("(max-width: 900px)").matches
-      || (navigator.maxTouchPoints > 0 && window.innerWidth <= 1180);
+    const isMobile = sequenceMode === "mobile";
     const totalFrames = isMobile ? 300 : 301;
     const frameDirectory = isMobile ? "frames-mobile" : "frames-v2";
     const frames: Array<HTMLImageElement | undefined> = new Array(totalFrames);
@@ -196,7 +218,7 @@ export default function Home() {
       const image = new Image();
       image.decoding = "async";
       frames[index] = image;
-      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=31`;
+      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=34`;
 
       try {
         await image.decode();
@@ -288,7 +310,7 @@ export default function Home() {
       gsap.ticker.remove(tick);
       lenis.destroy();
     };
-  }, []);
+  }, [sequenceMode]);
 
   const startCheckout = async () => {
     setCheckoutBusy(true);
