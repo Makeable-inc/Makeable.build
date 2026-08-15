@@ -8,7 +8,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .experience { position: sticky; top: 0; height: 100svh; background: #07162e; color: white; overflow: hidden; }
 .film-frame { position: absolute; inset: clamp(.75rem, 2vw, 1.6rem); overflow: hidden; background: #d9cec0; }
 .film-frame canvas { width: 100%; height: 100%; min-width: 100%; min-height: 100%; display: block; }
-.film-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5,15,34,.58), transparent 42%, transparent 68%, rgba(5,15,34,.18)); pointer-events: none; }
+.film-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5,15,34,.32), transparent 42%, transparent 68%, rgba(5,15,34,.1)); pointer-events: none; }
 .loader { position: absolute; inset: 0; background: var(--paper); z-index: 5; display: grid; place-items: center; transition: opacity .6s ease, visibility .6s ease; }
 .loader span { width: 3rem; height: 3rem; border: 1px solid var(--ink); border-top-color: var(--red); border-radius: 50%; animation: spin 1s linear infinite; }
 .loader.is-ready { opacity: 0; visibility: hidden; }
@@ -140,15 +140,13 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .make-build-visual { position: relative; min-width: 0; }
 .make-build-visual img { display: block; width: 100%; height: auto; filter: drop-shadow(0 1.2rem 1.3rem rgba(58,42,27,.18)); }
 .site-footer { position: relative; z-index: 2; padding: clamp(1.4rem, 2.2vw, 2.25rem) max(2rem, calc((100vw - 1500px) / 2)) 1rem; background: #f5eee5; color: #101417; }
-.footer-main { display: grid; grid-template-columns: minmax(10rem, .8fr) minmax(22rem, 1.3fr) minmax(23rem, 1.2fr); align-items: center; gap: clamp(1.5rem, 3vw, 3.5rem); }
+.footer-main { display: grid; grid-template-columns: minmax(10rem, 1fr) auto; align-items: center; gap: clamp(1.5rem, 3vw, 3.5rem); }
 .footer-brand { display: grid; width: 11rem; justify-items: center; gap: .45rem; }
 .footer-logo { display: block; width: 9rem; height: auto; }
 .footer-brand strong { display: block; width: 100%; text-align: center; font: 800 .54rem/1 monospace; letter-spacing: .1em; text-transform: uppercase; }
-.footer-links { display: flex; align-items: center; justify-content: space-between; gap: clamp(1rem, 2vw, 2.5rem); }
-.footer-links a { color: inherit; text-decoration: none; white-space: nowrap; font-size: clamp(.68rem, .82vw, .82rem); font-weight: 650; }
-.footer-links a:hover { color: #df1749; }
-.footer-socials { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(.6rem, 1.2vw, 1.25rem); }
-.footer-social { display: grid; justify-items: center; gap: .35rem; min-width: 0; }
+.footer-socials { display: grid; grid-template-columns: repeat(3, minmax(3rem, 1fr)); gap: clamp(1rem, 2vw, 2rem); }
+.footer-social { display: grid; justify-items: center; gap: .35rem; min-width: 0; color: inherit; text-decoration: none; }
+.footer-social:hover { color: #df1749; }
 .footer-social img { display: block; width: 1.35rem; height: 1.35rem; margin-block: .2rem; object-fit: contain; }
 .footer-social > span { font-size: .54rem; font-weight: 650; }
 .footer-bottom { display: flex; justify-content: center; margin-top: .85rem; padding-top: .2rem; border: 0; font-size: .62rem; font-weight: 650; }
@@ -178,7 +176,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .kit-card > button span { margin-left: .6rem; }
 @media (max-width: 700px) {
   .film-frame { inset: .5rem; }
-  .film-shade { background: linear-gradient(0deg, rgba(5,15,34,.75), transparent 65%); }
+  .film-shade { background: linear-gradient(0deg, rgba(5,15,34,.42), transparent 65%); }
   .intro-cue { bottom: 2.2rem; gap: .6rem; }
   .film-frame canvas { object-fit: cover; }
   .makeable-logo { left: .9rem; top: .9rem; width: clamp(7.25rem, 32vw, 10rem); }
@@ -218,7 +216,6 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
   .footer-main { grid-template-columns: 1fr; align-items: start; gap: 2.25rem; }
   .footer-brand { width: 12rem; }
   .footer-logo { width: 9.75rem; }
-  .footer-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
   .footer-socials { width: min(100%, 26rem); }
   .footer-bottom { margin-top: 2rem; font-size: .6rem; }
   .catalogue-header { grid-template-columns: 1fr 1fr; }

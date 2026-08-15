@@ -501,19 +501,16 @@ export default function Home() {
             <img className="footer-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
             <strong>Anything is makeable.</strong>
           </div>
-          <nav className="footer-links" aria-label="Footer navigation">
-            <a href="#builds">Builds</a>
-            <a href="#experience">Parts Kits and</a>
-            <a href="#make-a-build">Make a Build</a>
-            <a href="#experience">Pre-order Status</a>
-          </nav>
           <div className="footer-socials" aria-label="Makeable social channels">
-            <span className="footer-social"><img src="/social-tiktok.svg" alt="" aria-hidden="true" /><span>TikTok</span></span>
-            <span className="footer-social"><img src="/social-youtube.svg" alt="" aria-hidden="true" /><span>YouTube</span></span>
-            <span className="footer-social"><img src="/social-facebook.svg" alt="" aria-hidden="true" /><span>Facebook</span></span>
-            <span className="footer-social"><img src="/social-linkedin.svg" alt="" aria-hidden="true" /><span>LinkedIn</span></span>
-            <span className="footer-social"><img src="/social-instagram.svg" alt="" aria-hidden="true" /><span>Instagram</span></span>
-            <span className="footer-social"><img src="/social-x.svg" alt="" aria-hidden="true" /><span>X</span></span>
+            <a className="footer-social" href="https://www.instagram.com/makeable.build/" target="_blank" rel="noreferrer">
+              <img src="/social-instagram.svg" alt="" aria-hidden="true" /><span>Instagram</span>
+            </a>
+            <a className="footer-social" href="https://www.linkedin.com/company/makeable-build/" target="_blank" rel="noreferrer">
+              <img src="/social-linkedin.svg" alt="" aria-hidden="true" /><span>LinkedIn</span>
+            </a>
+            <a className="footer-social" href="https://x.com/Makeablebuild" target="_blank" rel="noreferrer">
+              <img src="/social-x.svg" alt="" aria-hidden="true" /><span>X</span>
+            </a>
           </div>
         </div>
         <div className="footer-bottom">
