@@ -78,7 +78,8 @@ export default function Home() {
 
     const canvas = canvasRef.current;
     const story = storyRef.current;
-    if (!canvas || !story) return;
+    const catalogue = catalogueRef.current;
+    if (!canvas || !story || !catalogue) return;
 
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) return;
@@ -99,10 +100,25 @@ export default function Home() {
     let touchStartY = 0;
     const keyframes = [0, 72, 156, 282];
 
-    const atSceneBoundary = (direction: number) => (
-      (direction > 0 && currentScene === keyframes.length - 1)
-      || (direction < 0 && currentScene === 0)
-    );
+    const atSceneBoundary = (direction: number) => direction < 0 && currentScene === 0;
+
+    const activateCatalogue = () => {
+      if (transitioning || currentScene !== keyframes.length - 1) return;
+      transitioning = true;
+      currentScene = keyframes.length;
+      setActiveScene(-1);
+
+      lenis.scrollTo(catalogue.offsetTop, {
+        duration: 2.2,
+        lock: true,
+        force: true,
+        easing: (value: number) => value * value * value * (value * (value * 6 - 15) + 10),
+        onComplete: () => {
+          setActiveScene(keyframes.length);
+          transitioning = false;
+        },
+      });
+    };
 
     const activateScene = (nextScene: number) => {
       if (transitioning || nextScene === currentScene || nextScene < 0 || nextScene >= keyframes.length) return;
@@ -224,6 +240,12 @@ export default function Home() {
     const onWheel = (event: WheelEvent) => {
       if (Math.abs(event.deltaY) < 6) return;
       const direction = Math.sign(event.deltaY);
+      if (!transitioning && direction > 0 && currentScene === keyframes.length - 1) {
+        event.preventDefault();
+        event.stopPropagation();
+        activateCatalogue();
+        return;
+      }
       if (!transitioning && atSceneBoundary(direction)) return;
       event.preventDefault();
       event.stopPropagation();
@@ -243,12 +265,22 @@ export default function Home() {
       const endY = event.changedTouches[0]?.clientY ?? touchStartY;
       const distance = touchStartY - endY;
       const direction = Math.sign(distance);
-      if (Math.abs(distance) < 28 || (!transitioning && atSceneBoundary(direction))) return;
+      if (Math.abs(distance) < 28) return;
+      if (!transitioning && direction > 0 && currentScene === keyframes.length - 1) {
+        activateCatalogue();
+        return;
+      }
+      if (!transitioning && atSceneBoundary(direction)) return;
       activateScene(currentScene + direction);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       const direction = ["ArrowDown", "PageDown", " "].includes(event.key) ? 1 : ["ArrowUp", "PageUp"].includes(event.key) ? -1 : 0;
       if (!direction) return;
+      if (!transitioning && direction > 0 && currentScene === keyframes.length - 1) {
+        event.preventDefault();
+        activateCatalogue();
+        return;
+      }
       if (!transitioning && atSceneBoundary(direction)) return;
       event.preventDefault();
       activateScene(currentScene + direction);
