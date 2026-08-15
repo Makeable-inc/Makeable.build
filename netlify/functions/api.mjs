@@ -139,6 +139,7 @@ function getEnv() {
     "DASHBOARD_ACCESS_KEY",
     "DASHBOARD_SESSION_SECRET",
     "STRIPE_SECRET_KEY",
+    "STRIPE_ALLOWED_SHIPPING_COUNTRIES",
   ];
   return Object.fromEntries(keys.map((key) => [key, envValue(key)]));
 }
@@ -194,6 +195,9 @@ async function createEmberCheckout(req, env) {
     cancel_url: `${origin}/?checkout=cancelled`,
     integration_identifier: "makeable_ember_qtmsvkwp",
   });
+  for (const country of stripeShippingCountries(env)) {
+    body.append("shipping_address_collection[allowed_countries][]", country);
+  }
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
@@ -213,6 +217,15 @@ async function createEmberCheckout(req, env) {
     );
   }
   return jsonResponse({ url: checkout.url }, 200, { "Cache-Control": "no-store" });
+}
+
+function stripeShippingCountries(env) {
+  const configured = String(env.STRIPE_ALLOWED_SHIPPING_COUNTRIES || "")
+    .split(",")
+    .map((country) => country.trim().toUpperCase())
+    .filter((country) => /^[A-Z]{2}$/.test(country));
+
+  return [...new Set(configured.length ? configured : ["SG", "US", "CA", "GB", "AU", "NZ"])];
 }
 
 async function saveBuildInterest(req, context) {

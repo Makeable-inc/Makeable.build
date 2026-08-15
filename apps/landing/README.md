@@ -28,6 +28,12 @@ and deploys the existing Netlify functions.
 Set `STRIPE_SECRET_KEY` in the deployment environment. The key must remain
 server-side and must never be committed to this repository.
 
+Checkout requires the customer's name, phone number, billing address, and
+shipping address. Shipping is available to Singapore, the United States,
+Canada, the United Kingdom, Australia, and New Zealand by default. To change
+that list, set `STRIPE_ALLOWED_SHIPPING_COUNTRIES` to comma-separated two-letter
+country codes, for example `SG,MY,ID,TH,PH,VN`.
+
 ## Animation assets
 
 - Desktop: `public/frames-v2` (301 optimized WebP frames)
