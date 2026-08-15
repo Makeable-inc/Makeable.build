@@ -3,63 +3,23 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import Lenis from "lenis";
 import gsap from "gsap";
+import SeenOnRealDesks from "./SeenOnRealDesks";
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
 
-const emberColors: Array<{ id: EmberColor; label: string }> = [
-  { id: "sage", label: "Sage" },
+const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
+  { id: "sage", label: "Sage", stock: 5 },
   { id: "bone", label: "Bone" },
-  { id: "blush", label: "Blush" },
-];
-
-const workbenchStories = [
-  {
-    id: "desk",
-    tone: "cobalt",
-    image: "/workbench-01.webp",
-    alt: "Ember glowing beneath a coding monitor beside a keyboard and phone",
-    caption: "Ember keeping watch while the next build takes shape.",
-    review: "Seeing Ember beside my code makes the work feel a little more alive.",
-    author: "Makeable builder · Night shift",
-  },
-  {
-    id: "focus",
-    tone: "clay",
-    image: "/workbench-02.webp",
-    alt: "Ember centered in a focused developer desk setup",
-    caption: "A focused desk setup, with Ember glowing between screen and keyboard.",
-    review: "It turns long build sessions into something warmer and more personal.",
-    author: "Makeable builder · Daily desk",
-  },
-  {
-    id: "night",
-    tone: "midnight",
-    image: "/workbench-03.webp",
-    alt: "Ember plugged in during a late-night coding session",
-    caption: "Ember plugged in and glowing through a late-night coding session.",
-    review: "The tiny screen gives my workspace its own character.",
-    author: "Makeable builder · After hours",
-  },
-  {
-    id: "prototype",
-    tone: "sage",
-    image: "/workbench-04.webp",
-    alt: "Ember on a busy two-monitor prototype workbench",
-    caption: "From first prompt to physical companion, all on one workbench.",
-    review: "It feels like a piece of the project crossed over into the real world.",
-    author: "Makeable builder · Prototype desk",
-  },
+  { id: "blush", label: "Blush", stock: 10 },
 ];
 
 export default function Home() {
   const storyRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const catalogueRef = useRef<HTMLElement>(null);
-  const carouselRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [activeScene, setActiveScene] = useState(0);
-  const [flippedStories, setFlippedStories] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState<EmberColor>("bone");
   const [selectedMarket, setSelectedMarket] = useState<EmberMarket>("US");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
@@ -67,6 +27,7 @@ export default function Home() {
   const [buildEmail, setBuildEmail] = useState("");
   const [buildNotice, setBuildNotice] = useState("");
   const [buildBusy, setBuildBusy] = useState(false);
+  const selectedEmberColor = emberColors.find((color) => color.id === selectedColor);
   useEffect(() => {
     const locale = navigator.language.toUpperCase();
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -346,18 +307,6 @@ export default function Home() {
     window.dispatchEvent(new Event("makeable:show-catalogue"));
   };
 
-  const moveCarousel = (direction: number) => {
-    const rail = carouselRef.current;
-    if (!rail) return;
-    rail.scrollBy({ left: direction * Math.min(rail.clientWidth * 0.82, 720), behavior: "smooth" });
-  };
-
-  const toggleStory = (storyId: string) => {
-    setFlippedStories((current) => current.includes(storyId)
-      ? current.filter((id) => id !== storyId)
-      : [...current, storyId]);
-  };
-
   const handleBuildInterest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBuildBusy(true);
@@ -426,7 +375,18 @@ export default function Home() {
                   ))}
                 </div>
               </fieldset>
-              <strong className="ember-price">USD $49.99</strong>
+              <div className="ember-price-row">
+                <s className="ember-price-was" aria-label="Previous price: 89 dollars and 99 cents USD"><sup>$</sup>89.99</s>
+                <span className="price-arrow" aria-hidden="true">→</span>
+                <strong className="ember-price" aria-label="Now 49 dollars and 99 cents USD"><sup>$</sup>49.99</strong>
+                <span className="discount-tag">44% off</span>
+                {selectedEmberColor?.stock != null && (
+                  <span className="stock-note" role="status">
+                    <span className="stock-flame" aria-hidden="true">🔥</span>
+                    Only {selectedEmberColor.stock} left in stock
+                  </span>
+                )}
+              </div>
               <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
                 {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
               </button>
@@ -439,70 +399,19 @@ export default function Home() {
 
       <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
-          <img className="catalogue-sheet" src="/build-catalogue-page.png" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
+          <img className="catalogue-sheet" src="/build-catalogue-page.png?v=2" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
           <button
             className={`catalogue-preorder ${checkoutBusy ? "is-busy" : ""}`}
             type="button"
             onClick={startCheckout}
             disabled={checkoutBusy}
             aria-label={checkoutBusy ? "Opening Stripe checkout" : "Pre-order Ember for 49 dollars and 99 cents USD"}
-          >
-            <span>{checkoutBusy ? "Opening checkout…" : "Pre-order · USD $49.99"}</span>
-          </button>
+          />
           {checkoutError && <p className="catalogue-checkout-error" role="status">{checkoutError}</p>}
         </div>
       </section>
 
-      <section className="workbench" aria-labelledby="workbench-title">
-        <header className="workbench-header">
-          <div>
-            <span>Community stories</span>
-            <h2 id="workbench-title">From the workbench.</h2>
-          </div>
-          <nav aria-label="Move through workbench stories">
-            <button type="button" onClick={() => moveCarousel(-1)} aria-label="Previous stories">←</button>
-            <button type="button" onClick={() => moveCarousel(1)} aria-label="Next stories">→</button>
-          </nav>
-        </header>
-
-        <div className="workbench-rail" ref={carouselRef}>
-          <article className="workbench-intro">
-            <span aria-hidden="true">✦</span>
-            <h3>From the<br />workbench.</h3>
-            <p>Builds in the wild.</p>
-            <small>New desk stories, always rolling →</small>
-          </article>
-
-          {workbenchStories.map((story, index) => {
-            const isFlipped = flippedStories.includes(story.id);
-            return (
-              <button
-                className={`story-card story-${story.tone} ${isFlipped ? "is-flipped" : ""}`}
-                type="button"
-                key={story.id}
-                aria-pressed={isFlipped}
-                aria-label={isFlipped ? `Show photo: ${story.caption}` : `Read review: ${story.caption}`}
-                onClick={() => toggleStory(story.id)}
-              >
-                <span className="story-card-inner">
-                  <span className="story-face story-front">
-                    <img className="story-photo" src={story.image} alt={story.alt} />
-                    <span className="story-caption"><b>Workbench {String(index + 1).padStart(2, "0")}</b>{story.caption}</span>
-                    <small>Click to read the story ↗</small>
-                  </span>
-                  <span className="story-face story-back">
-                    <b className="quote-mark" aria-hidden="true">“</b>
-                    <strong>{story.review}</strong>
-                    <small>{story.author}</small>
-                    <em>Click to return ↙</em>
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="workbench-rule" aria-hidden="true"><span /><i /></div>
-      </section>
+      <SeenOnRealDesks />
 
       <section className="make-build-feature" id="make-a-build" aria-labelledby="make-build-title">
         <div className="make-build-copy">

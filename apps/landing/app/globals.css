@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
-:root { --paper: #eee5d8; --ink: #10264b; --red: #d93652; }
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/assets/fonts/fredoka/fredoka.woff2?v=1") format("woff2");
+}
+
+:root { --paper: #eee5d8; --ink: #10264b; --red: #d93652; --display: "Fredoka", "Arial Rounded MT Bold", ui-rounded, system-ui, sans-serif; }
 * { box-sizing: border-box; }
 html { scroll-behavior: auto; background: var(--paper); }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: Arial, Helvetica, sans-serif; overflow-x: hidden; }
@@ -41,10 +49,10 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .product-ui { position: absolute; z-index: 7; inset: clamp(.75rem, 2vw, 1.6rem); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .45s ease, visibility .45s; }
 .product-ui.is-visible { opacity: 1; visibility: visible; pointer-events: auto; }
 .makeable-logo { position: absolute; left: clamp(1rem, 3vw, 2.5rem); top: clamp(1rem, 3vw, 2.5rem); width: clamp(9.5rem, 15vw, 15rem); height: auto; object-fit: contain; filter: drop-shadow(0 1px 12px rgba(255,248,238,.72)); }
-.ember-card { position: absolute; right: clamp(1rem, 4.5vw, 5rem); top: 50%; width: clamp(20rem, 31vw, 28rem); max-height: calc(100svh - clamp(4rem, 10vh, 7rem)); padding: clamp(1rem, 1.6vw, 1.55rem); transform: translateY(-50%); overflow-y: auto; border: 0; background: transparent; color: #0b1117; text-shadow: 0 1px 12px rgba(246,238,227,.28); scrollbar-width: thin; }
+.ember-card { position: absolute; right: clamp(1rem, 4.5vw, 5rem); top: 50%; width: clamp(20rem, 31vw, 28rem); max-height: calc(100svh - clamp(4rem, 10vh, 7rem)); padding: clamp(1rem, 1.6vw, 1.55rem); transform: translateY(-50%); overflow-y: auto; border: 0; background: transparent; color: #0b1117; text-shadow: 0 1px 12px rgba(246,238,227,.28); scrollbar-width: thin; container-type: inline-size; }
 .ember-card small { color: #df1749; font: 900 clamp(.62rem, .82vw, .78rem)/1 monospace; letter-spacing: .06em; text-transform: uppercase; }
 .ember-title-row { display: flex; align-items: center; gap: clamp(.7rem, 1.2vw, 1.15rem); margin: .55rem 0 .65rem; }
-.ember-card h1 { margin: 0; font-size: clamp(2.55rem, 4.1vw, 4.8rem); line-height: .82; letter-spacing: -.065em; text-transform: uppercase; }
+.ember-card h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: clamp(2.55rem, 4.1vw, 4.8rem); line-height: .9; letter-spacing: -.02em; text-transform: uppercase; }
 .ember-card h1 span { display: block; }
 .ember-star { flex: 0 0 auto; color: #df1749; font-size: clamp(2.25rem, 3.4vw, 4rem); line-height: 1; transform: rotate(12deg); }
 .ember-card > p { margin: 0; max-width: 26rem; font-size: clamp(.78rem, 1.02vw, 1.05rem); line-height: 1.35; }
@@ -60,7 +68,16 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .color-sage > span { background: #a9c5ad; }
 .color-bone > span { background: #e8dfd1; box-shadow: inset 0 0 0 3px rgba(11,17,23,.08); }
 .color-blush > span { background: #e7a6ad; }
-.ember-price { display: block; margin: clamp(.85rem, 1.3vw, 1.2rem) 0 .55rem; font-size: clamp(1.8rem, 2.8vw, 3rem); line-height: 1; letter-spacing: -.04em; }
+.ember-price-row { display: flex; width: 100%; flex-wrap: nowrap; align-items: center; gap: 1.05cqw; margin: clamp(.85rem, 1.3vw, 1.2rem) 0 .4rem; overflow: visible; white-space: nowrap; }
+.ember-price-row > * { flex: 0 0 auto; }
+.ember-price { display: inline-block; font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-size: 6.4cqw; line-height: 1; letter-spacing: -.01em; white-space: nowrap; }
+.ember-price sup { margin-right: .05em; font-size: .55em; font-weight: 700; vertical-align: .35em; }
+.ember-price-was { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 3.9cqw; line-height: 1; color: rgba(11, 17, 23, .8); opacity: 1; text-decoration-line: line-through; text-decoration-color: #b5402e; text-decoration-thickness: 2px; white-space: nowrap; }
+.ember-price-was sup { margin-right: .02em; font-size: .85em; font-weight: 400; vertical-align: 0; }
+.price-arrow { color: #0b1117; font-size: 2.6cqw; }
+.discount-tag { align-self: center; padding: .5em .78em; border-radius: .48em; background: #cf6138; color: #fff; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: 2.75cqw; font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .035em; text-transform: uppercase; white-space: nowrap; box-shadow: none; text-shadow: none; }
+.stock-note { display: inline-flex; align-items: center; gap: .34em; color: #bd5038; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: 3.45cqw; font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .035em; text-transform: uppercase; white-space: nowrap; text-shadow: none; }
+.stock-flame { display: inline-block; font-size: 1.18em; line-height: .8; transform: translateY(-.03em); }
 .ember-card button { width: 100%; cursor: pointer; text-transform: uppercase; letter-spacing: .045em; }
 .preorder-button { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: clamp(.85rem, 1.25vw, 1.05rem); border: 0; border-radius: .38rem; background: #df1749; color: #fff; font-size: clamp(.75rem, 1vw, 1rem); font-weight: 900; }
 .preorder-button span { font-size: 1.35em; }
@@ -72,52 +89,12 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
 .catalogue { position: relative; z-index: 2; display: grid; min-height: 100svh; place-items: center; overflow: hidden; padding: clamp(2rem, 5vw, 5rem) 0; background: #f0e5d9; color: #090b0c; }
 .catalogue-artwork { position: relative; width: min(100vw, 150svh); aspect-ratio: 3 / 2; }
 .catalogue-sheet { display: block; width: 100%; height: 100%; object-fit: contain; }
-.catalogue-preorder { position: absolute; z-index: 3; left: 11.7%; top: 80.65%; display: flex; width: 18.75%; height: 5.7%; min-height: 2.25rem; align-items: center; justify-content: center; padding: 0 .4rem; border: 0; border-radius: .65rem; background: #e30048; color: #fff; cursor: pointer; box-shadow: 0 .25rem .7rem rgba(137,0,45,.16); }
-.catalogue-preorder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 clamp(.52rem, 1.05vw, 1rem)/1 Arial, sans-serif; }
+.catalogue-preorder { position: absolute; z-index: 3; left: 11.7%; top: 80.65%; width: 18.75%; height: 5.7%; min-height: 2.25rem; padding: 0; border: 0; border-radius: .65rem; background: transparent; color: transparent; cursor: pointer; }
 .catalogue-preorder:hover { background: rgba(255,255,255,.12); box-shadow: 0 0 0 3px rgba(255,255,255,.62), 0 .5rem 1.25rem rgba(137,0,45,.24); }
 .catalogue-preorder:focus-visible { outline: 3px solid #fff; outline-offset: 3px; box-shadow: 0 0 0 6px #df1749; }
 .catalogue-preorder:disabled { cursor: wait; }
-.catalogue-preorder.is-busy { background: rgba(7,22,46,.26); }
+.catalogue-preorder.is-busy { background: transparent; }
 .catalogue-checkout-error { position: absolute; z-index: 4; left: 10.8%; top: 87%; width: 20.5%; margin: 0; padding: .5rem .65rem; border-radius: .5rem; background: rgba(246,238,227,.96); color: #9b1b35; text-align: center; font: 700 clamp(.5rem,.75vw,.7rem)/1.25 Arial,sans-serif; box-shadow: 0 .5rem 1.25rem rgba(24,18,12,.18); }
-.workbench { position: relative; z-index: 2; min-height: auto; padding: clamp(4rem, 8vw, 8rem) 0 clamp(3rem, 5vw, 5rem); overflow: hidden; background: #f6eee4; color: #101417; }
-.workbench-header { display: flex; align-items: end; justify-content: space-between; gap: 2rem; width: min(100% - 3rem, 1500px); margin: 0 auto clamp(1.6rem, 3vw, 3rem); }
-.workbench-header span { color: #df1749; font: 850 .68rem/1 monospace; letter-spacing: .12em; text-transform: uppercase; }
-.workbench-header h2 { margin: .5rem 0 0; font-size: clamp(2.5rem, 5vw, 5.6rem); line-height: .86; letter-spacing: -.065em; text-transform: uppercase; }
-.workbench-header nav { display: flex; gap: .55rem; }
-.workbench-header button { display: grid; width: 3rem; height: 3rem; place-items: center; border: 1.5px solid #101417; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; font-size: 1.25rem; transition: background .2s ease, color .2s ease, transform .2s ease; }
-.workbench-header button:hover { background: #101417; color: #f6eee4; transform: translateY(-2px); }
-.workbench-rail { display: grid; grid-auto-flow: column; grid-auto-columns: clamp(14.5rem, 19vw, 20rem); gap: clamp(.75rem, 1.1vw, 1rem); overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 0 max(1.5rem, calc((100vw - 1500px) / 2)) 1.75rem; }
-.workbench-rail::-webkit-scrollbar { display: none; }
-.workbench-intro, .story-card { min-height: clamp(22rem, 34vw, 30rem); border: 0; border-radius: .7rem; scroll-snap-align: start; box-shadow: 0 .9rem 1.4rem rgba(45,30,18,.12); }
-.workbench-intro { position: relative; display: flex; overflow: hidden; flex-direction: column; padding: clamp(1.2rem, 1.8vw, 1.75rem); background: #f8f1e8; }
-.workbench-intro > span { position: absolute; right: 1rem; top: 1.2rem; color: #df1749; font-size: 2.2rem; }
-.workbench-intro h3 { max-width: 100%; margin: 1.2rem 0 .75rem; font-size: clamp(1.55rem, 2vw, 2.2rem); line-height: .88; letter-spacing: -.055em; text-transform: uppercase; }
-.workbench-intro p { margin: 0; font-size: 1rem; }
-.workbench-intro small { margin-top: auto; padding-top: 1rem; border-bottom: 3px solid #df1749; padding-bottom: 1rem; font-size: .72rem; font-weight: 750; }
-.story-card { position: relative; min-width: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; perspective: 1400px; }
-.story-card:focus-visible { outline: 3px solid #df1749; outline-offset: 4px; }
-.story-card-inner { position: absolute; inset: 0; display: block; transform-style: preserve-3d; transition: transform .72s cubic-bezier(.2,.72,.2,1); }
-.story-card.is-flipped .story-card-inner { transform: rotateY(180deg); }
-.story-face { position: absolute; inset: 0; display: flex; overflow: hidden; flex-direction: column; border-radius: calc(.7rem - 2px); backface-visibility: hidden; }
-.story-front { background: #cfbda8; }
-.story-photo { display: block; width: 100%; min-height: 0; flex: 1; object-fit: cover; object-position: center; }
-.story-caption { display: grid; gap: .35rem; padding: 1rem 1rem .35rem; background: #f8f1e8; text-align: left; font-size: .76rem; line-height: 1.3; }
-.story-caption b { color: #df1749; font: 800 .55rem/1 monospace; letter-spacing: .08em; text-transform: uppercase; }
-.story-front > small { padding: .35rem 1rem 1rem; background: #f8f1e8; text-align: left; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.story-back { justify-content: center; padding: clamp(1.4rem, 2.4vw, 2.25rem); transform: rotateY(180deg); background: #0c4e9c; color: #fff; text-align: left; }
-.story-clay .story-back { background: #d8694e; }
-.story-midnight .story-back { background: #0b1d33; }
-.story-sage .story-back { background: #397552; }
-.story-blush .story-back { background: #f2bac5; color: #b91644; }
-.quote-mark { position: absolute; left: 1.2rem; top: 1rem; font-size: 3rem; line-height: 1; }
-.story-back strong { max-width: 12ch; font-size: clamp(1.6rem, 2.6vw, 2.55rem); line-height: 1.06; letter-spacing: -.035em; }
-.story-back small { margin-top: auto; font: 800 .58rem/1.2 monospace; letter-spacing: .07em; text-transform: uppercase; }
-.story-back em { margin-top: .75rem; font: normal 700 .52rem/1 monospace; letter-spacing: .06em; text-transform: uppercase; opacity: .72; }
-.workbench-rule { position: relative; width: calc(100% - 3rem); height: 1.5rem; margin: clamp(1rem, 2vw, 2rem) auto 0; }
-.workbench-rule::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #101417; }
-.workbench-rule span, .workbench-rule i { position: absolute; top: 50%; width: .65rem; height: .65rem; transform: translateY(-50%); border: 1px solid #101417; border-radius: 50%; background: #d7aa68; }
-.workbench-rule span { left: 0; }
-.workbench-rule i { right: 0; }
 .make-build-feature { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(17rem, .68fr) minmax(0, 1.55fr); align-items: center; gap: clamp(2rem, 5vw, 6rem); min-height: 76svh; padding: clamp(4.5rem, 8vw, 8rem) max(2rem, calc((100vw - 1500px) / 2)); border-top: 1px solid rgba(16,20,23,.12); border-bottom: 1px solid rgba(16,20,23,.12); background: #efe6dd; color: #101417; }
 .make-build-copy { position: relative; z-index: 2; }
 .make-build-copy > span { color: #df1749; font: 850 clamp(.62rem, .78vw, .76rem)/1 monospace; letter-spacing: .08em; text-transform: uppercase; }
@@ -178,7 +155,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
   .makeable-logo { left: clamp(.9rem, 3vw, 1.5rem); top: clamp(.9rem, 3vw, 1.5rem); width: clamp(7.25rem, 25vw, 10rem); }
   .ember-card { left: clamp(.75rem, 3vw, 1.5rem); right: clamp(.75rem, 3vw, 1.5rem); top: auto; bottom: clamp(.35rem, 1vh, .75rem); width: auto; max-height: min(43svh, 27rem); padding: clamp(.75rem, 2vw, 1rem); transform: none; }
   .ember-title-row { margin: .3rem 0 .4rem; gap: .55rem; }
-  .ember-card h1 { max-width: 18rem; font-size: clamp(1.65rem, 5.2vw, 2.4rem); line-height: .83; }
+  .ember-card h1 { max-width: 18rem; font-family: var(--display); font-weight: 600; font-size: clamp(1.65rem, 5.2vw, 2.4rem); line-height: .9; letter-spacing: -.02em; }
   .ember-card h1 span { display: inline-block; margin-right: .18em; }
   .ember-card h1 span:nth-child(2) { margin-right: 0; }
   .ember-card h1 span:last-child { display: block; margin-right: 0; }
@@ -190,7 +167,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
   .color-option { padding: .5rem .3rem; font-size: clamp(.56rem, 1.5vw, .68rem); }
   .color-option > span { width: .72rem; height: .72rem; margin-right: .22rem; vertical-align: -.12rem; }
   .color-option b { margin-left: .18rem; font-size: .68rem; }
-  .ember-price { margin: .55rem 0 .35rem; font-size: 1.55rem; }
+  .ember-price-row { margin: .55rem 0 .25rem; }
   .preorder-button, .other-builds { padding: .65rem .45rem; font-size: .67rem; }
   .other-builds { margin-top: .4rem; }
 }
@@ -206,13 +183,6 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Aria
   .catalogue { min-height: auto; padding: 2.5rem .75rem; }
   .catalogue-artwork { width: min(calc(100vw - 1.5rem), 150svh); }
   .catalogue-preorder { min-height: 2.75rem; top: calc(80.65% - .75rem); }
-  .workbench { min-height: auto; padding: 4rem 0 3.5rem; }
-  .workbench-header { align-items: center; width: calc(100% - 1.5rem); margin-bottom: 1.4rem; }
-  .workbench-header h2 { font-size: clamp(2.25rem, 12vw, 3.5rem); }
-  .workbench-header nav { display: none; }
-  .workbench-rail { grid-auto-columns: min(78vw, 19rem); gap: .75rem; padding: 0 .75rem 1.25rem; }
-  .workbench-intro, .story-card { min-height: 26rem; }
-  .workbench-rule { width: calc(100% - 1.5rem); }
   .make-build-feature { grid-template-columns: 1fr; gap: 2.5rem; min-height: auto; padding: 4.5rem 1.25rem; }
   .make-build-copy h2 { font-size: clamp(3.2rem, 17vw, 5rem); }
   .make-build-copy > p, .build-interest, .preview-build-button { max-width: none; }
