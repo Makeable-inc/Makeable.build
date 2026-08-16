@@ -235,3 +235,5 @@ The dream is simple:
 **Tagline:** Codex For Hardware
 
 Small tool. Big hardware confidence. ⚡
+
+<!-- Netlify redeploy marker: 2026-08-16 -->
