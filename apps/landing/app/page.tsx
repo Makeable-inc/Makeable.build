@@ -34,8 +34,13 @@ export default function Home() {
   const [productPresentationVisible, setProductPresentationVisible] = useState(false);
   const [selectedColor, setSelectedColor] = useState<EmberColor>("bone");
   const [selectedMarket, setSelectedMarket] = useState<EmberMarket>("US");
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const checkoutCloseRef = useRef<HTMLButtonElement>(null);
   const [checkoutSuccessOpen, setCheckoutSuccessOpen] = useState(false);
   const checkoutSuccessCloseRef = useRef<HTMLButtonElement>(null);
   const [buildEmail, setBuildEmail] = useState("");
@@ -94,6 +99,22 @@ export default function Home() {
       previouslyFocused?.focus();
     };
   }, [checkoutSuccessOpen]);
+
+  useEffect(() => {
+    if (!checkoutOpen) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    checkoutCloseRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !checkoutBusy) setCheckoutOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      previouslyFocused?.focus();
+    };
+  }, [checkoutBusy, checkoutOpen]);
 
   useEffect(() => {
     const updateSequenceMode = () => {
@@ -361,14 +382,30 @@ export default function Home() {
     };
   }, [sequenceMode]);
 
-  const startCheckout = async () => {
+  const openCheckout = () => {
+    setCheckoutError("");
+    setCheckoutOpen(true);
+  };
+
+  const startCheckout = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!termsAccepted) {
+      setCheckoutError("Please agree to the Terms and acknowledge the Privacy Policy.");
+      return;
+    }
     setCheckoutBusy(true);
     setCheckoutError("");
     try {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ color: selectedColor, market: selectedMarket }),
+        body: JSON.stringify({
+          color: selectedColor,
+          market: selectedMarket,
+          quantity,
+          termsAccepted,
+          marketingConsent,
+        }),
       });
       const contentType = response.headers.get("content-type") || "";
       const result = contentType.includes("application/json")
@@ -499,8 +536,9 @@ export default function Home() {
                   </span>
                 )}
               </div>
-              <button className="preorder-button" type="button" onClick={startCheckout} disabled={checkoutBusy}>
-                {checkoutBusy ? "Opening checkout…" : "Pre-order Ember"}<span aria-hidden="true">✦</span>
+              <p className="shipping-estimate">Shipping in October 2026.</p>
+              <button className="preorder-button" type="button" onClick={openCheckout}>
+                Pre-order Ember<span aria-hidden="true">✦</span>
               </button>
               <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
               {checkoutError && <p className="checkout-error" role="status">{checkoutError}</p>}
@@ -515,9 +553,8 @@ export default function Home() {
           <button
             className={`catalogue-preorder ${checkoutBusy ? "is-busy" : ""}`}
             type="button"
-            onClick={startCheckout}
-            disabled={checkoutBusy}
-            aria-label={checkoutBusy ? "Opening Stripe checkout" : "Pre-order Ember for 49 dollars and 99 cents USD"}
+            onClick={openCheckout}
+            aria-label="Pre-order Ember for 49 dollars and 99 cents USD"
           />
           {checkoutError && <p className="catalogue-checkout-error" role="status">{checkoutError}</p>}
         </div>
@@ -582,6 +619,95 @@ export default function Home() {
           <span>@Makeable 2026</span>
         </div>
       </footer>
+
+      {checkoutOpen && (
+        <div
+          className="checkout-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !checkoutBusy) setCheckoutOpen(false);
+          }}
+        >
+          <form
+            className="checkout-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="checkout-title"
+            onSubmit={startCheckout}
+          >
+            <button
+              ref={checkoutCloseRef}
+              className="checkout-dialog-close"
+              type="button"
+              aria-label="Close preorder options"
+              onClick={() => setCheckoutOpen(false)}
+              disabled={checkoutBusy}
+            >
+              ×
+            </button>
+            <small>Build 001 preorder</small>
+            <h2 id="checkout-title">Make Ember yours.</h2>
+            <p className="checkout-shipping">Estimated shipping: October 2026.</p>
+
+            <div className="checkout-summary">
+              <span>{selectedEmberColor?.label ?? "Beige"} Ember</span>
+              <strong>USD ${(49.99 * quantity).toFixed(2)}</strong>
+            </div>
+
+            <fieldset className="quantity-picker">
+              <legend>Quantity</legend>
+              <div>
+                <button
+                  type="button"
+                  aria-label="Decrease quantity"
+                  onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                  disabled={quantity <= 1 || checkoutBusy}
+                >
+                  −
+                </button>
+                <output aria-live="polite" aria-label={`${quantity} Ember kits`}>{quantity}</output>
+                <button
+                  type="button"
+                  aria-label="Increase quantity"
+                  onClick={() => setQuantity((current) => Math.min(10, current + 1))}
+                  disabled={quantity >= 10 || checkoutBusy}
+                >
+                  +
+                </button>
+              </div>
+              <p>Up to 10 kits per order.</p>
+            </fieldset>
+
+            <div className="checkout-consents">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(event) => setTermsAccepted(event.target.checked)}
+                  required
+                />
+                <span>
+                  I agree to the <a href="/terms/" target="_blank" rel="noreferrer">Terms</a> and acknowledge the <a href="/privacy/" target="_blank" rel="noreferrer">Privacy Policy</a>.
+                </span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={marketingConsent}
+                  onChange={(event) => setMarketingConsent(event.target.checked)}
+                />
+                <span>Email me product news, launch updates, and occasional offers. Optional.</span>
+              </label>
+            </div>
+
+            <button className="checkout-continue" type="submit" disabled={checkoutBusy || !termsAccepted}>
+              {checkoutBusy ? "Opening secure checkout…" : "Continue to secure checkout"}
+              <span aria-hidden="true">→</span>
+            </button>
+            {checkoutError && <p className="checkout-dialog-error" role="alert">{checkoutError}</p>}
+          </form>
+        </div>
+      )}
 
       {checkoutSuccessOpen && (
         <div

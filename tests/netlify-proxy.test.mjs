@@ -134,7 +134,11 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   };
 
   const response = await handler(
-    new Request(`${productionOrigin}/api/checkout`, { method: "POST" }),
+    new Request(`${productionOrigin}/api/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ termsAccepted: true, quantity: 2 }),
+    }),
   );
   const result = await response.json();
 
@@ -146,11 +150,20 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4999");
   assert.equal(
     stripeRequest.options.body.get("line_items[0][price_data][product_data][name]"),
-    "Makeable Ember -- Beige",
+    "Makeable Ember — Beige",
   );
   assert.equal(
     stripeRequest.options.body.get("line_items[0][price_data][product_data][description]"),
-    "Desk pet kit display with USB-C",
+    "Token-burner desk pet. Easy-to-assemble kit, USB-C cable included. Pre-order — ships October",
+  );
+  assert.equal(stripeRequest.options.body.get("line_items[0][quantity]"), "2");
+  assert.equal(stripeRequest.options.body.get("metadata[quantity]"), "2");
+  assert.equal(stripeRequest.options.body.get("metadata[terms_accepted]"), "true");
+  assert.equal(stripeRequest.options.body.get("metadata[privacy_acknowledged]"), "true");
+  assert.equal(stripeRequest.options.body.get("metadata[marketing_consent]"), "false");
+  assert.equal(
+    stripeRequest.options.body.get("custom_text[shipping_address][message]"),
+    "Pre-orders are expected to ship in October 2026.",
   );
   assert.equal(stripeRequest.options.body.get("customer_creation"), "always");
   assert.equal(stripeRequest.options.body.get("billing_address_collection"), "required");
@@ -223,18 +236,60 @@ test("Ember checkout uses fixed Singapore pricing for Singapore orders", async (
     new Request(`${productionOrigin}/api/checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ color: "sage", market: "SG" }),
+      body: JSON.stringify({
+        color: "sage",
+        market: "SG",
+        quantity: 4,
+        termsAccepted: true,
+        marketingConsent: true,
+      }),
     }),
   );
 
   assert.equal(response.status, 200);
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][currency]"), "sgd");
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "5999");
+  assert.equal(stripeRequest.options.body.get("line_items[0][quantity]"), "4");
   assert.equal(stripeRequest.options.body.get("metadata[market]"), "SG");
+  assert.equal(stripeRequest.options.body.get("metadata[marketing_consent]"), "true");
   assert.deepEqual(
     stripeRequest.options.body.getAll("shipping_address_collection[allowed_countries][]"),
     ["US", "SG"],
   );
+});
+
+test("Ember checkout requires legal consent and validates order quantity before Stripe", async (t) => {
+  installEnvironment(t, { STRIPE_SECRET_KEY: "sk_test_local" });
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Stripe should not be called");
+  };
+
+  const missingConsent = await handler(
+    new Request(`${productionOrigin}/api/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity: 2 }),
+    }),
+  );
+  const invalidQuantity = await handler(
+    new Request(`${productionOrigin}/api/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity: 11, termsAccepted: true }),
+    }),
+  );
+
+  assert.equal(missingConsent.status, 400);
+  assert.deepEqual(await missingConsent.json(), {
+    error: "Agree to the Terms and acknowledge the Privacy Policy to continue.",
+  });
+  assert.equal(invalidQuantity.status, 400);
+  assert.deepEqual(await invalidQuantity.json(), {
+    error: "Choose a quantity between 1 and 10.",
+  });
+  assert.equal(fetchCalls, 0);
 });
 
 test("Make a Build interest endpoint validates email before durable storage", async (t) => {

@@ -178,12 +178,30 @@ async function createEmberCheckout(req, env) {
   };
   let selectedColor = "bone";
   let selectedMarket = "US";
+  let quantity = 1;
+  let termsAccepted = false;
+  let marketingConsent = false;
   try {
     const requestBody = await req.json();
     if (allowedColors.has(requestBody?.color)) selectedColor = requestBody.color;
     if (Object.hasOwn(checkoutMarkets, requestBody?.market)) selectedMarket = requestBody.market;
+    if (Number.isInteger(requestBody?.quantity)) quantity = requestBody.quantity;
+    termsAccepted = requestBody?.termsAccepted === true;
+    marketingConsent = requestBody?.marketingConsent === true;
   } catch {
     // Preserve the default color and market for requests without a JSON body.
+  }
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
+    return jsonResponse({ error: "Choose a quantity between 1 and 10." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+  if (!termsAccepted) {
+    return jsonResponse(
+      { error: "Agree to the Terms and acknowledge the Privacy Policy to continue." },
+      400,
+      { "Cache-Control": "no-store" },
+    );
   }
   const colorLabels = {
     sage: "Sage",
@@ -201,12 +219,19 @@ async function createEmberCheckout(req, env) {
     "name_collection[individual][optional]": "false",
     "line_items[0][price_data][currency]": market.currency,
     "line_items[0][price_data][unit_amount]": market.unitAmount,
-    "line_items[0][price_data][product_data][name]": `Makeable Ember -- ${colorLabel}`,
+    "line_items[0][price_data][product_data][name]": `Makeable Ember — ${colorLabel}`,
     "line_items[0][price_data][product_data][description]":
-      "Desk pet kit display with USB-C",
-    "line_items[0][quantity]": "1",
+      "Token-burner desk pet. Easy-to-assemble kit, USB-C cable included. Pre-order — ships October",
+    "line_items[0][quantity]": String(quantity),
     "metadata[ember_color]": selectedColor,
     "metadata[market]": selectedMarket,
+    "metadata[quantity]": String(quantity),
+    "metadata[terms_accepted]": "true",
+    "metadata[privacy_acknowledged]": "true",
+    "metadata[marketing_consent]": marketingConsent ? "true" : "false",
+    "metadata[consent_version]": "2026-08-16",
+    "custom_text[shipping_address][message]":
+      "Pre-orders are expected to ship in October 2026.",
     success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?checkout=cancelled`,
     integration_identifier: "makeable_ember_qtmsvkwp",
