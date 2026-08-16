@@ -59,15 +59,23 @@ test("the production landing and pilot stay packaged as self-contained experienc
 
   const privacyHtml = await readFile(path.join(root, "dist", "privacy", "index.html"), "utf8");
   const termsHtml = await readFile(path.join(root, "dist", "terms", "index.html"), "utf8");
-  assert.match(privacyHtml, /Google sign-in supplies your name, email address, and email verification/);
-  assert.match(privacyHtml, /stable account identifier/);
-  assert.match(privacyHtml, /does not store either in new waitlist records/);
-  assert.match(privacyHtml, /random, HttpOnly browser/);
-  assert.match(privacyHtml, /not a Google credential/);
-  assert.match(privacyHtml, /Netlify Blobs/);
+  assert.match(privacyHtml, /Google sign-in supplies your\s+name, email address, email-verification status/);
+  assert.match(privacyHtml, /stable account\s+identifier/);
+  assert.match(privacyHtml, /does not store\s+the stable identifier or profile-image URL in new waitlist records/);
+  assert.match(privacyHtml, /random, HttpOnly\s+confirmation cookie/);
+  assert.match(privacyHtml, /Stripe collects and processes your payment\s+credentials/);
+  assert.match(privacyHtml, /billing address, and shipping address/);
+  assert.match(privacyHtml, /Marketing\s+consent is optional/);
+  assert.match(privacyHtml, /Netlify and other hosting/);
+  assert.match(privacyHtml, /International transfers/);
   assert.match(privacyHtml, /mohammedkhambhati2020@gmail\.com/);
-  assert.match(termsHtml, /Early access, not a finished product/);
-  assert.match(termsHtml, /acceptable-use rules/);
+  assert.match(termsHtml, /Terms of use and preorder/);
+  assert.match(termsHtml, /October 2026/);
+  assert.match(termsHtml, /Shipping delays, cancellations, and refunds/);
+  assert.match(termsHtml, /mandatory consumer rights/);
+  assert.match(termsHtml, /governed by the laws of Singapore/);
+  assert.equal((privacyHtml.match(/makeable-logo-tight\.webp/g) || []).length, 1);
+  assert.equal((termsHtml.match(/makeable-logo-tight\.webp/g) || []).length, 1);
 
   await assert.rejects(access(path.join(root, "dist", "app.js")));
   await assert.rejects(access(path.join(root, "dist", "styles.css")));
