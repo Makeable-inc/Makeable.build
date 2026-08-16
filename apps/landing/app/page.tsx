@@ -12,8 +12,8 @@ type SequenceMode = "desktop" | "mobile";
 
 const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "sage", label: "Sage", stock: 5 },
-  { id: "bone", label: "Bone" },
-  { id: "blush", label: "Blush", stock: 10 },
+  { id: "bone", label: "Beige" },
+  { id: "blush", label: "Sakura", stock: 10 },
 ];
 
 function BrandStar() {
@@ -410,7 +410,7 @@ export default function Home() {
           : "We could not save your email right now."));
       }
       setBuildEmail("");
-      setBuildNotice("You’re on the list — we’ll share Make a Build updates with you.");
+      setBuildNotice("You’re on the list - we’ll share Make a Build updates with you.");
     } catch (error) {
       setBuildNotice(error instanceof Error ? error.message : "We could not save your email right now.");
     } finally {

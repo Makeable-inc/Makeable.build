@@ -144,6 +144,14 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   assert.equal(stripeRequest.options.headers.Authorization, "Bearer sk_test_local");
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][currency]"), "usd");
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4999");
+  assert.equal(
+    stripeRequest.options.body.get("line_items[0][price_data][product_data][name]"),
+    "Makeable Ember -- Beige",
+  );
+  assert.equal(
+    stripeRequest.options.body.get("line_items[0][price_data][product_data][description]"),
+    "Desk pet kit display with USB-C",
+  );
   assert.equal(stripeRequest.options.body.get("customer_creation"), "always");
   assert.equal(stripeRequest.options.body.get("billing_address_collection"), "required");
   assert.deepEqual(

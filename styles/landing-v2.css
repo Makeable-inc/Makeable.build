@@ -54,7 +54,7 @@ html {
   /*
     Fluid root: rem = 16px at ~1440px viewport, so the design is unchanged
     there. The px part scales with browser zoom; the vw part scales with
-    window width — so everything sized in rem scales together on both.
+    window width - so everything sized in rem scales together on both.
   */
   font-size: clamp(15px, 11px + 0.35vw, 20px);
   min-width: 20rem;
@@ -238,7 +238,7 @@ figure {
   align-self: start;
   grid-template-columns: minmax(0, 1fr);
   place-items: center;
-  /* The left rail is scroll-locked — its contents never reflow or scroll;
+  /* The left rail is scroll-locked - its contents never reflow or scroll;
      they scale as one unit to fit whatever window height is available. */
   overflow: hidden;
   background-color: var(--bench-bg);
@@ -612,7 +612,7 @@ figure {
 
 /*
   Vertical torn-paper seam between the hero (left) and story (right)
-  columns — a white grainy strip roughened with the shared torn-paper
+  columns - a white grainy strip roughened with the shared torn-paper
   filter, matching the footer separator. It is a layout-level element so
   it spans the full document height (past the sticky hero) and covers the
   boundary all the way down beside the footer.

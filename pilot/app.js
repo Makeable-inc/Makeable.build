@@ -474,8 +474,8 @@ function renderPhotoPrepStep() {
   els.photoPrepCounter.textContent = `Photo check · ${state.photoPrepStep + 1} of ${PHOTO_PREP_STEPS.length}`;
   els.photoPrepBackButton.hidden = state.photoPrepStep === 0;
   els.photoPrepNextButton.textContent = state.photoPrepStep === PHOTO_PREP_STEPS.length - 1
-    ? "Looks good — choose photo"
-    : "Got it — next";
+    ? "Looks good - choose photo"
+    : "Got it - next";
   els.photoPrepProgress.forEach((marker, index) => {
     marker.classList.toggle("is-active", index === state.photoPrepStep);
     marker.classList.toggle("is-complete", index < state.photoPrepStep);

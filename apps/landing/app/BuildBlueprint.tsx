@@ -5,7 +5,7 @@ const BLUE = "#0c4e9c"; // --mk-blue, the brand cobalt (not --ink, which is navy
 const INK = "#12161a";
 const PAPER = "#f8f4ec"; // sheet tone, used to occlude where solids overlap
 
-// Registration mark: a dotted cross sitting on the fold line — four equally
+// Registration mark: a dotted cross sitting on the fold line - four equally
 // heavy arms broken at the centre, the vertical pair a little longer than the
 // horizontal so the mark reads upright rather than square.
 function Mark({ x, y }: { x: number; y: number }) {
@@ -43,7 +43,7 @@ export default function BuildBlueprint() {
           <path d="M26 44C180 32 320 32 470 41c170 10 312 10 462 0 154-10 304-10 442 2v462c-138 12-288 12-442 2-150-10-292-10-462 0-150 9-290 9-444-3Z" />
         </clipPath>
 
-        {/* Crease shading — light catches one side of each fold, shadow falls on the other. */}
+        {/* Crease shading - light catches one side of each fold, shadow falls on the other. */}
         <linearGradient id="bp-fold" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor="#8a6f4e" stopOpacity="0" />
           <stop offset=".42" stopColor="#8a6f4e" stopOpacity=".22" />
@@ -89,7 +89,7 @@ export default function BuildBlueprint() {
         <rect x="932" y="86" width="406" height="380" />
       </g>
 
-      {/* Marks straddle the folds at 25% and 75% of the page height — where the
+      {/* Marks straddle the folds at 25% and 75% of the page height - where the
           staples would sit on a saddle-stitched booklet. */}
       <Mark x={470} y={181} />
       <Mark x={470} y={371} />
@@ -120,7 +120,7 @@ export default function BuildBlueprint() {
         We prepare the parts.
       </text>
 
-      {/* Every part carries a second contour offset inside the first — that doubled
+      {/* Every part carries a second contour offset inside the first - that doubled
           line is what gives the reference parts their moulded thickness. */}
       <g fill="none" stroke={BLUE} strokeWidth="2.2" strokeLinejoin="round">
         {/* front shell */}
@@ -179,7 +179,7 @@ export default function BuildBlueprint() {
       </g>
 
       <g fill="none" stroke={BLUE} strokeWidth="2.2" strokeLinejoin="round">
-        {/* looped lead with twin plugs — cord drawn as a tube so it reads as cable */}
+        {/* looped lead with twin plugs - cord drawn as a tube so it reads as cable */}
         <path d="M600 370c-54 0-88 8-88 26s34 26 88 26v-12c-46 0-74-6-74-14s28-14 74-14Z" />
         <rect x="600" y="364" width="26" height="64" rx="7" />
         <path d="M606 372v48M613 370v52M620 372v48" strokeWidth="1.1" opacity=".7" />
@@ -219,15 +219,15 @@ export default function BuildBlueprint() {
           base rim and four castors. Centred on the card by measured bounds. */}
       {/* Back-to-front: side and top planes, knob and feet are drawn first, then the
           front face lands on top filled with the paper tone so it hides the parts
-          that should sit behind it — no hidden lines to erase. */}
+          that should sit behind it - no hidden lines to erase. */}
       {/* Drawn as a light product sketch, not an icon: hairline strokes, tonal
           planes for form, and small delicate features. */}
       {/* A real box in three-quarter view. Depth vector (+18,-14): the top and right
           faces are built on it, the front face is filled so it occludes their inner
           halves, and both seams wrap onto the right face along the same vector.
           Taller than wide, as in the reference. */}
-      {/* scaled 1.2× about its own drawn centre, then placed so those bounds — not
-          the front face — sit on the card's centreline */}
+      {/* scaled 1.2× about its own drawn centre, then placed so those bounds - not
+          the front face - sit on the card's centreline */}
       <g transform="translate(1137 320) scale(1.2) translate(-1137 -320) translate(-4 1.5)">
       <g stroke={BLUE} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
         <path d="M1104 300l18-26q4-4 12-4h34q12 0 12 12v18Z" fill="#f1f5fa" />
@@ -267,7 +267,7 @@ export default function BuildBlueprint() {
 
       <path d="M986 390h302" stroke={BLUE} strokeWidth="2" />
 
-      {/* divider at 390, card floor at 438 — both controls centre on that band (y 414) */}
+      {/* divider at 390, card floor at 438 - both controls centre on that band (y 414) */}
       <rect x="1004" y="398" width="126" height="32" rx="6" fill={BLUE} />
       <text x="1067" y="419" fill="#fff" fontSize="16" fontWeight="700" textAnchor="middle">
         BUILD THIS

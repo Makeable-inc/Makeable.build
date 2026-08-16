@@ -398,7 +398,7 @@ Do not treat IP address as identity; households and schools share IPs. Use it as
 
 ## Migration plan
 
-### Phase 1 — Secure foundation
+### Phase 1 - Secure foundation
 
 1. Create a production OpenAI project/key with spend limits and a webhook signing secret.
 2. Provision Render Starter web service and paid Render Postgres in the same region.
@@ -406,7 +406,7 @@ Do not treat IP address as identity; households and schools share IPs. Use it as
 4. Introduce migrations for users, credit account, immutable ledger, generations, AI calls, and webhook events.
 5. Add `/healthz`, structured logs, request IDs, body limits, and error redaction.
 
-### Phase 2 — Replace the proxy
+### Phase 2 - Replace the proxy
 
 1. Create `POST /v1/generations` and `GET /v1/generations/:id`.
 2. Move prompts, schemas, model selection, reasoning effort, and retry rules to server modules.
@@ -415,14 +415,14 @@ Do not treat IP address as identity; households and schools share IPs. Use it as
 5. Record token usage and estimated cost per call.
 6. Delete or permanently reject the generic `/api/openai/*` routes.
 
-### Phase 3 — Simplify the frontend
+### Phase 3 - Simplify the frontend
 
 1. Remove Deepgram key, OpenAI model, reasoning model, and provider status controls from Settings.
 2. Add sign-in, balance, usage history, “credits remaining,” and clear charge/refund messages.
 3. Replace direct OpenAI polling with internal generation polling.
 4. Add the authenticated Deepgram token endpoint.
 
-### Phase 4 — Integrations and hardware
+### Phase 4 - Integrations and hardware
 
 1. Replace shared GitHub token publishing with user OAuth, or ship download-only first.
 2. Design the isolated compile worker.

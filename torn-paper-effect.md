@@ -1,11 +1,11 @@
-# Torn-paper grain effect — portable snippet
+# Torn-paper grain effect - portable snippet
 
 The frayed "torn paper" grain used on cards and seams (e.g. the footer
 separator). Two pieces are required: (1) the SVG filter definitions, and
 (2) CSS that applies the filter to a background-only layer.
 
 > ⚠️ The filter frays *edges*, so only apply it to background layers
-> (strips, backing panels, `::before`/`::after` pseudo-elements) — never
+> (strips, backing panels, `::before`/`::after` pseudo-elements) - never
 > directly to elements containing text, or the text warps.
 
 ---
@@ -60,8 +60,8 @@ visible (width/height 0); it just registers the reusable filters.
 </svg>
 ```
 
-- `#torn-paper` — coarser fray (bigger, more dramatic tears).
-- `#torn-paper-fine` — finer fray. This is the one used almost everywhere,
+- `#torn-paper` - coarser fray (bigger, more dramatic tears).
+- `#torn-paper-fine` - finer fray. This is the one used almost everywhere,
   including cards and seams.
 
 ---
@@ -119,4 +119,4 @@ page. Tune `scale` on the SVG filter for more/less fraying.
 - Safari renders `feDisplacementMap` fine but can be slower; keep filtered
   layers small (thin strips, backing panels) rather than full-page.
 - Color the layer with `background-color` (or a `background` texture); the
-  filter only reshapes the edges — it doesn't add color.
+  filter only reshapes the edges - it doesn't add color.

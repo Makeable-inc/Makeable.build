@@ -46,7 +46,7 @@
 
 ### Spacing Variables
 
-*Density: 2/10 — Spacious*
+*Density: 2/10 - Spacious*
 
 | Token | Value | Usage |
 |-------|-------|-------|
@@ -181,7 +181,7 @@
 
 ## Motion
 
-**Page Transition** (Subtle) — Trigger: route change | Duration: 200-300ms | Easing: `power1.inOut`
+**Page Transition** (Subtle) - Trigger: route change | Duration: 200-300ms | Easing: `power1.inOut`
 
 ```js
 gsap.to(main, { opacity: 0, duration: 0.2, onComplete: () => { navigate(); gsap.fromTo(main, { opacity: 0 }, { opacity: 1, duration: 0.2 }); } });
@@ -202,12 +202,12 @@ gsap.to(main, { opacity: 0, duration: 0.2, onComplete: () => { navigate(); gsap.
 
 ### Additional Forbidden Patterns
 
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
+- ❌ **Emojis as icons** - Use SVG icons (Heroicons, Lucide, Simple Icons)
+- ❌ **Missing cursor:pointer** - All clickable elements must have cursor:pointer
+- ❌ **Layout-shifting hovers** - Avoid scale transforms that shift layout
+- ❌ **Low contrast text** - Maintain 4.5:1 minimum contrast ratio
+- ❌ **Instant state changes** - Always use transitions (150-300ms)
+- ❌ **Invisible focus states** - Focus states must be visible for a11y
 
 ---
 

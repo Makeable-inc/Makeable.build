@@ -211,7 +211,7 @@ async function submitGoogleCredential(credential) {
     } finally {
       window.clearTimeout(timeout);
     }
-    setStatus("Connection interrupted—retrying your signup…", "info");
+    setStatus("Connection interrupted-retrying your signup…", "info");
     await wait(300 * 2 ** attempt);
   }
   throw new Error(
@@ -247,7 +247,7 @@ function showWaitlistSuccess({ returning = false } = {}) {
   note.replaceChildren(
     document.createTextNode(
       returning
-        ? "You’re all set—this browser remembers your confirmed signup."
+        ? "You’re all set-this browser remembers your confirmed signup."
         : "Your confirmed waitlist signup is saved in this browser.",
     ),
   );
@@ -726,7 +726,7 @@ function setupGoogleWave() {
   hero is scroll-locked (overflow: hidden) and must never reflow, so instead
   of compacting the composition on short windows we scale the whole
   .hero-message as one unit to fit the available height. The design keeps its
-  exact layout at every window size — it only ever shrinks, never grows past
+  exact layout at every window size - it only ever shrinks, never grows past
   its natural (width-driven) size.
 */
 function setupHeroFit() {
@@ -738,7 +738,7 @@ function setupHeroFit() {
   const round = (v) => Math.round(v * 1000) / 1000;
 
   function fit() {
-    // The stacked single-column layout flows naturally — no scaling there.
+    // The stacked single-column layout flows naturally - no scaling there.
     if (!twoColumn.matches) {
       content.style.transform = "";
       return;

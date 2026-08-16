@@ -41,7 +41,7 @@ All eleven supplied references were inspected at their original resolution. They
 
 ## 4. Experience architecture
 
-### Stage 1 — Describe
+### Stage 1 - Describe
 
 The default route is `#capture`. The user types or speaks an idea in ordinary language and can attach a sketch. Three example scraps show the expected level of specificity without turning the page into a template picker.
 
@@ -54,7 +54,7 @@ Required states:
 - Validation when no idea is provided
 - Continue to Scan Parts
 
-### Stage 2 — Scan Parts
+### Stage 2 - Scan Parts
 
 The route is `#plan`. The user uploads a desk photo or captures one with the camera. Makeable asks the planning model to identify only relevant visible components and returns normalized photo boxes, names, confidence, wiring choices, warnings, and missing parts.
 
@@ -69,7 +69,7 @@ Required states:
 - Missing-parts recovery
 - Planning error with retry
 
-### Stage 3 — Build + Load
+### Stage 3 - Build + Load
 
 The route is `#flash`. This is one stage with two explicit modes: Wiring and Connect + load. The wiring mode turns the returned plan into a stepper. The load mode generates ESP32 firmware behind the scenes, compiles it on the hosted backend, and loads it through Web Serial. Source code, compiler settings, and board-target settings are not exposed to the user.
 
@@ -84,7 +84,7 @@ Required states:
 - Board connect and flash progress
 - Flash success/recovery
 
-### Stage 4 — Test
+### Stage 4 - Test
 
 The route is `#verify`. The automatic check combines serial output with optional camera evidence. The manual check translates the plan's expected behavior into concrete human actions and a clear pass/fix choice.
 
@@ -98,7 +98,7 @@ Required states:
 - Passed test
 - Troubleshooting recommendation
 
-### Stage 5 — Publish
+### Stage 5 - Publish
 
 The route is `#document`. Makeable generates project notes and publishes the README through the GitHub API when credentials are configured. Firmware source and binary downloads are not offered.
 
@@ -141,7 +141,7 @@ Color is used as wayfinding, not decoration alone. A stage keeps the same color 
 - Main work surfaces are white torn-paper cards over a cream fiber texture.
 - Washi tape anchors important cards and changes pattern/color across the flow.
 - Buttons are broad paper strips with slight rotation and imperfect edges.
-- Doodles—arrows, sparkles, underlines, motion marks—explain attention and causality.
+- Doodles-arrows, sparkles, underlines, motion marks-explain attention and causality.
 - Shadows stay shallow and diffuse so the UI reads as paper on a desk, not glass floating in space.
 
 ### Layout
@@ -182,15 +182,15 @@ Serial, camera, and automatic-test output share one status grammar: waiting, act
 
 Production assets live in `images/makeable/`.
 
-- `self-watering-kit.png` — generated hero/feature illustration showing the complete build.
-- `scan-parts.svg` — upload/camera instruction drawing.
-- `plant-doodle.svg` — lightweight idea-state illustration.
-- `icon-chat.svg` — Describe stage.
-- `icon-camera.svg` — Scan Parts stage.
-- `icon-code.svg` — Build + Code stage.
-- `icon-bolt.svg` — Test stage.
-- `icon-globe.svg` — Publish stage.
-- `icon-paperclip.svg` — sketch attachment.
+- `self-watering-kit.png` - generated hero/feature illustration showing the complete build.
+- `scan-parts.svg` - upload/camera instruction drawing.
+- `plant-doodle.svg` - lightweight idea-state illustration.
+- `icon-chat.svg` - Describe stage.
+- `icon-camera.svg` - Scan Parts stage.
+- `icon-code.svg` - Build + Code stage.
+- `icon-bolt.svg` - Test stage.
+- `icon-globe.svg` - Publish stage.
+- `icon-paperclip.svg` - sketch attachment.
 
 The SVGs provide crisp UI marks and may be recolored by state. The generated PNG provides the hand-rendered feature art that would feel synthetic if drawn entirely with CSS. Source concept art is retained at `design/makeable-ui-concept.png`.
 

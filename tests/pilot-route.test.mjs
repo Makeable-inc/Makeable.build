@@ -93,7 +93,7 @@ test("the parts scan teaches photo setup and starts recognition automatically", 
   assert.match(pilotScript, /const PHOTO_PREP_STEPS = \[/);
   assert.equal((pilotScript.match(/photo-tip-(?:lighting|spacing|angle)\.jpg/g) || []).length, 3);
   assert.match(pilotScript, /photoPrepDialog\.showModal\(\)/);
-  assert.match(pilotScript, /Looks good — choose photo/);
+  assert.match(pilotScript, /Looks good - choose photo/);
   assert.match(pilotScript, /if \(!state\.photoPrepComplete\)/);
   assert.match(pilotScript, /displayImg\.onload = \(\) => \{[\s\S]*?void analyzeHardware\(\);/);
   assert.match(pilotScript, /function setScanProcessStep\(activeStep\)/);
