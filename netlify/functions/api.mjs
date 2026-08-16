@@ -1,6 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import { OAuth2Client } from "google-auth-library";
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createGoogleWaitlistResult } from "../../lib/acquisition.mjs";
 import {
   clearDashboardSessionCookie,
@@ -27,6 +27,9 @@ import {
 } from "../../lib/waitlist-session.mjs";
 
 const googleVerifiers = new Map();
+const EMBER_OFFER_VERSION = "ember_usd_3499_free_shipping_oct_2026_v1";
+const POSTHOG_PROJECT_TOKEN = "phc_rfcnAWiEY6337gWcv54R8JHBNQ5K2iYy2Hd76ZUM6CJH";
+const POSTHOG_CAPTURE_URL = "https://us.i.posthog.com/capture/";
 
 export default async function handler(req, context = {}) {
   try {
@@ -42,8 +45,12 @@ export default async function handler(req, context = {}) {
       return jsonResponse(await resolvedPublicConfig(env));
     }
 
+    if (localApiPath === "/api/stripe/webhook") {
+      return await stripeWebhook(req, env);
+    }
+
     if (localApiPath === "/api/checkout") {
-      return await createEmberCheckout(req, env);
+      return await createEmberCheckout(req, env, context);
     }
 
     if (localApiPath === "/api/checkout/status") {
@@ -143,6 +150,7 @@ function getEnv() {
     "DASHBOARD_ACCESS_KEY",
     "DASHBOARD_SESSION_SECRET",
     "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
   ];
   return Object.fromEntries(keys.map((key) => [key, envValue(key)]));
 }
@@ -157,7 +165,7 @@ function normalizedLocalApiPath(pathname) {
   return normalized;
 }
 
-async function createEmberCheckout(req, env) {
+async function createEmberCheckout(req, env, context) {
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405, {
       Allow: "POST",
@@ -181,6 +189,7 @@ async function createEmberCheckout(req, env) {
   let quantity = 1;
   let termsAccepted = false;
   let marketingConsent = false;
+  let posthogDistinctId = "";
   try {
     const requestBody = await req.json();
     if (allowedColors.has(requestBody?.color)) selectedColor = requestBody.color;
@@ -188,6 +197,7 @@ async function createEmberCheckout(req, env) {
     if (Number.isInteger(requestBody?.quantity)) quantity = requestBody.quantity;
     termsAccepted = requestBody?.termsAccepted === true;
     marketingConsent = requestBody?.marketingConsent === true;
+    posthogDistinctId = safeAnalyticsDistinctId(requestBody?.posthogDistinctId);
   } catch {
     // Preserve the default color and market for requests without a JSON body.
   }
@@ -233,6 +243,7 @@ async function createEmberCheckout(req, env) {
     "metadata[consent_version]": "2026-08-16",
     "metadata[consent_recorded_at]": consentRecordedAt,
     "metadata[consent_source]": "makeable_web_preorder",
+    "metadata[offer_version]": EMBER_OFFER_VERSION,
     "payment_intent_data[metadata][ember_color]": selectedColor,
     "payment_intent_data[metadata][market]": selectedMarket,
     "payment_intent_data[metadata][quantity]": String(quantity),
@@ -242,6 +253,7 @@ async function createEmberCheckout(req, env) {
     "payment_intent_data[metadata][consent_version]": "2026-08-16",
     "payment_intent_data[metadata][consent_recorded_at]": consentRecordedAt,
     "payment_intent_data[metadata][consent_source]": "makeable_web_preorder",
+    "payment_intent_data[metadata][offer_version]": EMBER_OFFER_VERSION,
     "shipping_options[0][shipping_rate_data][type]": "fixed_amount",
     "shipping_options[0][shipping_rate_data][fixed_amount][amount]": "0",
     "shipping_options[0][shipping_rate_data][fixed_amount][currency]": market.currency,
@@ -252,6 +264,10 @@ async function createEmberCheckout(req, env) {
     cancel_url: `${origin}/?checkout=cancelled`,
     integration_identifier: "makeable_ember_qtmsvkwp",
   });
+  if (posthogDistinctId) {
+    body.set("metadata[posthog_distinct_id]", posthogDistinctId);
+    body.set("payment_intent_data[metadata][posthog_distinct_id]", posthogDistinctId);
+  }
   body.append("shipping_address_collection[allowed_countries][]", "US");
   body.append("shipping_address_collection[allowed_countries][]", "SG");
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -272,7 +288,194 @@ async function createEmberCheckout(req, env) {
       { "Cache-Control": "no-store" },
     );
   }
+  queueAnalyticsCapture(
+    context,
+    "checkout session created",
+    posthogDistinctId,
+    {
+      color: selectedColor,
+      currency: market.currency,
+      market: selectedMarket,
+      price_cents: Number(market.unitAmount) * quantity,
+      quantity,
+      source: "checkout_api",
+    },
+  );
   return jsonResponse({ url: checkout.url }, 200, { "Cache-Control": "no-store" });
+}
+
+async function stripeWebhook(req, env) {
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "POST",
+      "Cache-Control": "no-store",
+    });
+  }
+  if (!env.STRIPE_WEBHOOK_SECRET) {
+    return jsonResponse({ error: "Stripe webhook verification is not configured." }, 503, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const rawPayload = await req.text();
+  if (new TextEncoder().encode(rawPayload).byteLength > 512 * 1024) {
+    return jsonResponse({ error: "Webhook payload is too large." }, 413, {
+      "Cache-Control": "no-store",
+    });
+  }
+  if (!stripeSignatureMatches(rawPayload, req.headers.get("stripe-signature"), env.STRIPE_WEBHOOK_SECRET)) {
+    return jsonResponse({ error: "Invalid Stripe signature." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  let stripeEvent;
+  try {
+    stripeEvent = JSON.parse(rawPayload);
+  } catch {
+    return jsonResponse({ error: "Invalid Stripe webhook payload." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const eventType = typeof stripeEvent?.type === "string" ? stripeEvent.type : "";
+  const eventId = typeof stripeEvent?.id === "string" ? stripeEvent.id : "";
+  const stripeObject = stripeEvent?.data?.object;
+  if (new Set([
+    "checkout.session.completed",
+    "checkout.session.expired",
+    "checkout.session.async_payment_succeeded",
+    "checkout.session.async_payment_failed",
+  ]).has(eventType) && isEmberCheckout(stripeObject)) {
+    const eventName = {
+      "checkout.session.completed": "order paid",
+      "checkout.session.expired": "checkout expired",
+      "checkout.session.async_payment_succeeded": "order paid",
+      "checkout.session.async_payment_failed": "payment async failed",
+    }[eventType];
+    if (eventName !== "order paid" || stripeObject.payment_status === "paid") {
+      await captureCheckoutAnalytics(eventName, stripeObject, eventId, {
+        source: "stripe_webhook",
+        payment_status: typeof stripeObject.payment_status === "string" ? stripeObject.payment_status : "",
+      });
+    }
+  }
+
+  if (eventType === "charge.refunded") {
+    await captureRefundAnalytics(stripeObject, env, eventId);
+  }
+  return jsonResponse({ received: true }, 200, { "Cache-Control": "no-store" });
+}
+
+function safeAnalyticsDistinctId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_.:-]{1,200}$/.test(value)
+    ? value
+    : "";
+}
+
+function isEmberCheckout(checkout) {
+  return Boolean(checkout && new Set(["sage", "bone", "blush"])
+    .has(checkout?.metadata?.ember_color)
+    && new Set(["US", "SG"]).has(checkout?.metadata?.market));
+}
+
+async function captureCheckoutAnalytics(event, checkout, insertId, properties = {}) {
+  const metadata = checkout?.metadata || {};
+  return capturePosthogEvent(
+    event,
+    safeAnalyticsDistinctId(metadata.posthog_distinct_id),
+    {
+      amount_cents: Number.isInteger(checkout?.amount_total) ? checkout.amount_total : null,
+      color: metadata.ember_color || "",
+      currency: checkout?.currency || "",
+      market: metadata.market || "",
+      quantity: Number(metadata.quantity) || null,
+      source: "stripe_webhook",
+      ...properties,
+    },
+    insertId,
+  );
+}
+
+async function captureRefundAnalytics(charge, env, insertId) {
+  if (!env.STRIPE_SECRET_KEY || typeof charge?.payment_intent !== "string") return;
+  try {
+    const response = await fetch(
+      `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(charge.payment_intent)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+          "Stripe-Version": "2026-06-24.dahlia",
+        },
+      },
+    );
+    const paymentIntent = await response.json();
+    if (!response.ok || !isEmberCheckout({ metadata: paymentIntent?.metadata })) return;
+    await capturePosthogEvent(
+      "order refunded",
+      safeAnalyticsDistinctId(paymentIntent.metadata.posthog_distinct_id),
+      {
+        amount_cents: Number.isInteger(charge.amount_refunded) ? charge.amount_refunded : null,
+        currency: charge.currency || "",
+        market: paymentIntent.metadata.market || "",
+        quantity: Number(paymentIntent.metadata.quantity) || null,
+        source: "stripe_webhook",
+      },
+      insertId,
+    );
+  } catch (error) {
+    console.error("Could not record Stripe refund analytics", error);
+  }
+}
+
+function queueAnalyticsCapture(context, event, distinctId, properties) {
+  if (!distinctId) return;
+  const capture = capturePosthogEvent(event, distinctId, properties);
+  if (typeof context?.waitUntil === "function") {
+    context.waitUntil(capture);
+  }
+}
+
+async function capturePosthogEvent(event, distinctId, properties, insertId = "") {
+  if (!distinctId) return;
+  try {
+    await fetch(POSTHOG_CAPTURE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: POSTHOG_PROJECT_TOKEN,
+        event,
+        properties: {
+          $insert_id: insertId || undefined,
+          distinct_id: distinctId,
+          offer_version: EMBER_OFFER_VERSION,
+          product_id: "ember",
+          site: "makeable.build",
+          ...properties,
+        },
+      }),
+    });
+  } catch (error) {
+    console.error("Could not record PostHog analytics", error);
+  }
+}
+
+function stripeSignatureMatches(payload, header, secret) {
+  if (!header) return false;
+  const entries = header.split(",").map((entry) => entry.trim());
+  const timestamp = entries.find((entry) => entry.startsWith("t="))?.slice(2) || "";
+  const timestampNumber = Number(timestamp);
+  if (!Number.isInteger(timestampNumber) || Math.abs(Date.now() / 1000 - timestampNumber) > 5 * 60) return false;
+  const expected = createHmac("sha256", secret).update(`${timestamp}.${payload}`, "utf8").digest("hex");
+  return entries
+    .filter((entry) => entry.startsWith("v1="))
+    .some((entry) => timingSafeStringEqual(entry.slice(3), expected));
+}
+
+function timingSafeStringEqual(actual, expected) {
+  const actualBuffer = Buffer.from(actual, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 async function emberCheckoutStatus(req, env) {

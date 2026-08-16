@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import PostHogProvider from "./posthog-provider";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.URL || "http://localhost:3000"),
@@ -30,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><PostHogProvider>{children}</PostHogProvider></body>
     </html>
   );
 }

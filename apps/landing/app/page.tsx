@@ -5,10 +5,12 @@ import Lenis from "lenis";
 import gsap from "gsap";
 import SeenOnRealDesks from "./SeenOnRealDesks";
 import BuildBlueprint from "./BuildBlueprint";
+import { captureMakeableEvent, makeableDistinctId } from "./analytics";
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
 type SequenceMode = "desktop" | "mobile";
+type CheckoutLocation = "catalogue" | "story_card";
 
 const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "sage", label: "Sage", stock: 5 },
@@ -51,6 +53,9 @@ export default function Home() {
   const [buildEmail, setBuildEmail] = useState("");
   const [buildNotice, setBuildNotice] = useState("");
   const [buildBusy, setBuildBusy] = useState(false);
+  const seenStoryMilestonesRef = useRef(new Set<number>());
+  const seenEmberOfferRef = useRef(false);
+  const checkoutOriginRef = useRef<CheckoutLocation>("story_card");
   const selectedEmberColor = emberColors.find((color) => color.id === selectedColor);
   const selectedPrice = emberPrices[selectedMarket];
   useEffect(() => {
@@ -61,7 +66,14 @@ export default function Home() {
 
   useEffect(() => {
     const returnUrl = new URL(window.location.href);
-    if (returnUrl.searchParams.get("checkout") !== "success") return;
+    const checkoutState = returnUrl.searchParams.get("checkout");
+    if (checkoutState === "cancelled") {
+      captureMakeableEvent("checkout cancelled", { checkout_state: "cancelled" });
+      returnUrl.searchParams.delete("checkout");
+      window.history.replaceState({}, "", `${returnUrl.pathname}${returnUrl.search}${returnUrl.hash}`);
+      return;
+    }
+    if (checkoutState !== "success") return;
 
     const sessionId = returnUrl.searchParams.get("session_id");
     if (!sessionId) return;
@@ -74,6 +86,7 @@ export default function Home() {
         });
         const result = await response.json() as { paid?: boolean };
         if (!cancelled && response.ok && result.paid) {
+          captureMakeableEvent("checkout return verified", { checkout_state: "success" });
           setCheckoutSuccessOpen(true);
           returnUrl.searchParams.delete("checkout");
           returnUrl.searchParams.delete("session_id");
@@ -177,6 +190,14 @@ export default function Home() {
     const keyframes = [0, 72, 156, 282];
 
     const atSceneBoundary = (direction: number) => direction < 0 && currentScene === 0;
+    const recordStoryMilestone = (scene: number) => {
+      if (seenStoryMilestonesRef.current.has(scene)) return;
+      seenStoryMilestonesRef.current.add(scene);
+      captureMakeableEvent("story milestone reached", {
+        scene: ["box", "kit", "components", "ember_offer", "catalogue"][scene] || "unknown",
+        scene_index: scene,
+      });
+    };
 
     const activateCatalogue = () => {
       if (transitioning || currentScene !== keyframes.length - 1) return;
@@ -191,6 +212,7 @@ export default function Home() {
         easing: (value: number) => value * value * value * (value * (value * 6 - 15) + 10),
         onComplete: () => {
           setActiveScene(keyframes.length);
+          recordStoryMilestone(keyframes.length);
           transitioning = false;
         },
       });
@@ -222,7 +244,14 @@ export default function Home() {
           scheduleDraw();
         },
         onComplete: () => {
-          if (nextScene === keyframes.length - 1) setProductPresentationVisible(true);
+          if (nextScene === keyframes.length - 1) {
+            setProductPresentationVisible(true);
+            if (!seenEmberOfferRef.current) {
+              seenEmberOfferRef.current = true;
+              captureMakeableEvent("ember offer viewed", { entry_point: "scroll_story" });
+            }
+          }
+          recordStoryMilestone(nextScene);
           setActiveScene(nextScene);
           transitioning = false;
         },
@@ -388,7 +417,9 @@ export default function Home() {
     };
   }, [sequenceMode]);
 
-  const openCheckout = () => {
+  const openCheckout = (location: CheckoutLocation) => {
+    checkoutOriginRef.current = location;
+    captureMakeableEvent("preorder opened", { cta_location: location });
     setCheckoutError("");
     setCheckoutOpen(true);
   };
@@ -408,10 +439,11 @@ export default function Home() {
         body: JSON.stringify({
           color: selectedColor,
           market: selectedMarket,
-          quantity,
-          termsAccepted,
-          marketingConsent,
-        }),
+        quantity,
+        termsAccepted,
+        marketingConsent,
+        posthogDistinctId: makeableDistinctId(),
+      }),
       });
       const contentType = response.headers.get("content-type") || "";
       const result = contentType.includes("application/json")
@@ -422,8 +454,18 @@ export default function Home() {
           ? "Checkout is available on the deployed site."
           : "Checkout is unavailable right now."));
       }
+      captureMakeableEvent("checkout started", {
+        cta_location: checkoutOriginRef.current,
+        market: selectedMarket,
+        quantity,
+        price_cents: Math.round(selectedPrice.amount * quantity * 100),
+      });
       window.location.assign(result.url);
     } catch (error) {
+      captureMakeableEvent("checkout start failed", {
+        cta_location: checkoutOriginRef.current,
+        failure_category: "checkout_session_unavailable",
+      });
       setCheckoutError(error instanceof Error ? error.message : "Checkout is unavailable right now.");
       setCheckoutBusy(false);
     }
@@ -454,6 +496,7 @@ export default function Home() {
       }
       setBuildEmail("");
       setBuildNotice("You’re on the list - we’ll share Make a Build updates with you.");
+      captureMakeableEvent("make a build interest submitted", { placement: "landing_feature" });
     } catch (error) {
       setBuildNotice(error instanceof Error ? error.message : "We could not save your email right now.");
     } finally {
@@ -543,7 +586,7 @@ export default function Home() {
                 )}
               </div>
               <p className="shipping-estimate">Free shipping.</p>
-              <button className="preorder-button" type="button" onClick={openCheckout}>
+              <button className="preorder-button" type="button" onClick={() => openCheckout("story_card")}>
                 Pre-order Ember<span aria-hidden="true">✦</span>
               </button>
               <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
@@ -559,7 +602,7 @@ export default function Home() {
           <button
             className={`catalogue-preorder ${checkoutBusy ? "is-busy" : ""}`}
             type="button"
-            onClick={openCheckout}
+            onClick={() => openCheckout("catalogue")}
             aria-label="Pre-order Ember for 34 dollars and 99 cents USD"
           />
           {checkoutError && <p className="catalogue-checkout-error" role="status">{checkoutError}</p>}
@@ -666,7 +709,11 @@ export default function Home() {
                 <button
                   type="button"
                   aria-label="Decrease quantity"
-                  onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                  onClick={() => setQuantity((current) => {
+                    const next = Math.max(1, current - 1);
+                    if (next !== current) captureMakeableEvent("preorder quantity changed", { quantity: next });
+                    return next;
+                  })}
                   disabled={quantity <= 1 || checkoutBusy}
                 >
                   −
@@ -675,7 +722,11 @@ export default function Home() {
                 <button
                   type="button"
                   aria-label="Increase quantity"
-                  onClick={() => setQuantity((current) => Math.min(10, current + 1))}
+                  onClick={() => setQuantity((current) => {
+                    const next = Math.min(10, current + 1);
+                    if (next !== current) captureMakeableEvent("preorder quantity changed", { quantity: next });
+                    return next;
+                  })}
                   disabled={quantity >= 10 || checkoutBusy}
                 >
                   +
@@ -689,18 +740,24 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={termsAccepted}
-                  onChange={(event) => setTermsAccepted(event.target.checked)}
+                  onChange={(event) => {
+                    setTermsAccepted(event.target.checked);
+                    if (event.target.checked) captureMakeableEvent("preorder terms acknowledged");
+                  }}
                   required
                 />
                 <span>
-                  I agree to the <a href="/terms/" target="_blank" rel="noreferrer">Terms</a> and acknowledge the <a href="/privacy/" target="_blank" rel="noreferrer">Privacy Policy</a>.
+                  I agree to the <a href="/terms/" target="_blank" rel="noreferrer" onClick={() => captureMakeableEvent("preorder legal opened", { document: "terms" })}>Terms</a> and acknowledge the <a href="/privacy/" target="_blank" rel="noreferrer" onClick={() => captureMakeableEvent("preorder legal opened", { document: "privacy" })}>Privacy Policy</a>.
                 </span>
               </label>
               <label>
                 <input
                   type="checkbox"
                   checked={marketingConsent}
-                  onChange={(event) => setMarketingConsent(event.target.checked)}
+                  onChange={(event) => {
+                    setMarketingConsent(event.target.checked);
+                    captureMakeableEvent("preorder marketing consent changed", { opted_in: event.target.checked });
+                  }}
                 />
                 <span>Email me product news, launch updates, and occasional offers.</span>
               </label>
