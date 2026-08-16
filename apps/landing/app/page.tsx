@@ -561,9 +561,7 @@ export default function Home() {
             type="button"
             onClick={openCheckout}
             aria-label="Pre-order Ember for 34 dollars and 99 cents USD"
-          >
-            Pre-order • USD$34.99
-          </button>
+          />
           {checkoutError && <p className="catalogue-checkout-error" role="status">{checkoutError}</p>}
         </div>
       </section>
