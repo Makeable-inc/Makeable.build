@@ -46,6 +46,10 @@ export default async function handler(req, context = {}) {
       return await createEmberCheckout(req, env);
     }
 
+    if (localApiPath === "/api/checkout/status") {
+      return await emberCheckoutStatus(req, env);
+    }
+
     if (localApiPath === "/api/build-interest") {
       return await saveBuildInterest(req, context);
     }
@@ -198,7 +202,7 @@ async function createEmberCheckout(req, env) {
     "line_items[0][quantity]": "1",
     "metadata[ember_color]": selectedColor,
     "metadata[market]": selectedMarket,
-    success_url: `${origin}/?checkout=success`,
+    success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?checkout=cancelled`,
     integration_identifier: "makeable_ember_qtmsvkwp",
   });
@@ -223,6 +227,58 @@ async function createEmberCheckout(req, env) {
     );
   }
   return jsonResponse({ url: checkout.url }, 200, { "Cache-Control": "no-store" });
+}
+
+async function emberCheckoutStatus(req, env) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  if (!env.STRIPE_SECRET_KEY) {
+    return jsonResponse({ error: "Checkout verification is unavailable." }, 503, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const sessionId = new URL(req.url).searchParams.get("session_id") || "";
+  if (!/^cs_(?:test_|live_)[A-Za-z0-9]{10,255}$/.test(sessionId)) {
+    return jsonResponse({ error: "Invalid checkout session." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const response = await fetch(
+    `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+        "Stripe-Version": "2026-06-24.dahlia",
+      },
+    },
+  );
+  const checkout = await response.json();
+  if (!response.ok) {
+    return jsonResponse(
+      { error: checkout?.error?.message || "Unable to verify checkout." },
+      502,
+      { "Cache-Control": "no-store" },
+    );
+  }
+
+  const isEmberOrder = new Set(["sage", "bone", "blush"])
+    .has(checkout?.metadata?.ember_color)
+    && new Set(["US", "SG"]).has(checkout?.metadata?.market);
+  return jsonResponse(
+    {
+      paid: isEmberOrder
+        && checkout?.status === "complete"
+        && checkout?.payment_status === "paid",
+    },
+    200,
+    { "Cache-Control": "no-store" },
+  );
 }
 
 async function saveBuildInterest(req, context) {

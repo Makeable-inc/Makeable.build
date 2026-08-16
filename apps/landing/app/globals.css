@@ -92,6 +92,18 @@ button, input, textarea, select { font-family: inherit; }
 .ember-card button:disabled { opacity: .65; cursor: wait; }
 .ember-card .checkout-error { margin-top: .75rem; color: #9b1b35; font-size: .72rem; }
 
+.checkout-success-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 1.25rem; background: rgba(5,15,34,.58); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.checkout-success-dialog { position: relative; width: min(100%, 30rem); padding: clamp(2rem, 5vw, 3.25rem); border: 1px solid rgba(11,17,23,.2); border-radius: 1.2rem; background: #f6eee4; color: #101417; text-align: center; box-shadow: 0 2rem 5rem rgba(3,12,27,.38); animation: checkout-pop .42s cubic-bezier(.22,1,.36,1) both; }
+.checkout-success-dialog > .brand-star { width: 2.2rem; height: 2.2rem; margin: 1rem auto .7rem; color: var(--mk-pink); }
+.checkout-success-kicker { display: block; color: var(--mk-red); font: 800 .7rem/1 monospace; letter-spacing: .11em; text-transform: uppercase; }
+.checkout-success-dialog h2 { margin: 0; font-size: clamp(2.4rem, 7vw, 4rem); font-weight: 600; line-height: .92; letter-spacing: -.03em; text-transform: uppercase; }
+.checkout-success-dialog p { max-width: 22rem; margin: 1rem auto 1.5rem; font-size: clamp(.92rem, 2vw, 1.05rem); line-height: 1.45; }
+.checkout-success-close { position: absolute; top: .75rem; right: .85rem; display: grid; width: 2.4rem; height: 2.4rem; place-items: center; padding: 0; border: 1px solid rgba(11,17,23,.24); border-radius: 50%; background: transparent; color: inherit; cursor: pointer; font: 400 1.6rem/1 Arial, sans-serif; }
+.checkout-success-action { width: 100%; padding: 1rem 1.25rem; border: 0; border-radius: .55rem; background: var(--mk-red); color: #fff; cursor: pointer; font-size: .92rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.checkout-success-close:hover, .checkout-success-action:hover { filter: brightness(1.06); }
+.checkout-success-close:focus-visible, .checkout-success-action:focus-visible { outline: 3px solid rgba(223,23,73,.42); outline-offset: 3px; }
+@keyframes checkout-pop { from { opacity: 0; transform: translateY(1rem) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
 .catalogue { position: relative; z-index: 2; display: grid; min-height: 100svh; place-items: center; overflow: hidden; padding: clamp(2rem, 5vw, 5rem) 0; background: #f0e5d9; color: #090b0c; }
 .catalogue-artwork { position: relative; width: min(100vw, 150svh); aspect-ratio: 3 / 2; }
 .catalogue-sheet { display: block; width: 100%; height: 100%; object-fit: contain; }

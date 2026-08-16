@@ -152,7 +152,55 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   );
   assert.equal(stripeRequest.options.body.get("phone_number_collection[enabled]"), "true");
   assert.equal(stripeRequest.options.body.get("name_collection[individual][enabled]"), "true");
-  assert.equal(stripeRequest.options.body.get("success_url"), `${productionOrigin}/?checkout=success`);
+  assert.equal(
+    stripeRequest.options.body.get("success_url"),
+    `${productionOrigin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+  );
+});
+
+test("Ember checkout completion is verified with Stripe before confirming payment", async (t) => {
+  installEnvironment(t, { STRIPE_SECRET_KEY: "sk_test_local" });
+  const sessionId = "cs_test_1234567890abcdefghijkl";
+  let stripeRequest;
+  globalThis.fetch = async (url, options) => {
+    stripeRequest = { url: String(url), options };
+    return Response.json({
+      id: sessionId,
+      status: "complete",
+      payment_status: "paid",
+      metadata: { ember_color: "bone", market: "US" },
+    });
+  };
+
+  const response = await handler(
+    new Request(`${productionOrigin}/api/checkout/status?session_id=${sessionId}`),
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { paid: true });
+  assert.equal(
+    stripeRequest.url,
+    `https://api.stripe.com/v1/checkout/sessions/${sessionId}`,
+  );
+  assert.equal(stripeRequest.options.headers.Authorization, "Bearer sk_test_local");
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+});
+
+test("Ember checkout completion rejects invalid session identifiers without calling Stripe", async (t) => {
+  installEnvironment(t, { STRIPE_SECRET_KEY: "sk_test_local" });
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Stripe should not be called");
+  };
+
+  const response = await handler(
+    new Request(`${productionOrigin}/api/checkout/status?session_id=not-a-session`),
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "Invalid checkout session." });
+  assert.equal(fetchCalls, 0);
 });
 
 test("Ember checkout uses fixed Singapore pricing for Singapore orders", async (t) => {

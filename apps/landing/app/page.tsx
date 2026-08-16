@@ -36,6 +36,8 @@ export default function Home() {
   const [selectedMarket, setSelectedMarket] = useState<EmberMarket>("US");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutSuccessOpen, setCheckoutSuccessOpen] = useState(false);
+  const checkoutSuccessCloseRef = useRef<HTMLButtonElement>(null);
   const [buildEmail, setBuildEmail] = useState("");
   const [buildNotice, setBuildNotice] = useState("");
   const [buildBusy, setBuildBusy] = useState(false);
@@ -45,6 +47,53 @@ export default function Home() {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (locale.endsWith("-SG") || timeZone === "Asia/Singapore") setSelectedMarket("SG");
   }, []);
+
+  useEffect(() => {
+    const returnUrl = new URL(window.location.href);
+    if (returnUrl.searchParams.get("checkout") !== "success") return;
+
+    const sessionId = returnUrl.searchParams.get("session_id");
+    if (!sessionId) return;
+
+    let cancelled = false;
+    const verifyCheckout = async () => {
+      try {
+        const response = await fetch(`/api/checkout/status?session_id=${encodeURIComponent(sessionId)}`, {
+          headers: { Accept: "application/json" },
+        });
+        const result = await response.json() as { paid?: boolean };
+        if (!cancelled && response.ok && result.paid) {
+          setCheckoutSuccessOpen(true);
+          returnUrl.searchParams.delete("checkout");
+          returnUrl.searchParams.delete("session_id");
+          window.history.replaceState({}, "", `${returnUrl.pathname}${returnUrl.search}${returnUrl.hash}`);
+        }
+      } catch (error) {
+        console.error("Could not verify completed checkout", error);
+      }
+    };
+
+    void verifyCheckout();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!checkoutSuccessOpen) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    checkoutSuccessCloseRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCheckoutSuccessOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      previouslyFocused?.focus();
+    };
+  }, [checkoutSuccessOpen]);
 
   useEffect(() => {
     const updateSequenceMode = () => {
@@ -218,7 +267,7 @@ export default function Home() {
       const image = new Image();
       image.decoding = "async";
       frames[index] = image;
-      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=34`;
+      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=35`;
 
       try {
         await image.decode();
@@ -533,6 +582,43 @@ export default function Home() {
           <span>@Makeable 2026</span>
         </div>
       </footer>
+
+      {checkoutSuccessOpen && (
+        <div
+          className="checkout-success-backdrop"
+          role="presentation"
+          onMouseDown={() => setCheckoutSuccessOpen(false)}
+        >
+          <section
+            className="checkout-success-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="checkout-success-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              ref={checkoutSuccessCloseRef}
+              className="checkout-success-close"
+              type="button"
+              aria-label="Close order confirmation"
+              onClick={() => setCheckoutSuccessOpen(false)}
+            >
+              ×
+            </button>
+            <span className="checkout-success-kicker">Pre-order confirmed</span>
+            <BrandStar />
+            <h2 id="checkout-success-title">Ember is yours.</h2>
+            <p>Your payment was received and your Ember pre-order is confirmed.</p>
+            <button
+              className="checkout-success-action"
+              type="button"
+              onClick={() => setCheckoutSuccessOpen(false)}
+            >
+              Continue exploring
+            </button>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
