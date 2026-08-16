@@ -147,7 +147,7 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   assert.equal(stripeRequest.url, "https://api.stripe.com/v1/checkout/sessions");
   assert.equal(stripeRequest.options.headers.Authorization, "Bearer sk_test_local");
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][currency]"), "usd");
-  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4999");
+  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "3499");
   assert.equal(
     stripeRequest.options.body.get("line_items[0][price_data][product_data][name]"),
     "Makeable Ember — Beige",
@@ -161,6 +161,15 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   assert.equal(stripeRequest.options.body.get("metadata[terms_accepted]"), "true");
   assert.equal(stripeRequest.options.body.get("metadata[privacy_acknowledged]"), "true");
   assert.equal(stripeRequest.options.body.get("metadata[marketing_consent]"), "false");
+  assert.equal(stripeRequest.options.body.get("metadata[consent_source]"), "makeable_web_preorder");
+  assert.match(stripeRequest.options.body.get("metadata[consent_recorded_at]"), /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(stripeRequest.options.body.get("payment_intent_data[metadata][terms_accepted]"), "true");
+  assert.equal(stripeRequest.options.body.get("payment_intent_data[metadata][privacy_acknowledged]"), "true");
+  assert.equal(stripeRequest.options.body.get("payment_intent_data[metadata][marketing_consent]"), "false");
+  assert.equal(stripeRequest.options.body.get("payment_intent_data[metadata][consent_source]"), "makeable_web_preorder");
+  assert.equal(stripeRequest.options.body.get("shipping_options[0][shipping_rate_data][fixed_amount][amount]"), "0");
+  assert.equal(stripeRequest.options.body.get("shipping_options[0][shipping_rate_data][fixed_amount][currency]"), "usd");
+  assert.equal(stripeRequest.options.body.get("shipping_options[0][shipping_rate_data][display_name]"), "Free shipping");
   assert.equal(
     stripeRequest.options.body.get("custom_text[shipping_address][message]"),
     "Pre-orders are expected to ship in October 2026.",
@@ -248,10 +257,12 @@ test("Ember checkout uses fixed Singapore pricing for Singapore orders", async (
 
   assert.equal(response.status, 200);
   assert.equal(stripeRequest.options.body.get("line_items[0][price_data][currency]"), "sgd");
-  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "5999");
+  assert.equal(stripeRequest.options.body.get("line_items[0][price_data][unit_amount]"), "4499");
   assert.equal(stripeRequest.options.body.get("line_items[0][quantity]"), "4");
   assert.equal(stripeRequest.options.body.get("metadata[market]"), "SG");
   assert.equal(stripeRequest.options.body.get("metadata[marketing_consent]"), "true");
+  assert.equal(stripeRequest.options.body.get("payment_intent_data[metadata][marketing_consent]"), "true");
+  assert.equal(stripeRequest.options.body.get("shipping_options[0][shipping_rate_data][fixed_amount][currency]"), "sgd");
   assert.deepEqual(
     stripeRequest.options.body.getAll("shipping_address_collection[allowed_countries][]"),
     ["US", "SG"],

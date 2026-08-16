@@ -173,8 +173,8 @@ async function createEmberCheckout(req, env) {
   const origin = new URL(req.url).origin;
   const allowedColors = new Set(["sage", "bone", "blush"]);
   const checkoutMarkets = {
-    US: { currency: "usd", unitAmount: "4999" },
-    SG: { currency: "sgd", unitAmount: "5999" },
+    US: { currency: "usd", unitAmount: "3499" },
+    SG: { currency: "sgd", unitAmount: "4499" },
   };
   let selectedColor = "bone";
   let selectedMarket = "US";
@@ -210,6 +210,7 @@ async function createEmberCheckout(req, env) {
   };
   const colorLabel = colorLabels[selectedColor];
   const market = checkoutMarkets[selectedMarket];
+  const consentRecordedAt = new Date().toISOString();
   const body = new URLSearchParams({
     mode: "payment",
     customer_creation: "always",
@@ -230,6 +231,21 @@ async function createEmberCheckout(req, env) {
     "metadata[privacy_acknowledged]": "true",
     "metadata[marketing_consent]": marketingConsent ? "true" : "false",
     "metadata[consent_version]": "2026-08-16",
+    "metadata[consent_recorded_at]": consentRecordedAt,
+    "metadata[consent_source]": "makeable_web_preorder",
+    "payment_intent_data[metadata][ember_color]": selectedColor,
+    "payment_intent_data[metadata][market]": selectedMarket,
+    "payment_intent_data[metadata][quantity]": String(quantity),
+    "payment_intent_data[metadata][terms_accepted]": "true",
+    "payment_intent_data[metadata][privacy_acknowledged]": "true",
+    "payment_intent_data[metadata][marketing_consent]": marketingConsent ? "true" : "false",
+    "payment_intent_data[metadata][consent_version]": "2026-08-16",
+    "payment_intent_data[metadata][consent_recorded_at]": consentRecordedAt,
+    "payment_intent_data[metadata][consent_source]": "makeable_web_preorder",
+    "shipping_options[0][shipping_rate_data][type]": "fixed_amount",
+    "shipping_options[0][shipping_rate_data][fixed_amount][amount]": "0",
+    "shipping_options[0][shipping_rate_data][fixed_amount][currency]": market.currency,
+    "shipping_options[0][shipping_rate_data][display_name]": "Free shipping",
     "custom_text[shipping_address][message]":
       "Pre-orders are expected to ship in October 2026.",
     success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,

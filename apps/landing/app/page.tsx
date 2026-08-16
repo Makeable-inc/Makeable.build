@@ -16,6 +16,11 @@ const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "blush", label: "Sakura", stock: 10 },
 ];
 
+const emberPrices: Record<EmberMarket, { currency: string; amount: number }> = {
+  US: { currency: "USD", amount: 34.99 },
+  SG: { currency: "SGD", amount: 44.99 },
+};
+
 function BrandStar() {
   return (
     <svg className="brand-star" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">
@@ -47,6 +52,7 @@ export default function Home() {
   const [buildNotice, setBuildNotice] = useState("");
   const [buildBusy, setBuildBusy] = useState(false);
   const selectedEmberColor = emberColors.find((color) => color.id === selectedColor);
+  const selectedPrice = emberPrices[selectedMarket];
   useEffect(() => {
     const locale = navigator.language.toUpperCase();
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -527,8 +533,8 @@ export default function Home() {
               <div className="ember-price-row">
                 <s className="ember-price-was" aria-label="Previous price: 89 dollars and 99 cents USD"><sup>$</sup>89.99</s>
                 <span className="price-arrow" aria-hidden="true">→</span>
-                <strong className="ember-price" aria-label="Now 49 dollars and 99 cents USD"><sup>$</sup>49.99</strong>
-                <span className="discount-tag">44% off</span>
+                <strong className="ember-price" aria-label="Now 34 dollars and 99 cents USD"><sup>$</sup>34.99</strong>
+                <span className="discount-tag">61% off</span>
                 {selectedEmberColor?.stock != null && (
                   <span className="stock-note" role="status">
                     <span className="stock-flame" aria-hidden="true">🔥</span>
@@ -536,7 +542,7 @@ export default function Home() {
                   </span>
                 )}
               </div>
-              <p className="shipping-estimate">Shipping in October 2026.</p>
+              <p className="shipping-estimate">Free shipping.</p>
               <button className="preorder-button" type="button" onClick={openCheckout}>
                 Pre-order Ember<span aria-hidden="true">✦</span>
               </button>
@@ -554,8 +560,10 @@ export default function Home() {
             className={`catalogue-preorder ${checkoutBusy ? "is-busy" : ""}`}
             type="button"
             onClick={openCheckout}
-            aria-label="Pre-order Ember for 49 dollars and 99 cents USD"
-          />
+            aria-label="Pre-order Ember for 34 dollars and 99 cents USD"
+          >
+            Pre-order • USD$34.99
+          </button>
           {checkoutError && <p className="catalogue-checkout-error" role="status">{checkoutError}</p>}
         </div>
       </section>
@@ -647,11 +655,11 @@ export default function Home() {
             </button>
             <small>Build 001 preorder</small>
             <h2 id="checkout-title">Make Ember yours.</h2>
-            <p className="checkout-shipping">Estimated shipping: October 2026.</p>
+            <p className="checkout-shipping">Free shipping. Estimated shipping: October 2026.</p>
 
             <div className="checkout-summary">
               <span>{selectedEmberColor?.label ?? "Beige"} Ember</span>
-              <strong>USD ${(49.99 * quantity).toFixed(2)}</strong>
+              <strong>{selectedPrice.currency} ${(selectedPrice.amount * quantity).toFixed(2)}</strong>
             </div>
 
             <fieldset className="quantity-picker">
@@ -696,7 +704,7 @@ export default function Home() {
                   checked={marketingConsent}
                   onChange={(event) => setMarketingConsent(event.target.checked)}
                 />
-                <span>Email me product news, launch updates, and occasional offers. Optional.</span>
+                <span>Email me product news, launch updates, and occasional offers.</span>
               </label>
             </div>
 
@@ -734,7 +742,7 @@ export default function Home() {
             <span className="checkout-success-kicker">Pre-order confirmed</span>
             <BrandStar />
             <h2 id="checkout-success-title">Ember is yours.</h2>
-            <p>Your payment was received and your Ember pre-order is confirmed.</p>
+            <p>Your payment was received. Shipping is free and your Ember pre-order is estimated to ship in October 2026.</p>
             <button
               className="checkout-success-action"
               type="button"

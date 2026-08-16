@@ -137,8 +137,8 @@ button, input, textarea, select { font-family: inherit; }
 .catalogue { position: relative; z-index: 2; display: grid; min-height: 100svh; place-items: center; overflow: hidden; padding: clamp(2rem, 5vw, 5rem) 0; background: #f0e5d9; color: #090b0c; }
 .catalogue-artwork { position: relative; width: min(100vw, 150svh); aspect-ratio: 3 / 2; }
 .catalogue-sheet { display: block; width: 100%; height: 100%; object-fit: contain; }
-.catalogue-preorder { position: absolute; z-index: 3; left: 11.7%; top: 80.65%; width: 18.75%; height: 5.7%; min-height: 2.25rem; padding: 0; border: 0; border-radius: .65rem; background: transparent; color: transparent; cursor: pointer; }
-.catalogue-preorder:hover { background: rgba(255,255,255,.12); box-shadow: 0 0 0 3px rgba(255,255,255,.62), 0 .5rem 1.25rem rgba(137,0,45,.24); }
+.catalogue-preorder { position: absolute; z-index: 3; left: 11.7%; top: 80.65%; width: 18.75%; height: 5.7%; min-height: 2.25rem; padding: 0 .4rem; border: 0; border-radius: .65rem; background: #df1749; color: #fff; cursor: pointer; font-family: var(--display); font-size: clamp(.48rem, 1.4vw, 1.15rem); font-weight: 650; white-space: nowrap; }
+.catalogue-preorder:hover { background: #ed1e55; box-shadow: 0 0 0 3px rgba(255,255,255,.62), 0 .5rem 1.25rem rgba(137,0,45,.24); }
 .catalogue-preorder:focus-visible { outline: 3px solid #fff; outline-offset: 3px; box-shadow: 0 0 0 6px #df1749; }
 .catalogue-preorder:disabled { cursor: wait; }
 .catalogue-preorder.is-busy { background: transparent; }
