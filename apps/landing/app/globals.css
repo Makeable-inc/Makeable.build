@@ -84,7 +84,6 @@ button, input, textarea, select { font-family: inherit; }
 .discount-tag { align-self: center; padding: .48em .66em; border-radius: .48em; background: #cf6138; color: #fff; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: clamp(.54rem, 2.22cqw, .7rem); font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap; box-shadow: none; text-shadow: none; }
 .stock-note { display: inline-flex; min-width: 0; align-items: center; gap: .26em; color: #bd5038; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: clamp(.56rem, 2.5cqw, .76rem); font-stretch: condensed; font-weight: 900; line-height: 1; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; text-shadow: none; }
 .stock-flame { display: inline-block; font-size: 1.18em; line-height: .8; transform: translateY(-.03em); }
-.ember-card > .shipping-estimate { margin: 0 0 .62rem; color: #8f1736; font: 800 clamp(.58rem, .8vw, .72rem)/1.2 monospace; letter-spacing: .055em; text-transform: uppercase; }
 .ember-card button { width: 100%; cursor: pointer; text-transform: uppercase; letter-spacing: .045em; }
 .preorder-button { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: clamp(.85rem, 1.25vw, 1.05rem); border: 0; border-radius: .38rem; background: #df1749; color: #fff; font-size: clamp(.75rem, 1vw, 1rem); font-weight: 900; }
 .preorder-button span { font-size: 1.35em; }
@@ -217,7 +216,6 @@ button, input, textarea, select { font-family: inherit; }
   .color-option > span { width: .72rem; height: .72rem; margin-right: .22rem; vertical-align: -.12rem; }
   .color-option b { margin-left: .18rem; font-size: .68rem; }
   .ember-price-row { margin: .55rem 0 .25rem; }
-  .ember-card > .shipping-estimate { margin-bottom: .42rem; font-size: .54rem; }
   .preorder-button, .other-builds { padding: .65rem .45rem; font-size: .67rem; }
   .other-builds { margin-top: .4rem; }
 }

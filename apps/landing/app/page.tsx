@@ -585,7 +585,6 @@ export default function Home() {
                   </span>
                 )}
               </div>
-              <p className="shipping-estimate">Free shipping.</p>
               <button className="preorder-button" type="button" onClick={() => openCheckout("story_card")}>
                 Pre-order Ember<span aria-hidden="true">✦</span>
               </button>
@@ -598,7 +597,7 @@ export default function Home() {
 
       <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
-          <img className="catalogue-sheet" src="/build-catalogue-page.png?v=2" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
+          <img className="catalogue-sheet" src="/build-catalogue-page.png?v=3" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
           <button
             className={`catalogue-preorder ${checkoutBusy ? "is-busy" : ""}`}
             type="button"
