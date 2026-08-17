@@ -232,7 +232,7 @@ async function createEmberCheckout(req, env, context) {
     "line_items[0][price_data][unit_amount]": market.unitAmount,
     "line_items[0][price_data][product_data][name]": `Makeable Ember — ${colorLabel}`,
     "line_items[0][price_data][product_data][description]":
-      "Token-burner desk pet. Easy-to-assemble kit, USB-C cable included. Pre-order — ships October",
+      "Token-burner desk pet. Easy-to-assemble kit, USB-C cable included.",
     "line_items[0][quantity]": String(quantity),
     "metadata[ember_color]": selectedColor,
     "metadata[market]": selectedMarket,
