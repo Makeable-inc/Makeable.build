@@ -158,7 +158,7 @@ export default function Home() {
     setProductPresentationVisible(false);
 
     const lenis = new Lenis({
-      duration: 1.25,
+      duration: 1.4,
       smoothWheel: true,
       syncTouch: false,
     });
@@ -184,12 +184,11 @@ export default function Home() {
     let drawRequest = 0;
     let disposed = false;
     let allFramesDecoded = false;
-    let currentScene = 0;
-    let transitioning = false;
-    let touchStartY = 0;
     const keyframes = [0, 72, 156, 282];
+    const offerFrame = keyframes[keyframes.length - 1];
+    let introVisible = true;
+    let offerVisible = false;
 
-    const atSceneBoundary = (direction: number) => direction < 0 && currentScene === 0;
     const recordStoryMilestone = (scene: number) => {
       if (seenStoryMilestonesRef.current.has(scene)) return;
       seenStoryMilestonesRef.current.add(scene);
@@ -200,63 +199,19 @@ export default function Home() {
     };
 
     const activateCatalogue = () => {
-      if (transitioning || currentScene !== keyframes.length - 1) return;
-      transitioning = true;
-      currentScene = keyframes.length;
-      setActiveScene(-1);
-
       lenis.scrollTo(catalogue.offsetTop, {
-        duration: 2.2,
+        duration: 1.6,
         lock: true,
         force: true,
         easing: (value: number) => value * value * value * (value * (value * 6 - 15) + 10),
         onComplete: () => {
           setActiveScene(keyframes.length);
           recordStoryMilestone(keyframes.length);
-          transitioning = false;
         },
       });
     };
 
     const onCatalogueRequest = () => activateCatalogue();
-
-    const activateScene = (nextScene: number) => {
-      if (transitioning || nextScene === currentScene || nextScene < 0 || nextScene >= keyframes.length) return;
-      transitioning = true;
-      currentScene = nextScene;
-      if (nextScene < keyframes.length - 1) setProductPresentationVisible(false);
-      setActiveScene(-1);
-
-      const scrollRange = Math.max(0, story.offsetHeight - window.innerHeight);
-      const sceneRange = scrollRange * 0.84;
-      lenis.scrollTo(story.offsetTop + (nextScene / (keyframes.length - 1)) * sceneRange, {
-        duration: 1.25,
-        easing: (value: number) => 1 - Math.pow(1 - value, 4),
-      });
-
-      gsap.to(playhead, {
-        frame: keyframes[nextScene],
-        duration: 1.25,
-        ease: "power3.inOut",
-        overwrite: true,
-        onUpdate: () => {
-          requestedFrame = playhead.frame;
-          scheduleDraw();
-        },
-        onComplete: () => {
-          if (nextScene === keyframes.length - 1) {
-            setProductPresentationVisible(true);
-            if (!seenEmberOfferRef.current) {
-              seenEmberOfferRef.current = true;
-              captureMakeableEvent("ember offer viewed", { entry_point: "scroll_story" });
-            }
-          }
-          recordStoryMilestone(nextScene);
-          setActiveScene(nextScene);
-          transitioning = false;
-        },
-      });
-    };
 
     const drawImageCover = (image: HTMLImageElement) => {
       const width = canvas.width;
@@ -341,76 +296,56 @@ export default function Home() {
       } catch (error) {
         console.error(`Could not decode frame ${index + 1}`, error);
       } finally {
+        if (Math.abs(index - Math.floor(requestedFrame)) <= 1) scheduleDraw();
         void loadNext();
       }
     };
     for (let worker = 0; worker < 8; worker++) void loadNext();
 
-    const onWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) < 6) return;
-      const direction = Math.sign(event.deltaY);
-      if (!transitioning && direction > 0 && currentScene === keyframes.length - 1) {
-        event.preventDefault();
-        event.stopPropagation();
-        activateCatalogue();
-        return;
+    const updateFromScroll = () => {
+      const storyStart = story.offsetTop;
+      const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
+      const finalHold = window.innerHeight * 0.75;
+      const animationEnd = Math.max(storyStart + 1, storyEnd - finalHold);
+      const progress = Math.max(0, Math.min(1, (window.scrollY - storyStart) / (animationEnd - storyStart)));
+      const nextFrame = progress * (totalFrames - 1);
+
+      playhead.frame = nextFrame;
+      requestedFrame = nextFrame;
+      scheduleDraw();
+
+      const nextIntroVisible = progress <= 0.025;
+      if (nextIntroVisible !== introVisible) {
+        introVisible = nextIntroVisible;
+        setActiveScene(nextIntroVisible ? 0 : -1);
       }
-      if (!transitioning && atSceneBoundary(direction)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      activateScene(currentScene + direction);
-    };
-    const onTouchStart = (event: TouchEvent) => {
-      touchStartY = event.touches[0]?.clientY ?? 0;
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      const currentY = event.touches[0]?.clientY ?? touchStartY;
-      const direction = Math.sign(touchStartY - currentY);
-      if (!transitioning && atSceneBoundary(direction)) return;
-      event.preventDefault();
-      event.stopPropagation();
-    };
-    const onTouchEnd = (event: TouchEvent) => {
-      const endY = event.changedTouches[0]?.clientY ?? touchStartY;
-      const distance = touchStartY - endY;
-      const direction = Math.sign(distance);
-      if (Math.abs(distance) < 28) return;
-      if (!transitioning && direction > 0 && currentScene === keyframes.length - 1) {
-        activateCatalogue();
-        return;
+
+      const nextOfferVisible = nextFrame >= offerFrame;
+      if (nextOfferVisible !== offerVisible) {
+        offerVisible = nextOfferVisible;
+        setProductPresentationVisible(nextOfferVisible);
+        if (nextOfferVisible && !seenEmberOfferRef.current) {
+          seenEmberOfferRef.current = true;
+          captureMakeableEvent("ember offer viewed", { entry_point: "scroll_story" });
+        }
       }
-      if (!transitioning && atSceneBoundary(direction)) return;
-      activateScene(currentScene + direction);
+
+      keyframes.forEach((frame, scene) => {
+        if (nextFrame >= frame) recordStoryMilestone(scene);
+      });
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      const direction = ["ArrowDown", "PageDown", " "].includes(event.key) ? 1 : ["ArrowUp", "PageUp"].includes(event.key) ? -1 : 0;
-      if (!direction) return;
-      if (!transitioning && direction > 0 && currentScene === keyframes.length - 1) {
-        event.preventDefault();
-        activateCatalogue();
-        return;
-      }
-      if (!transitioning && atSceneBoundary(direction)) return;
-      event.preventDefault();
-      activateScene(currentScene + direction);
-    };
-    story.addEventListener("wheel", onWheel, { passive: false, capture: true });
-    story.addEventListener("touchstart", onTouchStart, { passive: true });
-    story.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
-    story.addEventListener("touchend", onTouchEnd, { passive: true });
-    window.addEventListener("keydown", onKeyDown);
+
+    window.addEventListener("scroll", updateFromScroll, { passive: true });
+    window.addEventListener("resize", updateFromScroll);
     window.addEventListener("makeable:show-catalogue", onCatalogueRequest);
+    updateFromScroll();
 
     return () => {
       disposed = true;
       resizeObserver.disconnect();
       cancelAnimationFrame(drawRequest);
-      gsap.killTweensOf(playhead);
-      story.removeEventListener("wheel", onWheel, true);
-      story.removeEventListener("touchstart", onTouchStart);
-      story.removeEventListener("touchmove", onTouchMove, true);
-      story.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", updateFromScroll);
+      window.removeEventListener("resize", updateFromScroll);
       window.removeEventListener("makeable:show-catalogue", onCatalogueRequest);
       gsap.ticker.remove(tick);
       lenis.destroy();
@@ -597,7 +532,7 @@ export default function Home() {
 
       <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
-          <img className="catalogue-sheet" src="/build-catalogue-page.png?v=3" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
+          <img className="catalogue-sheet" src="/build-catalogue-page.png?v=4" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
           <button
             className={`catalogue-preorder ${checkoutBusy ? "is-busy" : ""}`}
             type="button"
