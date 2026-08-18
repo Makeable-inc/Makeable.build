@@ -138,7 +138,7 @@ test("Netlify serves the landing at root and routes the private product surfaces
   const config = await readFile(path.join(root, "netlify.toml"), "utf8");
   assert.match(
     config,
-    /from = "\/pilot"[\s\S]*?to = "\/pilot-app\.html"[\s\S]*?status = 200[\s\S]*?force = true/,
+    /from = "\/pilot"[\s\S]*?to = "\/pilot-coming-soon\.html"[\s\S]*?status = 200[\s\S]*?force = true/,
   );
   assert.match(
     config,

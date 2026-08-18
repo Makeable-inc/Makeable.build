@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#eee5d8" />
+    <meta name="robots" content="noindex, follow" />
+    <title>Coming soon · Makeable</title>
+    <meta
+      name="description"
+      content="The Makeable pilot builder is coming soon."
+    />
+    <link rel="canonical" href="https://makeable.build/pilot" />
+    <link rel="icon" href="/assets/icons/lucide/sparkles.svg" />
+    <style>
+      @font-face {
+        font-family: "Fredoka";
+        src: url("/assets/fonts/fredoka/fredoka.woff2") format("woff2");
+        font-weight: 500 700;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        --paper: #eee5d8;
+        --ink: #10264b;
+        --mk-red: #df1749;
+        --mk-pink: #e02d6c;
+        --display: "Fredoka", "Arial Rounded MT Bold", ui-rounded, system-ui, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { min-height: 100%; }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--display);
+      }
+
+      .page-nav {
+        display: flex;
+        align-items: center;
+        padding: 1.25rem clamp(1.25rem, 4vw, 2.5rem);
+      }
+
+      .makeable-wordmark img {
+        display: block;
+        height: 1.7rem;
+        width: auto;
+      }
+
+      .coming-soon-backdrop {
+        position: fixed;
+        z-index: 100;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 1.25rem;
+        background: rgba(5, 15, 34, 0.58);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+
+      .coming-soon-dialog {
+        position: relative;
+        width: min(100%, 30rem);
+        padding: clamp(2rem, 5vw, 3.25rem);
+        border: 1px solid rgba(11, 17, 23, 0.2);
+        border-radius: 1.2rem;
+        background: #f6eee4;
+        color: #101417;
+        text-align: center;
+        box-shadow: 0 2rem 5rem rgba(3, 12, 27, 0.38);
+        animation: coming-soon-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      .coming-soon-dialog > .brand-star {
+        display: inline-block;
+        width: 2.2rem;
+        height: 2.2rem;
+        margin: 1rem auto 0.7rem;
+        color: var(--mk-pink);
+      }
+
+      .coming-soon-kicker {
+        display: block;
+        color: var(--mk-red);
+        font: 800 0.7rem/1 monospace;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .coming-soon-dialog h1 {
+        margin: 0;
+        font-size: clamp(2.4rem, 7vw, 4rem);
+        font-weight: 600;
+        line-height: 0.92;
+        letter-spacing: -0.03em;
+        text-transform: uppercase;
+      }
+
+      .coming-soon-dialog p {
+        max-width: 22rem;
+        margin: 1rem auto 1.5rem;
+        font-size: clamp(0.92rem, 2vw, 1.05rem);
+        line-height: 1.45;
+      }
+
+      .coming-soon-close {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.85rem;
+        display: grid;
+        width: 2.4rem;
+        height: 2.4rem;
+        place-items: center;
+        padding: 0;
+        border: 1px solid rgba(11, 17, 23, 0.24);
+        border-radius: 50%;
+        background: transparent;
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+        font: 400 1.6rem/1 Arial, sans-serif;
+      }
+
+      .coming-soon-action {
+        display: inline-block;
+        width: 100%;
+        padding: 1rem 1.25rem;
+        border: 0;
+        border-radius: 0.55rem;
+        background: var(--mk-red);
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .coming-soon-close:hover,
+      .coming-soon-action:hover {
+        filter: brightness(1.06);
+      }
+
+      .coming-soon-close:focus-visible,
+      .coming-soon-action:focus-visible {
+        outline: 3px solid rgba(223, 23, 73, 0.42);
+        outline-offset: 3px;
+      }
+
+      @keyframes coming-soon-pop {
+        from { opacity: 0; transform: translateY(1rem) scale(0.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-nav">
+      <a class="makeable-wordmark" href="/" aria-label="Makeable home">
+        <img src="/makeable-logo-tight.webp" alt="Makeable" />
+      </a>
+    </header>
+
+    <div class="coming-soon-backdrop" role="presentation">
+      <section
+        class="coming-soon-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="coming-soon-title"
+      >
+        <a href="/" class="coming-soon-close" aria-label="Back to Makeable">×</a>
+        <span class="coming-soon-kicker">Pilot builder</span>
+        <svg class="brand-star" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">
+          <path d="M63.8 0 63.3 35.6 98.4 27.5 70.9 49.3 100 61.7 66.5 66 70 100 52 74 43.2 88.7 38.5 71.2 8.5 85.6 28.6 57.5 0 42.5 31.5 40 22.7 9.6 46.3 30.6Z" />
+        </svg>
+        <h1 id="coming-soon-title">Coming soon.</h1>
+        <p>The Makeable pilot builder isn’t open yet. We’re still putting the finishing touches on it — check back soon.</p>
+        <a class="coming-soon-action" href="/">Back to Makeable</a>
+      </section>
+    </div>
+  </body>
+</html>

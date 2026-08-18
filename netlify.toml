@@ -11,7 +11,7 @@
 
 [[redirects]]
   from = "/pilot"
-  to = "/pilot-app.html"
+  to = "/pilot-coming-soon.html"
   status = 200
   force = true
 

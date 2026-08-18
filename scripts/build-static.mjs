@@ -20,3 +20,4 @@ await cp(path.join(root, "dashboard"), path.join(output, "dashboard"), { recursi
 await cp(path.join(root, "pilot"), path.join(output, "pilot"), { recursive: true });
 await cp(path.join(root, "pilot", "index.html"), path.join(output, "pilot-app.html"));
 await rm(path.join(output, "pilot", "index.html"));
+await cp(path.join(root, "pilot-coming-soon.html"), path.join(output, "pilot-coming-soon.html"));
