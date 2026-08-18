@@ -154,7 +154,7 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   );
   assert.equal(
     stripeRequest.options.body.get("line_items[0][price_data][product_data][description]"),
-    "Token-burner desk pet. Easy-to-assemble kit, USB-C cable included. Pre-order — ships October",
+    "Token-burner desk pet. Easy-to-assemble kit, USB-C cable included.",
   );
   assert.equal(stripeRequest.options.body.get("line_items[0][quantity]"), "2");
   assert.equal(stripeRequest.options.body.get("metadata[quantity]"), "2");
