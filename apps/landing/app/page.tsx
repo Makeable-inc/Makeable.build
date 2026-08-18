@@ -273,21 +273,23 @@ export default function Home() {
     // all ~300 decoded bitmaps resident (each a multi-megabyte raw RGBA buffer)
     // meant multiple GB of memory pressure by the time someone scrolled through
     // the whole sequence, which is a heavier cost than the network transfer.
-    const windowRadius = isMobile ? 24 : 20;
+    // Mobile hardware decodes/composites markedly slower than desktop, so it
+    // gets a smaller window and less concurrency rather than more — a wider
+    // window there just means more decode/eviction work competing with the
+    // main thread during the scroll itself.
+    const windowRadius = isMobile ? 14 : 20;
     const evictMargin = windowRadius * 2;
     const alwaysKeep = new Set([0]);
-
-    // Bounded concurrency: a big scroll jump can bring dozens of new indices
-    // into the window at once, and firing them all as simultaneous requests
-    // saturates the connection pool (and, on some dev/edge setups, causes
-    // outright connection resets). Queue by proximity to the playhead and
-    // only ever run a handful of decodes in flight.
-    const maxConcurrentLoads = 6;
+    const maxConcurrentLoads = isMobile ? 4 : 6;
     const maxRetries = 4;
     let activeLoads = 0;
     const queued = new Set<number>();
     const retryCounts = new Map<number, number>();
     let queue: number[] = [];
+    // Tracks which indices are actually decoded so eviction only has to check
+    // the handful of resident frames instead of scanning the full ~300-slot
+    // array on every unique frame reached during a scroll.
+    const loadedIndices = new Set<number>();
 
     const frameUrl = (index: number) => `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=35`;
 
@@ -297,6 +299,7 @@ export default function Home() {
       if (!image) return;
       image.removeAttribute("src");
       frames[index] = undefined;
+      loadedIndices.delete(index);
     };
 
     const requestFrame = (index: number) => {
@@ -321,6 +324,7 @@ export default function Home() {
           .then(() => {
             if (disposed) return;
             frames[index] = image;
+            loadedIndices.add(index);
             retryCounts.delete(index);
             if (index === 0) {
               resizeCanvas();
@@ -368,8 +372,8 @@ export default function Home() {
       queued.clear();
       queue.forEach((index) => queued.add(index));
 
-      frames.forEach((image, index) => {
-        if (!image || alwaysKeep.has(index)) return;
+      loadedIndices.forEach((index) => {
+        if (alwaysKeep.has(index)) return;
         if (index < center - evictMargin || index > center + evictMargin) releaseFrame(index);
       });
 
@@ -429,10 +433,8 @@ export default function Home() {
       window.removeEventListener("makeable:show-catalogue", onCatalogueRequest);
       gsap.ticker.remove(tick);
       lenis.destroy();
-      frames.forEach((_, index) => {
-        alwaysKeep.delete(index);
-        releaseFrame(index);
-      });
+      alwaysKeep.clear();
+      loadedIndices.forEach((index) => releaseFrame(index));
     };
   }, [sequenceMode]);
 
