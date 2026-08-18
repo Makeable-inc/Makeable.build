@@ -178,12 +178,13 @@ export default function Home() {
     const totalFrames = isMobile ? 300 : 301;
     const frameDirectory = isMobile ? "frames-mobile" : "frames-v2";
     const frames: Array<HTMLImageElement | undefined> = new Array(totalFrames);
+    const pending = new Set<number>();
     const playhead = { frame: 0 };
     let requestedFrame = 0;
     let renderedFrame = -1;
     let drawRequest = 0;
     let disposed = false;
-    let allFramesDecoded = false;
+    let lastSyncedCenter = -1;
     const keyframes = [0, 72, 156, 282];
     const offerFrame = keyframes[keyframes.length - 1];
     let introVisible = true;
@@ -252,7 +253,7 @@ export default function Home() {
       if (drawRequest) return;
       drawRequest = requestAnimationFrame(() => {
         drawRequest = 0;
-        if (allFramesDecoded || frames[Math.floor(requestedFrame)]?.naturalWidth) {
+        if (frames[Math.floor(requestedFrame)]?.naturalWidth) {
           drawFrame(requestedFrame);
         }
       });
@@ -268,39 +269,113 @@ export default function Home() {
     const resizeObserver = new ResizeObserver(resizeCanvas);
     resizeObserver.observe(canvas);
 
-    const priorityFrames = [0, totalFrames - 1];
-    const loadOrder = [...priorityFrames, ...Array.from({ length: totalFrames }, (_, index) => index).filter((index) => !priorityFrames.includes(index))];
-    let cursor = 0;
-    let decodedCount = 0;
-    const loadNext = async () => {
-      if (disposed || cursor >= loadOrder.length) return;
-      const index = loadOrder[cursor++];
-      const image = new Image();
-      image.decoding = "async";
-      frames[index] = image;
-      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=35`;
+    // Keep only a window of frames around the playhead decoded at once. Holding
+    // all ~300 decoded bitmaps resident (each a multi-megabyte raw RGBA buffer)
+    // meant multiple GB of memory pressure by the time someone scrolled through
+    // the whole sequence, which is a heavier cost than the network transfer.
+    const windowRadius = isMobile ? 24 : 20;
+    const evictMargin = windowRadius * 2;
+    const alwaysKeep = new Set([0]);
 
-      try {
-        await image.decode();
-        if (disposed) return;
-        if (index === 0) {
-          resizeCanvas();
-          setReady(true);
-          scheduleDraw();
-        }
-        decodedCount += 1;
-        if (decodedCount === totalFrames) {
-          allFramesDecoded = true;
-          scheduleDraw();
-        }
-      } catch (error) {
-        console.error(`Could not decode frame ${index + 1}`, error);
-      } finally {
-        if (Math.abs(index - Math.floor(requestedFrame)) <= 1) scheduleDraw();
-        void loadNext();
+    // Bounded concurrency: a big scroll jump can bring dozens of new indices
+    // into the window at once, and firing them all as simultaneous requests
+    // saturates the connection pool (and, on some dev/edge setups, causes
+    // outright connection resets). Queue by proximity to the playhead and
+    // only ever run a handful of decodes in flight.
+    const maxConcurrentLoads = 6;
+    const maxRetries = 4;
+    let activeLoads = 0;
+    const queued = new Set<number>();
+    const retryCounts = new Map<number, number>();
+    let queue: number[] = [];
+
+    const frameUrl = (index: number) => `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=35`;
+
+    const releaseFrame = (index: number) => {
+      if (alwaysKeep.has(index)) return;
+      const image = frames[index];
+      if (!image) return;
+      image.removeAttribute("src");
+      frames[index] = undefined;
+    };
+
+    const requestFrame = (index: number) => {
+      if (frames[index] || pending.has(index) || queued.has(index)) return;
+      queued.add(index);
+      queue.push(index);
+    };
+
+    const pump = () => {
+      while (activeLoads < maxConcurrentLoads && queue.length > 0) {
+        const index = queue.shift()!;
+        queued.delete(index);
+        if (frames[index] || pending.has(index)) continue;
+
+        activeLoads += 1;
+        pending.add(index);
+        const image = new Image();
+        image.decoding = "async";
+        image.src = frameUrl(index);
+        void image
+          .decode()
+          .then(() => {
+            if (disposed) return;
+            frames[index] = image;
+            retryCounts.delete(index);
+            if (index === 0) {
+              resizeCanvas();
+              setReady(true);
+            }
+            if (Math.abs(index - Math.floor(requestedFrame)) <= 1) scheduleDraw();
+          })
+          .catch((error) => {
+            // Transient decode/network failures (e.g. a dropped connection
+            // under a burst of requests) shouldn't permanently leave a hole
+            // in the sequence — retry a few times with backoff before
+            // giving up on this frame.
+            const attempts = (retryCounts.get(index) ?? 0) + 1;
+            retryCounts.set(index, attempts);
+            if (!disposed && attempts <= maxRetries) {
+              setTimeout(() => {
+                if (disposed || frames[index]) return;
+                requestFrame(index);
+                pump();
+              }, 150 * attempts);
+            } else {
+              console.error(`Could not decode frame ${index + 1} after ${attempts} attempts`, error);
+            }
+          })
+          .finally(() => {
+            pending.delete(index);
+            activeLoads -= 1;
+            pump();
+          });
       }
     };
-    for (let worker = 0; worker < 8; worker++) void loadNext();
+
+    const syncFrameWindow = (center: number) => {
+      const lower = Math.max(0, center - windowRadius);
+      const upper = Math.min(totalFrames - 1, center + windowRadius);
+      // Request nearest-to-farthest so the frame the playhead actually needs
+      // wins the queue even after a large jump.
+      for (let distance = 0; distance <= windowRadius; distance++) {
+        if (center - distance >= lower) requestFrame(center - distance);
+        if (distance > 0 && center + distance <= upper) requestFrame(center + distance);
+      }
+
+      // Drop still-queued requests that fell out of range before they started.
+      queue = queue.filter((index) => index >= center - evictMargin && index <= center + evictMargin);
+      queued.clear();
+      queue.forEach((index) => queued.add(index));
+
+      frames.forEach((image, index) => {
+        if (!image || alwaysKeep.has(index)) return;
+        if (index < center - evictMargin || index > center + evictMargin) releaseFrame(index);
+      });
+
+      pump();
+    };
+    syncFrameWindow(0);
 
     const updateFromScroll = () => {
       const storyStart = story.offsetTop;
@@ -312,6 +387,12 @@ export default function Home() {
       playhead.frame = nextFrame;
       requestedFrame = nextFrame;
       scheduleDraw();
+
+      const centerFrame = Math.round(nextFrame);
+      if (centerFrame !== lastSyncedCenter) {
+        lastSyncedCenter = centerFrame;
+        syncFrameWindow(centerFrame);
+      }
 
       const nextIntroVisible = progress <= 0.025;
       if (nextIntroVisible !== introVisible) {
@@ -348,6 +429,10 @@ export default function Home() {
       window.removeEventListener("makeable:show-catalogue", onCatalogueRequest);
       gsap.ticker.remove(tick);
       lenis.destroy();
+      frames.forEach((_, index) => {
+        alwaysKeep.delete(index);
+        releaseFrame(index);
+      });
     };
   }, [sequenceMode]);
 
