@@ -188,7 +188,6 @@ export default function Home() {
     const offerFrame = keyframes[keyframes.length - 1];
     let introVisible = true;
     let offerVisible = false;
-    let catalogueActivated = false;
 
     const recordStoryMilestone = (scene: number) => {
       if (seenStoryMilestonesRef.current.has(scene)) return;
@@ -306,7 +305,8 @@ export default function Home() {
     const updateFromScroll = () => {
       const storyStart = story.offsetTop;
       const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
-      const animationEnd = Math.max(storyStart + 1, storyEnd);
+      const finalHold = window.innerHeight * 0.75;
+      const animationEnd = Math.max(storyStart + 1, storyEnd - finalHold);
       const progress = Math.max(0, Math.min(1, (window.scrollY - storyStart) / (animationEnd - storyStart)));
       const nextFrame = progress * (totalFrames - 1);
 
@@ -333,20 +333,6 @@ export default function Home() {
       keyframes.forEach((frame, scene) => {
         if (nextFrame >= frame) recordStoryMilestone(scene);
       });
-
-      // Position: sticky always consumes one full viewport of scroll to
-      // release the pinned animation before the catalogue can appear, no
-      // matter how the progress math above is tuned — that's what read as a
-      // "dead" extra scroll. Snap straight to the catalogue the moment the
-      // animation finishes instead of making the visitor scroll through it.
-      if (window.scrollY >= animationEnd) {
-        if (!catalogueActivated) {
-          catalogueActivated = true;
-          activateCatalogue();
-        }
-      } else {
-        catalogueActivated = false;
-      }
     };
 
     window.addEventListener("scroll", updateFromScroll, { passive: true });
