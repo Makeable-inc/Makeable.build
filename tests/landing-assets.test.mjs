@@ -9,7 +9,7 @@ const dist = path.join(root, "dist");
 
 test("the deployed homepage is the Moment in Motion experience", async () => {
   const html = await readFile(path.join(dist, "index.html"), "utf8");
-  assert.match(html, /<title>Makeable<\/title>/);
+  assert.match(html, /<title>Makeable — Feed Ember Tokens\.<\/title>/);
   assert.match(html, /_next\/static/);
   await access(path.join(dist, "build-catalogue-page.png"));
   await access(path.join(dist, "makeable-logo.png"));
