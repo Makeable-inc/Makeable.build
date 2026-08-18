@@ -305,8 +305,7 @@ export default function Home() {
     const updateFromScroll = () => {
       const storyStart = story.offsetTop;
       const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
-      const finalHold = window.innerHeight * 0.75;
-      const animationEnd = Math.max(storyStart + 1, storyEnd - finalHold);
+      const animationEnd = Math.max(storyStart + 1, storyEnd);
       const progress = Math.max(0, Math.min(1, (window.scrollY - storyStart) / (animationEnd - storyStart)));
       const nextFrame = progress * (totalFrames - 1);
 
