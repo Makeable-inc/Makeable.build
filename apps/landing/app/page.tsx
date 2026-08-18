@@ -33,6 +33,7 @@ function BrandStar() {
 
 export default function Home() {
   const storyRef = useRef<HTMLElement>(null);
+  const experienceRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const catalogueRef = useRef<HTMLElement>(null);
   const [ready, setReady] = useState(false);
@@ -168,8 +169,9 @@ export default function Home() {
 
     const canvas = canvasRef.current;
     const story = storyRef.current;
+    const experience = experienceRef.current;
     const catalogue = catalogueRef.current;
-    if (!canvas || !story || !catalogue) return;
+    if (!canvas || !story || !experience || !catalogue) return;
 
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) return;
@@ -188,7 +190,6 @@ export default function Home() {
     const offerFrame = keyframes[keyframes.length - 1];
     let introVisible = true;
     let offerVisible = false;
-    let catalogueActivated = false;
 
     const recordStoryMilestone = (scene: number) => {
       if (seenStoryMilestonesRef.current.has(scene)) return;
@@ -305,10 +306,18 @@ export default function Home() {
 
     const updateFromScroll = () => {
       const storyStart = story.offsetTop;
-      const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
-      const animationEnd = Math.max(storyStart + 1, storyEnd);
+      // story.offsetHeight is sized to exactly the scroll distance the
+      // animation needs (see .scroll-story in globals.css) — the pin below
+      // is a JS-driven fixed/absolute toggle rather than CSS `position:
+      // sticky`, precisely so there's no extra viewport of scroll required
+      // to release it once the animation completes.
+      const animationEnd = Math.max(storyStart + 1, storyStart + story.offsetHeight);
       const progress = Math.max(0, Math.min(1, (window.scrollY - storyStart) / (animationEnd - storyStart)));
       const nextFrame = progress * (totalFrames - 1);
+
+      const isPinned = window.scrollY >= storyStart && window.scrollY < animationEnd;
+      experience.classList.toggle("is-pinned", isPinned);
+      experience.classList.toggle("is-unpinned", !isPinned);
 
       playhead.frame = nextFrame;
       requestedFrame = nextFrame;
@@ -333,20 +342,6 @@ export default function Home() {
       keyframes.forEach((frame, scene) => {
         if (nextFrame >= frame) recordStoryMilestone(scene);
       });
-
-      // Position: sticky always consumes one full viewport of scroll to
-      // release the pinned animation before the catalogue can appear, no
-      // matter how the progress math above is tuned — that's what read as a
-      // "dead" extra scroll. Snap straight to the catalogue the moment the
-      // animation finishes instead of making the visitor scroll through it.
-      if (window.scrollY >= animationEnd) {
-        if (!catalogueActivated) {
-          catalogueActivated = true;
-          activateCatalogue();
-        }
-      } else {
-        catalogueActivated = false;
-      }
     };
 
     window.addEventListener("scroll", updateFromScroll, { passive: true });
@@ -456,7 +451,7 @@ export default function Home() {
   return (
     <main>
       <section className="scroll-story" id="experience" ref={storyRef}>
-        <div className="experience">
+        <div className="experience is-pinned" ref={experienceRef}>
           <div className="film-frame">
             <canvas ref={canvasRef} aria-label="Product reveal controlled by scrolling" />
             <div
