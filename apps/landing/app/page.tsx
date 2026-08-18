@@ -157,9 +157,11 @@ export default function Home() {
     setReady(false);
     setProductPresentationVisible(false);
 
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     const lenis = new Lenis({
-      duration: 1.4,
-      smoothWheel: true,
+      duration: prefersReducedMotion ? 0 : 1.4,
+      smoothWheel: !prefersReducedMotion,
       syncTouch: false,
     });
     const tick = (time: number) => lenis.raf(time * 1000);
@@ -178,16 +180,30 @@ export default function Home() {
     const totalFrames = isMobile ? 300 : 301;
     const frameDirectory = isMobile ? "frames-mobile" : "frames-v2";
     const frames: Array<HTMLImageElement | undefined> = new Array(totalFrames);
-    const playhead = { frame: 0 };
-    let requestedFrame = 0;
+    // The playhead eases toward the scroll-derived target so fast flicks glide
+    // and slow drags track closely, independent of raw scroll cadence.
+    let targetFrame = 0;
+    let playhead = 0;
     let renderedFrame = -1;
-    let drawRequest = 0;
     let disposed = false;
-    let allFramesDecoded = false;
+    // Per-60fps-frame catch-up: higher = snappier/closer to scroll, lower = floatier.
+    const SMOOTHING = prefersReducedMotion ? 1 : 0.2;
     const keyframes = [0, 72, 156, 282];
     const offerFrame = keyframes[keyframes.length - 1];
     let introVisible = true;
     let offerVisible = false;
+
+    // Cache story geometry so the render loop never triggers a layout reflow.
+    let animationStart = 0;
+    let animationSpan = 1;
+    const readMetrics = () => {
+      const storyStart = story.offsetTop;
+      const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
+      const finalHold = window.innerHeight * 0.75;
+      const animationEnd = Math.max(storyStart + 1, storyEnd - finalHold);
+      animationStart = storyStart;
+      animationSpan = Math.max(1, animationEnd - storyStart);
+    };
 
     const recordStoryMilestone = (scene: number) => {
       if (seenStoryMilestonesRef.current.has(scene)) return;
@@ -222,22 +238,35 @@ export default function Home() {
       context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
     };
 
+    // Nearest decoded frame, so a fast scroll into not-yet-loaded frames shows
+    // the closest available image instead of freezing on a stale one.
+    const nearestDecoded = (index: number) => {
+      if (frames[index]) return index;
+      for (let radius = 1; radius < totalFrames; radius++) {
+        if (frames[index - radius]) return index - radius;
+        if (frames[index + radius]) return index + radius;
+      }
+      return -1;
+    };
+
     const drawFrame = (position: number, force = false) => {
       const clampedPosition = Math.max(0, Math.min(position, totalFrames - 1));
       if (!force && Math.abs(clampedPosition - renderedFrame) < 0.001) return;
 
       const baseIndex = Math.floor(clampedPosition);
-      const nextIndex = Math.min(baseIndex + 1, totalFrames - 1);
-      const baseImage = frames[baseIndex];
-      const nextImage = frames[nextIndex];
-      if (!baseImage?.naturalWidth) return;
+      const baseSource = nearestDecoded(baseIndex);
+      if (baseSource < 0) return;
+      const baseImage = frames[baseSource]!;
 
       context.globalCompositeOperation = "copy";
       context.globalAlpha = 1;
       drawImageCover(baseImage);
 
+      // Cross-fade to the next frame only when the exact base frame is present,
+      // giving true sub-frame interpolation without flashing a far fallback.
       const blend = clampedPosition - baseIndex;
-      if (blend > 0 && nextImage?.naturalWidth) {
+      const nextImage = frames[Math.min(baseIndex + 1, totalFrames - 1)];
+      if (blend > 0 && baseSource === baseIndex && nextImage) {
         context.globalCompositeOperation = "source-over";
         context.globalAlpha = blend;
         drawImageCover(nextImage);
@@ -248,71 +277,21 @@ export default function Home() {
       renderedFrame = clampedPosition;
     };
 
-    const scheduleDraw = () => {
-      if (drawRequest) return;
-      drawRequest = requestAnimationFrame(() => {
-        drawRequest = 0;
-        if (allFramesDecoded || frames[Math.floor(requestedFrame)]?.naturalWidth) {
-          drawFrame(requestedFrame);
-        }
-      });
-    };
-
     const resizeCanvas = () => {
       const bounds = canvas.getBoundingClientRect();
       const density = Math.min(window.devicePixelRatio || 1, 1.5);
       canvas.width = Math.round(bounds.width * density);
       canvas.height = Math.round(bounds.height * density);
-      drawFrame(playhead.frame, true);
+      readMetrics();
+      drawFrame(playhead, true);
     };
     const resizeObserver = new ResizeObserver(resizeCanvas);
     resizeObserver.observe(canvas);
 
-    const priorityFrames = [0, totalFrames - 1];
-    const loadOrder = [...priorityFrames, ...Array.from({ length: totalFrames }, (_, index) => index).filter((index) => !priorityFrames.includes(index))];
-    let cursor = 0;
-    let decodedCount = 0;
-    const loadNext = async () => {
-      if (disposed || cursor >= loadOrder.length) return;
-      const index = loadOrder[cursor++];
-      const image = new Image();
-      image.decoding = "async";
-      frames[index] = image;
-      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=35`;
-
-      try {
-        await image.decode();
-        if (disposed) return;
-        if (index === 0) {
-          resizeCanvas();
-          setReady(true);
-          scheduleDraw();
-        }
-        decodedCount += 1;
-        if (decodedCount === totalFrames) {
-          allFramesDecoded = true;
-          scheduleDraw();
-        }
-      } catch (error) {
-        console.error(`Could not decode frame ${index + 1}`, error);
-      } finally {
-        if (Math.abs(index - Math.floor(requestedFrame)) <= 1) scheduleDraw();
-        void loadNext();
-      }
-    };
-    for (let worker = 0; worker < 8; worker++) void loadNext();
-
-    const updateFromScroll = () => {
-      const storyStart = story.offsetTop;
-      const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
-      const finalHold = window.innerHeight * 0.75;
-      const animationEnd = Math.max(storyStart + 1, storyEnd - finalHold);
-      const progress = Math.max(0, Math.min(1, (window.scrollY - storyStart) / (animationEnd - storyStart)));
-      const nextFrame = progress * (totalFrames - 1);
-
-      playhead.frame = nextFrame;
-      requestedFrame = nextFrame;
-      scheduleDraw();
+    // Scene/offer milestones track raw scroll intent (not the eased visual) so
+    // React state transitions never fire late relative to where the user is.
+    const updateScenes = () => {
+      const progress = targetFrame / (totalFrames - 1);
 
       const nextIntroVisible = progress <= 0.025;
       if (nextIntroVisible !== introVisible) {
@@ -320,7 +299,7 @@ export default function Home() {
         setActiveScene(nextIntroVisible ? 0 : -1);
       }
 
-      const nextOfferVisible = nextFrame >= offerFrame;
+      const nextOfferVisible = targetFrame >= offerFrame;
       if (nextOfferVisible !== offerVisible) {
         offerVisible = nextOfferVisible;
         setProductPresentationVisible(nextOfferVisible);
@@ -331,22 +310,67 @@ export default function Home() {
       }
 
       keyframes.forEach((frame, scene) => {
-        if (nextFrame >= frame) recordStoryMilestone(scene);
+        if (targetFrame >= frame) recordStoryMilestone(scene);
       });
     };
 
-    window.addEventListener("scroll", updateFromScroll, { passive: true });
-    window.addEventListener("resize", updateFromScroll);
+    // Single render loop, phase-locked to Lenis (added after lenis.raf so scroll
+    // is already updated this tick). deltaTime clamp keeps a backgrounded tab
+    // from snapping violently on resume.
+    let lastTime = performance.now();
+    const render = () => {
+      const now = performance.now();
+      const deltaFrames = Math.min(4, (now - lastTime) / (1000 / 60));
+      lastTime = now;
+
+      const scroll = typeof lenis.scroll === "number" ? lenis.scroll : window.scrollY;
+      const progress = Math.max(0, Math.min(1, (scroll - animationStart) / animationSpan));
+      targetFrame = progress * (totalFrames - 1);
+
+      const factor = 1 - Math.pow(1 - SMOOTHING, deltaFrames);
+      playhead += (targetFrame - playhead) * factor;
+      if (Math.abs(targetFrame - playhead) < 0.01) playhead = targetFrame;
+
+      updateScenes();
+      drawFrame(playhead);
+    };
+
+    const priorityFrames = [0, totalFrames - 1];
+    const loadOrder = [...priorityFrames, ...Array.from({ length: totalFrames }, (_, index) => index).filter((index) => !priorityFrames.includes(index))];
+    let cursor = 0;
+    const loadNext = async () => {
+      if (disposed || cursor >= loadOrder.length) return;
+      const index = loadOrder[cursor++];
+      const image = new Image();
+      image.decoding = "async";
+      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=35`;
+      try {
+        await image.decode();
+        if (disposed) return;
+        // Assigned only after decode, so a truthy frames[index] always means ready.
+        frames[index] = image;
+        if (index === 0) setReady(true);
+      } catch (error) {
+        console.error(`Could not decode frame ${index + 1}`, error);
+      } finally {
+        void loadNext();
+      }
+    };
+
+    readMetrics();
+    resizeCanvas();
+    render();
+    gsap.ticker.add(render);
+    window.addEventListener("resize", readMetrics);
     window.addEventListener("makeable:show-catalogue", onCatalogueRequest);
-    updateFromScroll();
+    for (let worker = 0; worker < 8; worker++) void loadNext();
 
     return () => {
       disposed = true;
       resizeObserver.disconnect();
-      cancelAnimationFrame(drawRequest);
-      window.removeEventListener("scroll", updateFromScroll);
-      window.removeEventListener("resize", updateFromScroll);
+      window.removeEventListener("resize", readMetrics);
       window.removeEventListener("makeable:show-catalogue", onCatalogueRequest);
+      gsap.ticker.remove(render);
       gsap.ticker.remove(tick);
       lenis.destroy();
     };
