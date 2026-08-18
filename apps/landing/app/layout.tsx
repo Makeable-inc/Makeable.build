@@ -4,18 +4,19 @@ import PostHogProvider from "./posthog-provider";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.URL || "http://localhost:3000"),
-  title: "Makeable",
-  description: "A cinematic, scroll-controlled product story.",
+  title: "Makeable — Feed Ember Tokens.",
+  description: "A desk pet that grows with every Claude and Codex token you burn. Pick a kit, snap it together, bring it to life.",
   openGraph: {
-    title: "Some Things Deserve a Moment",
-    description: "A tactile story, told in motion.",
-    images: [{ url: "/og.png", width: 1536, height: 909 }],
+    siteName: "Makeable",
+    title: "Makeable — Feed Ember Tokens.",
+    description: "A desk pet that grows with every Claude and Codex token you burn. Pick a kit, snap it together, bring it to life.",
+    images: [{ url: "/build-catalogue-page.png", width: 1536, height: 1024 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Some Things Deserve a Moment",
-    description: "A tactile story, told in motion.",
-    images: ["/og.png"],
+    title: "Makeable — Feed Ember Tokens.",
+    description: "A desk pet that grows with every Claude and Codex token you burn.",
+    images: ["/build-catalogue-page.png"],
   },
   icons: {
     icon: [{ url: "/favicon.png", type: "image/png", sizes: "512x512" }],
