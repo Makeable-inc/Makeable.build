@@ -1,16 +1,14 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import Lenis from "lenis";
-import gsap from "gsap";
 import SeenOnRealDesks from "./SeenOnRealDesks";
-import BuildBlueprint from "./BuildBlueprint";
+import EmberAdopt, { type EmberConfig } from "./EmberAdopt";
+import Build002Builder from "./Build002Builder";
 import { captureMakeableEvent, makeableDistinctId } from "./analytics";
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
-type SequenceMode = "desktop" | "mobile";
-type CheckoutLocation = "catalogue" | "story_card";
+type CheckoutLocation = "catalogue" | "adopt_flow" | "story_card";
 
 const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "sage", label: "Sage", stock: 5 },
@@ -32,13 +30,7 @@ function BrandStar() {
 }
 
 export default function Home() {
-  const storyRef = useRef<HTMLElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const catalogueRef = useRef<HTMLElement>(null);
-  const [ready, setReady] = useState(false);
-  const [sequenceMode, setSequenceMode] = useState<SequenceMode | null>(null);
-  const [activeScene, setActiveScene] = useState(0);
-  const [productPresentationVisible, setProductPresentationVisible] = useState(false);
   const [selectedColor, setSelectedColor] = useState<EmberColor>("bone");
   const [selectedMarket, setSelectedMarket] = useState<EmberMarket>("US");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -50,12 +42,10 @@ export default function Home() {
   const checkoutCloseRef = useRef<HTMLButtonElement>(null);
   const [checkoutSuccessOpen, setCheckoutSuccessOpen] = useState(false);
   const checkoutSuccessCloseRef = useRef<HTMLButtonElement>(null);
-  const [buildEmail, setBuildEmail] = useState("");
-  const [buildNotice, setBuildNotice] = useState("");
-  const [buildBusy, setBuildBusy] = useState(false);
-  const seenStoryMilestonesRef = useRef(new Set<number>());
-  const seenEmberOfferRef = useRef(false);
-  const checkoutOriginRef = useRef<CheckoutLocation>("story_card");
+  const [adoptedConfig, setAdoptedConfig] = useState<EmberConfig | null>(null);
+  const [exitSurveyOpen, setExitSurveyOpen] = useState(false);
+  const build002Ref = useRef<HTMLElement>(null);
+  const checkoutOriginRef = useRef<CheckoutLocation>("adopt_flow");
   const selectedEmberColor = emberColors.find((color) => color.id === selectedColor);
   const selectedPrice = emberPrices[selectedMarket];
   useEffect(() => {
@@ -126,7 +116,7 @@ export default function Home() {
       : null;
     checkoutCloseRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !checkoutBusy) setCheckoutOpen(false);
+      if (event.key === "Escape" && !checkoutBusy) { setCheckoutOpen(false); setExitSurveyOpen(true); }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => {
@@ -134,250 +124,6 @@ export default function Home() {
       previouslyFocused?.focus();
     };
   }, [checkoutBusy, checkoutOpen]);
-
-  useEffect(() => {
-    const updateSequenceMode = () => {
-      const mobile = window.matchMedia("(max-width: 900px)").matches
-        || (navigator.maxTouchPoints > 0 && window.innerWidth <= 1180);
-      const nextMode: SequenceMode = mobile ? "mobile" : "desktop";
-      setSequenceMode((currentMode) => currentMode === nextMode ? currentMode : nextMode);
-    };
-
-    updateSequenceMode();
-    window.addEventListener("resize", updateSequenceMode);
-    window.addEventListener("orientationchange", updateSequenceMode);
-    return () => {
-      window.removeEventListener("resize", updateSequenceMode);
-      window.removeEventListener("orientationchange", updateSequenceMode);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!sequenceMode) return;
-    setReady(false);
-    setProductPresentationVisible(false);
-
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const lenis = new Lenis({
-      duration: prefersReducedMotion ? 0 : 1.4,
-      smoothWheel: !prefersReducedMotion,
-      syncTouch: false,
-    });
-    const tick = (time: number) => lenis.raf(time * 1000);
-    gsap.ticker.add(tick);
-    gsap.ticker.lagSmoothing(0);
-
-    const canvas = canvasRef.current;
-    const story = storyRef.current;
-    const catalogue = catalogueRef.current;
-    if (!canvas || !story || !catalogue) return;
-
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) return;
-
-    const isMobile = sequenceMode === "mobile";
-    const totalFrames = isMobile ? 300 : 301;
-    const frameDirectory = isMobile ? "frames-mobile" : "frames-v2";
-    const frames: Array<HTMLImageElement | undefined> = new Array(totalFrames);
-    // The playhead eases toward the scroll-derived target so fast flicks glide
-    // and slow drags track closely, independent of raw scroll cadence.
-    let targetFrame = 0;
-    let playhead = 0;
-    let renderedFrame = -1;
-    let disposed = false;
-    // Per-60fps-frame catch-up: higher = snappier/closer to scroll, lower = floatier.
-    const SMOOTHING = prefersReducedMotion ? 1 : 0.2;
-    const keyframes = [0, 72, 156, 282];
-    const offerFrame = keyframes[keyframes.length - 1];
-    let introVisible = true;
-    let offerVisible = false;
-
-    // Cache story geometry so the render loop never triggers a layout reflow.
-    let animationStart = 0;
-    let animationSpan = 1;
-    const readMetrics = () => {
-      const storyStart = story.offsetTop;
-      // Map the scrub across the full pinned range so the animation completes
-      // exactly when position: sticky releases. There's no frozen pinned
-      // buffer afterward: the hero (video + logo + offer card) is one absolute
-      // unit inside .experience, so the moment the last frame lands it scrolls
-      // up together into the catalogue.
-      const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
-      animationStart = storyStart;
-      animationSpan = Math.max(1, storyEnd - storyStart);
-    };
-
-    const recordStoryMilestone = (scene: number) => {
-      if (seenStoryMilestonesRef.current.has(scene)) return;
-      seenStoryMilestonesRef.current.add(scene);
-      captureMakeableEvent("story milestone reached", {
-        scene: ["box", "kit", "components", "ember_offer", "catalogue"][scene] || "unknown",
-        scene_index: scene,
-      });
-    };
-
-    const activateCatalogue = () => {
-      lenis.scrollTo(catalogue.offsetTop, {
-        duration: 1.6,
-        lock: true,
-        force: true,
-        easing: (value: number) => value * value * value * (value * (value * 6 - 15) + 10),
-        onComplete: () => {
-          setActiveScene(keyframes.length);
-          recordStoryMilestone(keyframes.length);
-        },
-      });
-    };
-
-    const onCatalogueRequest = () => activateCatalogue();
-
-    const drawImageCover = (image: HTMLImageElement) => {
-      const width = canvas.width;
-      const height = canvas.height;
-      const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
-      const drawWidth = image.naturalWidth * scale;
-      const drawHeight = image.naturalHeight * scale;
-      context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
-    };
-
-    // Nearest decoded frame, so a fast scroll into not-yet-loaded frames shows
-    // the closest available image instead of freezing on a stale one.
-    const nearestDecoded = (index: number) => {
-      if (frames[index]) return index;
-      for (let radius = 1; radius < totalFrames; radius++) {
-        if (frames[index - radius]) return index - radius;
-        if (frames[index + radius]) return index + radius;
-      }
-      return -1;
-    };
-
-    const drawFrame = (position: number, force = false) => {
-      const clampedPosition = Math.max(0, Math.min(position, totalFrames - 1));
-      if (!force && Math.abs(clampedPosition - renderedFrame) < 0.001) return;
-
-      const baseIndex = Math.floor(clampedPosition);
-      const baseSource = nearestDecoded(baseIndex);
-      if (baseSource < 0) return;
-      const baseImage = frames[baseSource]!;
-
-      context.globalCompositeOperation = "copy";
-      context.globalAlpha = 1;
-      drawImageCover(baseImage);
-
-      // Cross-fade to the next frame only when the exact base frame is present,
-      // giving true sub-frame interpolation without flashing a far fallback.
-      const blend = clampedPosition - baseIndex;
-      const nextImage = frames[Math.min(baseIndex + 1, totalFrames - 1)];
-      if (blend > 0 && baseSource === baseIndex && nextImage) {
-        context.globalCompositeOperation = "source-over";
-        context.globalAlpha = blend;
-        drawImageCover(nextImage);
-      }
-
-      context.globalAlpha = 1;
-      context.globalCompositeOperation = "source-over";
-      renderedFrame = clampedPosition;
-    };
-
-    const resizeCanvas = () => {
-      const bounds = canvas.getBoundingClientRect();
-      const density = Math.min(window.devicePixelRatio || 1, 1.5);
-      canvas.width = Math.round(bounds.width * density);
-      canvas.height = Math.round(bounds.height * density);
-      readMetrics();
-      drawFrame(playhead, true);
-    };
-    const resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(canvas);
-
-    // Scene/offer milestones track raw scroll intent (not the eased visual) so
-    // React state transitions never fire late relative to where the user is.
-    const updateScenes = () => {
-      const progress = targetFrame / (totalFrames - 1);
-
-      const nextIntroVisible = progress <= 0.025;
-      if (nextIntroVisible !== introVisible) {
-        introVisible = nextIntroVisible;
-        setActiveScene(nextIntroVisible ? 0 : -1);
-      }
-
-      const nextOfferVisible = targetFrame >= offerFrame;
-      if (nextOfferVisible !== offerVisible) {
-        offerVisible = nextOfferVisible;
-        setProductPresentationVisible(nextOfferVisible);
-        if (nextOfferVisible && !seenEmberOfferRef.current) {
-          seenEmberOfferRef.current = true;
-          captureMakeableEvent("ember offer viewed", { entry_point: "scroll_story" });
-        }
-      }
-
-      keyframes.forEach((frame, scene) => {
-        if (targetFrame >= frame) recordStoryMilestone(scene);
-      });
-    };
-
-    // Single render loop, phase-locked to Lenis (added after lenis.raf so scroll
-    // is already updated this tick). deltaTime clamp keeps a backgrounded tab
-    // from snapping violently on resume.
-    let lastTime = performance.now();
-    const render = () => {
-      const now = performance.now();
-      const deltaFrames = Math.min(4, (now - lastTime) / (1000 / 60));
-      lastTime = now;
-
-      const scroll = typeof lenis.scroll === "number" ? lenis.scroll : window.scrollY;
-      const progress = Math.max(0, Math.min(1, (scroll - animationStart) / animationSpan));
-      targetFrame = progress * (totalFrames - 1);
-
-      const factor = 1 - Math.pow(1 - SMOOTHING, deltaFrames);
-      playhead += (targetFrame - playhead) * factor;
-      if (Math.abs(targetFrame - playhead) < 0.01) playhead = targetFrame;
-
-      updateScenes();
-      drawFrame(playhead);
-    };
-
-    const priorityFrames = [0, totalFrames - 1];
-    const loadOrder = [...priorityFrames, ...Array.from({ length: totalFrames }, (_, index) => index).filter((index) => !priorityFrames.includes(index))];
-    let cursor = 0;
-    const loadNext = async () => {
-      if (disposed || cursor >= loadOrder.length) return;
-      const index = loadOrder[cursor++];
-      const image = new Image();
-      image.decoding = "async";
-      image.src = `/${frameDirectory}/frame_${String(index + 1).padStart(3, "0")}.webp?v=35`;
-      try {
-        await image.decode();
-        if (disposed) return;
-        // Assigned only after decode, so a truthy frames[index] always means ready.
-        frames[index] = image;
-        if (index === 0) setReady(true);
-      } catch (error) {
-        console.error(`Could not decode frame ${index + 1}`, error);
-      } finally {
-        void loadNext();
-      }
-    };
-
-    readMetrics();
-    resizeCanvas();
-    render();
-    gsap.ticker.add(render);
-    window.addEventListener("resize", readMetrics);
-    window.addEventListener("makeable:show-catalogue", onCatalogueRequest);
-    for (let worker = 0; worker < 8; worker++) void loadNext();
-
-    return () => {
-      disposed = true;
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", readMetrics);
-      window.removeEventListener("makeable:show-catalogue", onCatalogueRequest);
-      gsap.ticker.remove(render);
-      gsap.ticker.remove(tick);
-      lenis.destroy();
-    };
-  }, [sequenceMode]);
 
   const openCheckout = (location: CheckoutLocation) => {
     checkoutOriginRef.current = location;
@@ -433,129 +179,40 @@ export default function Home() {
     }
   };
 
+  // Feature 7 — post-decline placement: point people who pass on Ember at Build 002.
   const showOtherBuilds = () => {
-    window.dispatchEvent(new Event("makeable:show-catalogue"));
+    captureMakeableEvent("build002 entry clicked", { placement: "post_decline" });
+    build002Ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleBuildInterest = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setBuildBusy(true);
-    setBuildNotice("");
-    try {
-      const response = await fetch("/api/build-interest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: buildEmail }),
-      });
-      const contentType = response.headers.get("content-type") || "";
-      const result = contentType.includes("application/json")
-        ? await response.json() as { ok?: boolean; error?: string }
-        : {};
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || (response.status === 404
-          ? "Email signup is available on the deployed site."
-          : "We could not save your email right now."));
-      }
-      setBuildEmail("");
-      setBuildNotice("You’re on the list - we’ll share Make a Build updates with you.");
-      captureMakeableEvent("make a build interest submitted", { placement: "landing_feature" });
-    } catch (error) {
-      setBuildNotice(error instanceof Error ? error.message : "We could not save your email right now.");
-    } finally {
-      setBuildBusy(false);
-    }
+  const inventBuild002 = () => {
+    setCheckoutSuccessOpen(false);
+    captureMakeableEvent("build002 entry clicked", { placement: "post_purchase" });
+    build002Ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // Feature 8 — closing the modal without paying opens the one-question survey.
+  const closeCheckout = () => {
+    if (checkoutBusy) return;
+    setCheckoutOpen(false);
+    setExitSurveyOpen(true);
+  };
+
+  const submitExitReason = (reason: string) => {
+    captureMakeableEvent("checkout exit reason submitted", { reason });
+    setExitSurveyOpen(false);
   };
 
   return (
     <main>
-      <section className="scroll-story" id="experience" ref={storyRef}>
-        <div className="experience">
-          <div className="film-frame">
-            <canvas ref={canvasRef} aria-label="Product reveal controlled by scrolling" />
-            <div
-              className="ember-color-artworks"
-              aria-hidden="true"
-              style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }}
-            >
-              {emberColors.map((color) => (
-                <picture
-                  className={`ember-color-artwork ${productPresentationVisible && selectedColor === color.id ? "is-visible" : ""}`}
-                  key={color.id}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "block",
-                    opacity: productPresentationVisible && selectedColor === color.id ? 1 : 0,
-                    visibility: productPresentationVisible && selectedColor === color.id ? "visible" : "hidden",
-                    transform: "scale(1.004)",
-                    transition: "opacity .5s cubic-bezier(.22, 1, .36, 1), visibility .5s",
-                  }}
-                >
-                  <source media="(max-width: 900px)" srcSet={`/ember-${color.id}-mobile.webp`} />
-                  <img
-                    src={`/ember-${color.id}-desktop.webp`}
-                    alt=""
-                    decoding="async"
-                    style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                </picture>
-              ))}
-            </div>
-            <div className={`loader ${ready ? "is-ready" : ""}`}><span /></div>
-            <div className="film-shade" />
-          </div>
-          <div className={`intro-cue ${activeScene === 0 ? "is-visible" : ""}`} aria-hidden={activeScene !== 0}>
-            <span>Scroll to explore Ember</span>
-            <i aria-hidden="true">↓</i>
-          </div>
-          <div className={`product-ui ${productPresentationVisible ? "is-visible" : ""}`} data-selected-color={selectedColor} aria-hidden={!productPresentationVisible}>
-            <img className="makeable-logo" src="/makeable-logo-tight.webp" alt="Makeable" />
-            <aside className="ember-card" aria-label="Ember preorder details">
-              <small>Build 001</small>
-              <div className="ember-title-row">
-                <h1 aria-label="Feed Ember Tokens."><span>Feed</span><span>Ember</span><span>Tokens.</span></h1>
-                <span className="ember-star" aria-hidden="true">✦</span>
-              </div>
-              <p>A desk pet that grows with every Claude and Codex token you burn.</p>
-              <fieldset className="color-picker">
-                <legend>Choose a color</legend>
-                <div className="color-options">
-                  {emberColors.map((color) => (
-                    <button
-                      className={`color-option color-${color.id}`}
-                      type="button"
-                      key={color.id}
-                      aria-pressed={selectedColor === color.id}
-                      onClick={() => setSelectedColor(color.id)}
-                    >
-                      <span aria-hidden="true" />
-                      {color.label}
-                      {selectedColor === color.id && <b aria-hidden="true">✓</b>}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <div className="ember-price-row">
-                <s className="ember-price-was" aria-label="Previous price: 89 dollars and 99 cents USD"><sup>$</sup>89.99</s>
-                <span className="price-arrow" aria-hidden="true">→</span>
-                <strong className="ember-price" aria-label="Now 34 dollars and 99 cents USD"><sup>$</sup>34.99</strong>
-                <span className="discount-tag">61% off</span>
-                {selectedEmberColor?.stock != null && (
-                  <span className="stock-note" role="status">
-                    <span className="stock-flame" aria-hidden="true">🔥</span>
-                    Only {selectedEmberColor.stock} left in stock
-                  </span>
-                )}
-              </div>
-              <button className="preorder-button" type="button" onClick={() => openCheckout("story_card")}>
-                Pre-order Ember<span aria-hidden="true">✦</span>
-              </button>
-              <button className="other-builds" type="button" onClick={showOtherBuilds}>Show me other builds.</button>
-              {checkoutError && <p className="checkout-error" role="status">{checkoutError}</p>}
-            </aside>
-          </div>
-        </div>
-      </section>
+      <EmberAdopt
+        colors={emberColors}
+        selectedColor={selectedColor}
+        onSelectColor={(color) => setSelectedColor(color)}
+        price={selectedPrice}
+        onAdopt={(config) => { setAdoptedConfig(config); openCheckout("adopt_flow"); }}
+        onShowOtherBuilds={showOtherBuilds}
+      />
 
       <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
@@ -572,39 +229,8 @@ export default function Home() {
 
       <SeenOnRealDesks />
 
-      <section className="make-build-feature" id="make-a-build" aria-labelledby="make-build-title">
-        <div className="make-build-copy">
-          <span>Feature 02 • Coming soon</span>
-          <h2 id="make-build-title">
-            Make your<br />own build.
-            <sup><BrandStar /></sup>
-          </h2>
-          <form className="build-interest" onSubmit={handleBuildInterest}>
-            <label htmlFor="build-email">Enter your email for Make a Build updates</label>
-            <div>
-              <input
-                id="build-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="Enter your email"
-                value={buildEmail}
-                onChange={(event) => setBuildEmail(event.target.value)}
-                required
-              />
-              <button type="submit" disabled={buildBusy} aria-label="Join the Make a Build updates list">
-                {buildBusy ? <span className="button-spinner" aria-hidden="true" /> : "→"}
-              </button>
-            </div>
-          </form>
-          {buildNotice && <p className="build-notice" role="status">{buildNotice}</p>}
-          <a className="preview-build-button" href="/pilot">
-            Preview Make a Build <BrandStar />
-          </a>
-        </div>
-        <div className="make-build-visual">
-          <BuildBlueprint />
-        </div>
+      <section className="make-build-feature" id="make-a-build" ref={build002Ref} aria-label="Make your own build">
+        <Build002Builder placement="section" />
       </section>
 
       <footer className="site-footer">
@@ -635,7 +261,7 @@ export default function Home() {
           className="checkout-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !checkoutBusy) setCheckoutOpen(false);
+            if (event.target === event.currentTarget) closeCheckout();
           }}
         >
           <form
@@ -650,17 +276,24 @@ export default function Home() {
               className="checkout-dialog-close"
               type="button"
               aria-label="Close preorder options"
-              onClick={() => setCheckoutOpen(false)}
+              onClick={closeCheckout}
               disabled={checkoutBusy}
             >
               ×
             </button>
             <small>Build 001 preorder</small>
-            <h2 id="checkout-title">Make Ember yours.</h2>
-            <p className="checkout-shipping">Free shipping. Estimated shipping: October 2026.</p>
+            <h2 id="checkout-title">
+              {adoptedConfig?.name ? `Bring ${adoptedConfig.name} home.` : "Make Ember yours."}
+            </h2>
+            <p className="checkout-shipping">Free shipping · Ships October 2026 · No account required.</p>
 
             <div className="checkout-summary">
-              <span>{selectedEmberColor?.label ?? "Beige"} Ember</span>
+              <span>
+                {adoptedConfig?.name ? `${adoptedConfig.name} · ` : ""}
+                {selectedEmberColor?.label ?? "Beige"} Ember
+                {adoptedConfig?.level ? ` · ${adoptedConfig.level}` : ""}
+                {adoptedConfig?.personality ? ` · ${adoptedConfig.personality}` : ""}
+              </span>
               <strong>{selectedPrice.currency} ${(selectedPrice.amount * quantity).toFixed(2)}</strong>
             </div>
 
@@ -757,15 +390,59 @@ export default function Home() {
             </button>
             <span className="checkout-success-kicker">Pre-order confirmed</span>
             <BrandStar />
-            <h2 id="checkout-success-title">Ember is yours.</h2>
+            <h2 id="checkout-success-title">
+              {adoptedConfig?.name ? `${adoptedConfig.name} is yours.` : "Ember is yours."}
+            </h2>
             <p>Your payment was received. Shipping is free and your Ember pre-order is estimated to ship in October 2026.</p>
+            {/* Feature 7 — post-purchase Build 002 invitation */}
+            <div className="success-next">
+              <strong>You adopted Build 001. What should Build 002 do?</strong>
+              <button className="checkout-success-action" type="button" onClick={inventBuild002}>
+                Invent Build 002 ✦
+              </button>
+            </div>
             <button
-              className="checkout-success-action"
+              className="raise-link"
               type="button"
               onClick={() => setCheckoutSuccessOpen(false)}
             >
               Continue exploring
             </button>
+          </section>
+        </div>
+      )}
+
+      {/* Feature 8 — one-question exit survey */}
+      {exitSurveyOpen && (
+        <div
+          className="exit-survey-backdrop"
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setExitSurveyOpen(false); }}
+        >
+          <section className="exit-survey" role="dialog" aria-modal="true" aria-labelledby="exit-survey-title">
+            <button
+              className="checkout-dialog-close"
+              type="button"
+              aria-label="Dismiss survey"
+              onClick={() => setExitSurveyOpen(false)}
+            >
+              ×
+            </button>
+            <h2 id="exit-survey-title">What stopped you today?</h2>
+            <div className="exit-survey-options">
+              {[
+                { id: "price", label: "Price" },
+                { id: "ships_late", label: "Ships too late" },
+                { id: "unclear_value", label: "Not sure what Ember does for me" },
+                { id: "compatibility", label: "Compatibility questions" },
+                { id: "checkout_problem", label: "Checkout problem" },
+                { id: "just_browsing", label: "Just browsing" },
+              ].map((option) => (
+                <button key={option.id} type="button" onClick={() => submitExitReason(option.id)}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </section>
         </div>
       )}
