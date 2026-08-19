@@ -198,11 +198,14 @@ export default function Home() {
     let animationSpan = 1;
     const readMetrics = () => {
       const storyStart = story.offsetTop;
+      // Map the scrub across the full pinned range so the animation completes
+      // exactly when position: sticky releases. There's no frozen pinned
+      // buffer afterward: the hero (video + logo + offer card) is one absolute
+      // unit inside .experience, so the moment the last frame lands it scrolls
+      // up together into the catalogue.
       const storyEnd = storyStart + story.offsetHeight - window.innerHeight;
-      const finalHold = window.innerHeight * 0.75;
-      const animationEnd = Math.max(storyStart + 1, storyEnd - finalHold);
       animationStart = storyStart;
-      animationSpan = Math.max(1, animationEnd - storyStart);
+      animationSpan = Math.max(1, storyEnd - storyStart);
     };
 
     const recordStoryMilestone = (scene: number) => {
