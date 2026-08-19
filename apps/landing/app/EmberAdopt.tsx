@@ -28,8 +28,8 @@ interface EmberAdoptProps {
 // one set per color, in /public/ember-states.
 const STAGES = [
   { name: "Sleepy", state: "sleepy", tag: "Lvl 1", note: "Cold silicon. Barely awake." },
-  { name: "Awakened", state: "awakened", tag: "Lvl 3", note: "First tokens land — it stirs." },
-  { name: "Energized", state: "energized", tag: "Lvl 5", note: "Fully alive. Ready to come home." },
+  { name: "Energized", state: "energized", tag: "Lvl 3", note: "First tokens land — it stirs." },
+  { name: "Awakened", state: "awakened", tag: "Lvl 5", note: "Fully alive. Ready to come home." },
 ] as const;
 
 // Ember color id → art filename prefix.
