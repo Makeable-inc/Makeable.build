@@ -69,7 +69,6 @@ export default function EmberAdopt({
 }: EmberAdoptProps) {
   const [step, setStep] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
-  const [energy, setEnergy] = useState(0);
   const [burstKey, setBurstKey] = useState(0);
   const [emberName, setEmberName] = useState("");
   const [useCase, setUseCase] = useState<string>("");
@@ -80,6 +79,7 @@ export default function EmberAdopt({
   const particleCanvasRef = useRef<HTMLCanvasElement>(null);
   const feedBtnRef = useRef<HTMLButtonElement>(null);
   const emberRef = useRef<HTMLDivElement>(null);
+  const energyFillRef = useRef<HTMLDivElement>(null);
   const holdingRef = useRef(false);
   const energyRef = useRef(0);
   const stageRef = useRef(0);
@@ -90,7 +90,6 @@ export default function EmberAdopt({
   const atFinal = stageIndex >= FINAL_STAGE;
   const selectedOption = colors.find((color) => color.id === selectedColor);
   const displayName = emberName.trim();
-  const priceLabel = `${price.currency} $${price.amount.toFixed(2)}`;
 
   const config = (): EmberConfig => ({
     name: displayName,
@@ -198,7 +197,18 @@ export default function EmberAdopt({
           setStageIndex(to);
           setBurstKey((key) => key + 1);
         }
-        setEnergy(Math.round(energyRef.current));
+      }
+
+      // Drive the energy bar straight from the animation loop. Going through
+      // React state here means the per-frame updates don't paint until the next
+      // React event (pointer-up), which made the bar look frozen while holding.
+      const fill = energyFillRef.current;
+      if (fill) {
+        const pct = stageRef.current >= FINAL_STAGE
+          ? 100
+          : Math.max(0, Math.min(100, energyRef.current));
+        fill.style.width = `${pct}%`;
+        fill.setAttribute("aria-valuenow", String(Math.round(pct)));
       }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -360,10 +370,10 @@ export default function EmberAdopt({
                 </div>
                 <div className="raise-energy-track">
                   <div
+                    ref={energyFillRef}
                     className="raise-energy-fill"
-                    style={{ width: `${atFinal ? 100 : energy}%` }}
                     role="progressbar"
-                    aria-valuenow={atFinal ? 100 : energy}
+                    aria-valuenow={atFinal ? 100 : 0}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-label="Ember energy"
@@ -371,21 +381,21 @@ export default function EmberAdopt({
                 </div>
               </div>
 
+              {/* Name lives in the same flow as feeding — not gated behind full growth. */}
+              <label className="raise-name">
+                <span>Name your Ember</span>
+                <input
+                  type="text"
+                  maxLength={24}
+                  value={emberName}
+                  placeholder="e.g. Lumi"
+                  onChange={(event) => setEmberName(event.target.value)}
+                  onBlur={() => { if (displayName) captureMakeableEvent("ember named", { name_set: true }); }}
+                />
+              </label>
+
               {atFinal ? (
                 <>
-                  {/* Fully charged: name + adopt inline — no separate stage. */}
-                  <label className="raise-name">
-                    <span>Name your Ember</span>
-                    <input
-                      type="text"
-                      maxLength={24}
-                      value={emberName}
-                      placeholder="e.g. Lumi"
-                      onChange={(event) => setEmberName(event.target.value)}
-                      onBlur={() => { if (displayName) captureMakeableEvent("ember named", { name_set: true }); }}
-                    />
-                  </label>
-
                   <fieldset className="raise-chips">
                     <legend>Pick a personality</legend>
                     <div>
@@ -427,7 +437,7 @@ export default function EmberAdopt({
                     <span className="discount-tag">61% off</span>
                   </div>
                   <button type="button" className="raise-adopt-btn" onClick={() => adopt("adopt_flow")}>
-                    Adopt {displayName || "Ember"} — {priceLabel}
+                    Bring {displayName || "Ember"} home
                     <span aria-hidden="true">✦</span>
                   </button>
                   <p className="raise-fineprint">Free shipping · Ships October 2026 · No account required</p>

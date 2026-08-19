@@ -572,6 +572,10 @@ button, input, textarea, select { font-family: inherit; }
 /* Feed-hold affordance: warmer resting state, clear active depth. */
 .raise-holdbtn { transition: transform .12s var(--ease), box-shadow .2s var(--ease); }
 
+/* Energy bar is driven imperatively (per-frame) from the feed loop, so it
+   needs an explicit empty default and a short transition to smooth frames. */
+.raise-energy-fill { width: 0; transition: width .12s linear; }
+
 /* --- 8. Deskstories heading aligned to the section-eyebrow system. --- */
 .deskstories-header p {
   color: var(--red);
