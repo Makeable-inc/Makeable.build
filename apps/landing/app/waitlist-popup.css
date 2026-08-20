@@ -1,0 +1,339 @@
+/* Make Your Own Build waitlist popup — shown over the Ember offer. */
+.mk-overlay {
+  --mk-pink: #e91d4f;
+  --mk-pink-dark: #cc1041;
+  --mk-cream: #fff8f0;
+  --mk-ink: #121212;
+  --mk-border: #ef9cab;
+  --mk-overlay-bg: rgba(30, 22, 17, 0.66);
+
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--mk-overlay-bg);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.mk-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mk-modal {
+  position: relative;
+  width: min(100%, 500px);
+  max-height: calc(100vh - 30px);
+  overflow: auto;
+  padding: 30px 40px 22px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.95), transparent 36%),
+    var(--mk-cream);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+  text-align: center;
+  color: var(--mk-ink);
+}
+
+.mk-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #222;
+  font-size: 36px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mk-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.mk-spark {
+  margin-bottom: 4px;
+  color: var(--mk-pink);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.mk-title {
+  margin: 0 auto;
+  max-width: 440px;
+  color: var(--mk-ink);
+  font-size: 38px;
+  line-height: 1.04;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+}
+
+.mk-divider {
+  width: 44px;
+  height: 2px;
+  margin: 12px auto 14px;
+  background: var(--mk-pink);
+  border-radius: 99px;
+}
+
+.mk-intro {
+  margin: 0 auto 16px;
+  max-width: 430px;
+  color: #2a2725;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.mk-intro strong {
+  font-weight: 900;
+}
+
+.mk-offer-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 14px 18px;
+  border: 1.5px solid var(--mk-border);
+  border-radius: 16px;
+  background: rgba(255, 239, 238, 0.72);
+  text-align: left;
+}
+
+.mk-tag-icon {
+  flex: 0 0 50px;
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffd9dd;
+  color: var(--mk-pink);
+  font-size: 28px;
+}
+
+.mk-offer-label {
+  margin: 0 0 4px;
+  color: var(--mk-pink);
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mk-offer-title {
+  margin: 0 0 4px;
+  color: var(--mk-ink);
+  font-size: 19px;
+  line-height: 1.2;
+  font-weight: 850;
+}
+
+.mk-offer-title strong {
+  color: var(--mk-pink);
+}
+
+.mk-offer-sub {
+  margin: 0;
+  color: #2c2826;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.mk-form {
+  display: grid;
+  gap: 10px;
+}
+
+.mk-email {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 18px;
+  border: 1.3px solid #9b9087;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.52);
+  color: #111;
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.mk-email:focus {
+  border-color: var(--mk-pink);
+  box-shadow: 0 0 0 4px rgba(233, 29, 79, 0.1);
+}
+
+.mk-submit {
+  min-height: 52px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(90deg, var(--mk-pink), var(--mk-pink-dark));
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.mk-submit:hover {
+  transform: translateY(-1px);
+}
+
+.mk-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
+}
+
+.mk-message {
+  min-height: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mk-message:empty {
+  display: none;
+}
+
+.mk-message.error {
+  color: #ad1738;
+}
+
+.mk-ember-wrap {
+  position: relative;
+  min-height: 100px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.mk-ember-image {
+  display: block;
+  width: auto;
+  height: 118px;
+  max-width: 70%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.12));
+}
+
+.mk-ember-fallback {
+  font-size: 66px;
+  line-height: 1;
+}
+
+.mk-mini-spark {
+  position: absolute;
+  color: var(--mk-pink);
+  font-size: 22px;
+}
+
+.mk-mini-spark.left {
+  left: 22%;
+  bottom: 34px;
+}
+
+.mk-mini-spark.right {
+  right: 23%;
+  bottom: 52px;
+}
+
+.mk-success {
+  padding: 22px 0 10px;
+}
+
+.mk-success h3 {
+  margin: 0 0 10px;
+  color: var(--mk-ink);
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.mk-success p {
+  margin: 0 auto 20px;
+  max-width: 410px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.mk-buy {
+  min-height: 58px;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: var(--mk-pink);
+  color: #fff;
+  text-decoration: none;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mk-buy:hover {
+  background: var(--mk-pink-dark);
+}
+
+@media (max-width: 600px) {
+  .mk-overlay {
+    padding: 10px;
+    align-items: end;
+  }
+
+  .mk-modal {
+    width: 100%;
+    padding: 30px 20px 18px;
+    border-radius: 20px 20px 12px 12px;
+  }
+
+  .mk-title {
+    font-size: 32px;
+  }
+
+  .mk-intro {
+    font-size: 14px;
+  }
+
+  .mk-offer-card {
+    padding: 13px 15px;
+    gap: 12px;
+  }
+
+  .mk-tag-icon {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+  }
+
+  .mk-ember-image {
+    height: 104px;
+  }
+
+  .mk-ember-wrap {
+    min-height: 90px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-overlay,
+  .mk-submit {
+    transition: none !important;
+  }
+}

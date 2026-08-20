@@ -5,12 +5,17 @@ import Lenis from "lenis";
 import gsap from "gsap";
 import SeenOnRealDesks from "./SeenOnRealDesks";
 import BuildBlueprint from "./BuildBlueprint";
+import WaitlistPopup from "./WaitlistPopup";
 import { captureMakeableEvent, makeableDistinctId } from "./analytics";
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
 type SequenceMode = "desktop" | "mobile";
-type CheckoutLocation = "catalogue" | "story_card";
+type CheckoutLocation = "catalogue" | "story_card" | "waitlist_popup";
+
+const WAITLIST_JOINED_KEY = "makeable_waitlist_joined";
+const WAITLIST_DISMISSED_KEY = "makeable_waitlist_dismissed_at";
+const WAITLIST_DISMISS_HOURS = 24;
 
 const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "sage", label: "Sage", stock: 5 },
@@ -53,6 +58,8 @@ export default function Home() {
   const [buildEmail, setBuildEmail] = useState("");
   const [buildNotice, setBuildNotice] = useState("");
   const [buildBusy, setBuildBusy] = useState(false);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const waitlistHandledRef = useRef(false);
   const seenStoryMilestonesRef = useRef(new Set<number>());
   const seenEmberOfferRef = useRef(false);
   const checkoutOriginRef = useRef<CheckoutLocation>("story_card");
@@ -359,6 +366,53 @@ export default function Home() {
     setCheckoutOpen(true);
   };
 
+  // Surface the "Make Your Own Build" waitlist popup once the Ember offer is
+  // revealed at the end of the scroll story. Mirrors the standalone popup's
+  // rules: skip if already joined, or dismissed within the last 24 hours.
+  useEffect(() => {
+    if (!productPresentationVisible || waitlistHandledRef.current) return;
+    waitlistHandledRef.current = true;
+
+    try {
+      if (localStorage.getItem(WAITLIST_JOINED_KEY) === "1") return;
+      const dismissedAt = Number(localStorage.getItem(WAITLIST_DISMISSED_KEY) || 0);
+      if (dismissedAt && Date.now() - dismissedAt < WAITLIST_DISMISS_HOURS * 60 * 60 * 1000) return;
+    } catch {
+      // localStorage unavailable (private mode) — still show the popup.
+    }
+
+    const timer = window.setTimeout(() => {
+      setWaitlistOpen(true);
+      captureMakeableEvent("waitlist popup shown", { entry_point: "ember_offer" });
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [productPresentationVisible]);
+
+  const dismissWaitlist = () => {
+    setWaitlistOpen(false);
+    try {
+      localStorage.setItem(WAITLIST_DISMISSED_KEY, String(Date.now()));
+    } catch {
+      // ignore storage failures
+    }
+    captureMakeableEvent("waitlist popup dismissed", { entry_point: "ember_offer" });
+  };
+
+  const handleWaitlistJoined = () => {
+    try {
+      localStorage.setItem(WAITLIST_JOINED_KEY, "1");
+      localStorage.removeItem(WAITLIST_DISMISSED_KEY);
+    } catch {
+      // ignore storage failures
+    }
+    captureMakeableEvent("waitlist popup joined", { entry_point: "ember_offer" });
+  };
+
+  const handleWaitlistGetEmber = () => {
+    setWaitlistOpen(false);
+    openCheckout("waitlist_popup");
+  };
+
   const startCheckout = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!termsAccepted) {
@@ -602,6 +656,13 @@ export default function Home() {
           <span>@Makeable 2026</span>
         </div>
       </footer>
+
+      <WaitlistPopup
+        open={waitlistOpen}
+        onClose={dismissWaitlist}
+        onJoined={handleWaitlistJoined}
+        onGetEmber={handleWaitlistGetEmber}
+      />
 
       {checkoutOpen && (
         <div
