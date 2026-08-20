@@ -43,7 +43,7 @@ export default function SeenOnRealDesks() {
   };
 
   return (
-    <section className="deskstories" aria-labelledby="deskstories-title">
+    <section className="deskstories" data-reveal aria-labelledby="deskstories-title">
       <header className="deskstories-header">
         <h2 id="deskstories-title">
           Seen on real desks.

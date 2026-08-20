@@ -8,7 +8,7 @@ import { captureMakeableEvent, makeableDistinctId } from "./analytics";
 
 type EmberColor = "sage" | "bone" | "blush";
 type EmberMarket = "US" | "SG";
-type CheckoutLocation = "catalogue" | "adopt_flow" | "story_card";
+type CheckoutLocation = "catalogue" | "adopt_flow" | "story_card" | "sticky_bar";
 
 const emberColors: Array<{ id: EmberColor; label: string; stock?: number }> = [
   { id: "sage", label: "Sage", stock: 5 },
@@ -125,6 +125,27 @@ export default function Home() {
     };
   }, [checkoutBusy, checkoutOpen]);
 
+  // Retention — reveal sections as they scroll into view (staggered fade + rise).
+  // Skipped entirely under reduced-motion so nothing is hidden from those users.
+  useEffect(() => {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const targets = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+    if (reduceMotion || !("IntersectionObserver" in window)) {
+      targets.forEach((el) => el.classList.add("is-inview"));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-inview");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.14, rootMargin: "0px 0px -8% 0px" });
+    targets.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
   const openCheckout = (location: CheckoutLocation) => {
     checkoutOriginRef.current = location;
     captureMakeableEvent("preorder opened", { cta_location: location });
@@ -214,7 +235,51 @@ export default function Home() {
         onShowOtherBuilds={showOtherBuilds}
       />
 
-      <section className="catalogue" id="builds" ref={catalogueRef} aria-label="Browse more Makeable builds">
+      <section className="value-strip" data-reveal aria-labelledby="value-title">
+        <div className="value-intro">
+          <span className="raise-eyebrow">What Ember actually is</span>
+          <h2 id="value-title">A tiny living device that runs on your work.</h2>
+          <p>
+            Ember is a palm-size desk companion with a 2.8-inch display. It wakes up,
+            evolves, and glows with every Claude and Codex token you burn — then slowly
+            cools while you rest.
+          </p>
+          <p className="value-spec">2.8″ display · USB-powered · Sage / Beige / Sakura · Ships Oct 2026</p>
+        </div>
+        <figure className="value-shot">
+          <img
+            src={`/ember-${selectedColor}-desktop.webp`}
+            alt={`${selectedEmberColor?.label ?? "Beige"} Ember`}
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+        <ol className="value-steps">
+          <li>
+            <span aria-hidden="true">1</span>
+            <div>
+              <strong>Set it on your desk</strong>
+              <p>Plug the Ember display into any USB port. No setup, no app store.</p>
+            </div>
+          </li>
+          <li>
+            <span aria-hidden="true">2</span>
+            <div>
+              <strong>Just keep building</strong>
+              <p>Every token you spend with Claude and Codex feeds it and charges its energy.</p>
+            </div>
+          </li>
+          <li>
+            <span aria-hidden="true">3</span>
+            <div>
+              <strong>Watch it come alive</strong>
+              <p>Ember levels up through moods and forms, then cools over ~60 hours when you step away.</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section className="catalogue" id="builds" data-reveal ref={catalogueRef} aria-label="Browse more Makeable builds">
         <div className="catalogue-artwork">
           <img className="catalogue-sheet" src="/build-catalogue-page.png?v=4" alt="What will you make? Ember, Study Desk Companion, and Plant Companion build catalogue" />
           <button
@@ -229,7 +294,7 @@ export default function Home() {
 
       <SeenOnRealDesks />
 
-      <section className="make-build-feature" id="make-a-build" ref={build002Ref} aria-label="Make your own build">
+      <section className="make-build-feature" id="make-a-build" data-reveal ref={build002Ref} aria-label="Make your own build">
         <Build002Builder placement="section" />
       </section>
 
@@ -255,6 +320,18 @@ export default function Home() {
           <span>@Makeable 2026</span>
         </div>
       </footer>
+
+      {/* Retention — sticky buy bar keeps the offer one tap away on mobile scroll. */}
+      <div className="sticky-buy" role="region" aria-label="Pre-order Ember">
+        <div className="sticky-buy-offer">
+          <s><sup>$</sup>89.99</s>
+          <strong><sup>$</sup>{selectedPrice.amount.toFixed(2)}</strong>
+          <span className="sticky-buy-ship">Free shipping · Ships Oct 2026</span>
+        </div>
+        <button type="button" className="sticky-buy-cta" onClick={() => openCheckout("sticky_bar")}>
+          Pre-order now
+        </button>
+      </div>
 
       {checkoutOpen && (
         <div
@@ -361,6 +438,10 @@ export default function Home() {
               {checkoutBusy ? "Opening secure checkout…" : "Continue to secure checkout"}
               <span aria-hidden="true">→</span>
             </button>
+            <p className="checkout-reassure">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></svg>
+              Payment secured by Stripe · 30-day money-back · Cancel anytime before it ships
+            </p>
             {checkoutError && <p className="checkout-dialog-error" role="alert">{checkoutError}</p>}
           </form>
         </div>

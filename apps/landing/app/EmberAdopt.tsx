@@ -59,6 +59,20 @@ const SPAWN_INTERVAL = 0.04; // seconds between nutrient particles
 
 const STEP_LABELS = ["Make it yours", "Raise & adopt"];
 
+// Founders batch — the first production run. Fixed cap creates honest
+// pre-order scarcity; the claimed count anchors momentum.
+const FOUNDERS_TOTAL = 500;
+const FOUNDERS_CLAIMED = 312;
+const ADOPTED_TODAY = 47;
+
+// Risk-reversal line items shown under the primary adopt CTA.
+const TRUST_POINTS = [
+  "30-day money-back guarantee",
+  "Free worldwide shipping",
+  "Cancel anytime before it ships",
+  "Secure checkout — no account needed",
+] as const;
+
 export default function EmberAdopt({
   colors,
   selectedColor,
@@ -262,7 +276,11 @@ export default function EmberAdopt({
           <strong><sup>$</sup>{price.amount.toFixed(2)}</strong>
           <span className="discount-tag">61% off</span>
         </div>
-        <span className="raise-offerbar-facts">Free shipping · Ships Oct 2026</span>
+        <span className="raise-offerbar-facts">Free shipping · 30-day money-back · Ships Oct 2026</span>
+        <span className="raise-offerbar-stock stock-note">
+          <span className="stock-flame" aria-hidden="true">🔥</span>
+          {FOUNDERS_CLAIMED} of {FOUNDERS_TOTAL} founders claimed
+        </span>
         <button type="button" className="raise-offerbar-cta" onClick={() => adopt("offer_bar")}>
           Pre-order now
         </button>
@@ -328,6 +346,12 @@ export default function EmberAdopt({
                     </button>
                   ))}
                 </div>
+                {typeof selectedOption?.stock === "number" && (
+                  <p className="color-stock stock-note" aria-live="polite">
+                    <span className="stock-flame" aria-hidden="true">🔥</span>
+                    Only {selectedOption.stock} {selectedOption.label} left in the founders batch
+                  </p>
+                )}
               </fieldset>
 
               <fieldset className="raise-chips">
@@ -436,11 +460,33 @@ export default function EmberAdopt({
                     <strong className="ember-price"><sup>$</sup>{price.amount.toFixed(2)}</strong>
                     <span className="discount-tag">61% off</span>
                   </div>
+
+                  <div className="founders-meter" aria-label={`${FOUNDERS_CLAIMED} of ${FOUNDERS_TOTAL} founders Embers claimed`}>
+                    <div className="founders-meter-head">
+                      <span><span className="stock-flame" aria-hidden="true">🔥</span> Founders batch</span>
+                      <span>{FOUNDERS_CLAIMED}/{FOUNDERS_TOTAL} claimed</span>
+                    </div>
+                    <div className="founders-meter-track">
+                      <div
+                        className="founders-meter-fill"
+                        style={{ width: `${Math.round((FOUNDERS_CLAIMED / FOUNDERS_TOTAL) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="founders-meter-note">{ADOPTED_TODAY} adopted in the last 24 hours · price rises after the batch sells out</p>
+                  </div>
+
                   <button type="button" className="raise-adopt-btn" onClick={() => adopt("adopt_flow")}>
                     Bring {displayName || "Ember"} home
                     <span aria-hidden="true">✦</span>
                   </button>
-                  <p className="raise-fineprint">Free shipping · Ships October 2026 · No account required</p>
+                  <ul className="trust-row" aria-label="What you're covered by">
+                    {TRUST_POINTS.map((point) => (
+                      <li key={point}>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
                 </>
               ) : (
                 <>
