@@ -1,5 +1,7 @@
 const state = {
   records: [],
+  activity: [],
+  report: null,
   chartRange: 30,
   generatedAt: "",
   refreshTimer: null,
@@ -18,8 +20,11 @@ const els = {
   downloadButton: document.querySelector("#downloadButton"),
   signOutButton: document.querySelector("#signOutButton"),
   totalMetric: document.querySelector("#totalMetric"),
-  weekMetric: document.querySelector("#weekMetric"),
-  monthMetric: document.querySelector("#monthMetric"),
+  builderMetric: document.querySelector("#builderMetric"),
+  projectMetric: document.querySelector("#projectMetric"),
+  ownerMetric: document.querySelector("#ownerMetric"),
+  todayMetric: document.querySelector("#todayMetric"),
+  activeMetric: document.querySelector("#activeMetric"),
   chartTotal: document.querySelector("#chartTotal"),
   lastUpdated: document.querySelector("#lastUpdated"),
   chartWrap: document.querySelector("#chartWrap"),
@@ -29,6 +34,7 @@ const els = {
   signupRows: document.querySelector("#signupRows"),
   emptyState: document.querySelector("#emptyState"),
   resultCount: document.querySelector("#resultCount"),
+  dataHealth: document.querySelector("#dataHealth"),
   rangeButtons: [...document.querySelectorAll("[data-range]")],
   toast: document.querySelector("#toast"),
 };
@@ -170,6 +176,8 @@ async function loadDashboard(options = {}) {
     state.records = Array.isArray(payload.records)
       ? payload.records.filter(validRecord)
       : [];
+    state.activity = Array.isArray(payload.activity) ? payload.activity : [];
+    state.report = payload;
     state.generatedAt = payload.generatedAt || new Date().toISOString();
     renderDashboard();
     if (options.announce) showToast("Dashboard refreshed");
@@ -190,16 +198,21 @@ function validRecord(record) {
 }
 
 function renderDashboard() {
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * MS_PER_DAY);
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * MS_PER_DAY);
-  const lastSevenDays = countSince(sevenDaysAgo);
-  const lastThirtyDays = countSince(thirtyDaysAgo);
-  els.totalMetric.textContent = numberFormatter.format(state.records.length);
-  els.weekMetric.textContent = numberFormatter.format(lastSevenDays);
-  els.monthMetric.textContent = numberFormatter.format(lastThirtyDays);
-  els.chartTotal.textContent = numberFormatter.format(state.records.length);
+  const report = state.report || {};
+  els.totalMetric.textContent = numberFormatter.format(Number(report.total) || 0);
+  els.builderMetric.textContent = numberFormatter.format(Number(report.builderAccountsTotal) || 0);
+  els.projectMetric.textContent = numberFormatter.format(Number(report.publicProjectsTotal) || 0);
+  els.ownerMetric.textContent = numberFormatter.format(Number(report.projectOwnersTotal) || 0);
+  els.todayMetric.textContent = numberFormatter.format(Number(report.todayTotal) || 0);
+  els.activeMetric.textContent = numberFormatter.format(Number(report.activeTodayTotal) || 0);
+  els.chartTotal.textContent = numberFormatter.format(Number(report.total) || 0);
   els.lastUpdated.textContent = `Updated ${relativeTimestamp(state.generatedAt)}`;
+  const health = report.dataHealth || {};
+  const missing = Number(health.builderAccountsMissingFromWaitlist) || 0;
+  const unmatched = Number(health.unmatchedProjectOwners) || 0;
+  els.dataHealth.textContent = missing || unmatched
+    ? `Data check: ${numberFormatter.format(missing)} builder accounts are not yet stored in the waitlist and ${numberFormatter.format(unmatched)} project owners could not be matched. Email addresses stay inside this authenticated dashboard.`
+    : "Data check passed: every builder account and project owner is matched. Email addresses stay inside this authenticated dashboard and are not sent to PostHog.";
   renderChart();
   renderTable();
 }
@@ -298,6 +311,38 @@ function renderChart() {
     chart.append(label);
   });
 
+  const dailyMaximum = Math.max(1, ...data.flatMap((point) => [
+    point.newContacts,
+    point.newBuilders,
+    point.projects,
+  ]));
+  const stepWidth = innerWidth / Math.max(data.length - 1, 1);
+  const groupWidth = Math.max(4.5, Math.min(28, stepWidth * 0.72));
+  const barWidth = groupWidth / 3;
+  data.forEach((point, index) => {
+    const values = [
+      ["contact", point.newContacts, "new contacts"],
+      ["builder", point.newBuilders, "new builders"],
+      ["project", point.projects, "projects"],
+    ];
+    values.forEach(([kind, rawValue, label], seriesIndex) => {
+      const value = Number(rawValue) || 0;
+      const barHeight = value ? Math.max(3, (innerHeight * 0.32 * value) / dailyMaximum) : 0;
+      const bar = svgElement("rect", {
+        class: `chart-bar chart-bar-${kind}`,
+        x: xAt(index) - groupWidth / 2 + seriesIndex * barWidth,
+        y: padding.top + innerHeight - barHeight,
+        width: barWidth,
+        height: barHeight,
+        rx: Math.min(2, Math.max(0.5, barWidth * 0.15)),
+      });
+      const title = svgElement("title");
+      title.textContent = `${chartDateFormatter.format(point.date)}: ${value} ${label}`;
+      bar.append(title);
+      chart.append(bar);
+    });
+  });
+
   const points = data.map((point, index) => [xAt(index), yAt(point.value)]);
   const linePath = smoothPath(points);
   const baseline = yAt(0);
@@ -356,42 +401,33 @@ function renderChart() {
   chart.append(hitArea);
 }
 
-function chartSeries(records, range) {
-  const now = startOfLocalDay(new Date());
-  const validDates = records
-    .map((record) => new Date(record.createdAt))
-    .filter((date) => !Number.isNaN(date.getTime()))
-    .sort((a, b) => a - b);
-  let firstDay;
-  if (range === "all") {
-    firstDay = validDates.length ? startOfLocalDay(validDates[0]) : now;
-  } else {
-    firstDay = new Date(now.getTime() - (range - 1) * MS_PER_DAY);
+function chartSeries(_records, range) {
+  const activity = state.activity.map((point) => ({
+    date: new Date(`${point.date}T00:00:00.000Z`),
+    value: Number(point.totalContacts) || 0,
+    newContacts: Number(point.newContacts) || 0,
+    newBuilders: Number(point.newBuilders) || 0,
+    projects: Number(point.projects) || 0,
+  }));
+  if (!activity.length) {
+    return [{
+      date: startOfLocalDay(new Date()),
+      value: 0,
+      newContacts: 0,
+      newBuilders: 0,
+      projects: 0,
+    }];
   }
-  const beforeRange = validDates.filter((date) => date < firstDay).length;
-  const countsByDay = new Map();
-  validDates.forEach((date) => {
-    const day = localDateKey(date);
-    countsByDay.set(day, (countsByDay.get(day) || 0) + 1);
-  });
-  const output = [];
-  let cumulative = beforeRange;
-  for (
-    let cursor = new Date(firstDay);
-    cursor <= now;
-    cursor = new Date(cursor.getTime() + MS_PER_DAY)
-  ) {
-    cumulative += countsByDay.get(localDateKey(cursor)) || 0;
-    output.push({ date: new Date(cursor), value: cumulative });
-  }
-  return output.length ? output : [{ date: now, value: 0 }];
+  return range === "all" ? activity : activity.slice(-range);
 }
 
 function renderTable() {
   const query = els.searchInput.value.trim().toLowerCase();
   const filtered = query
     ? state.records.filter((record) =>
-        `${record.name || ""} ${record.email}`.toLowerCase().includes(query),
+        `${record.name || ""} ${record.email} ${record.latestProject || ""}`
+          .toLowerCase()
+          .includes(query),
       )
     : state.records;
   els.signupRows.replaceChildren();
@@ -402,9 +438,13 @@ function renderTable() {
     const avatar = document.createElement("span");
     const name = document.createElement("span");
     const email = document.createElement("td");
-    const joined = document.createElement("td");
     const source = document.createElement("td");
     const sourceBadge = document.createElement("span");
+    const firstContact = document.createElement("td");
+    const firstBuilder = document.createElement("td");
+    const lastActivity = document.createElement("td");
+    const projects = document.createElement("td");
+    const latestProject = document.createElement("td");
 
     personWrap.className = "person-cell";
     avatar.className = "person-avatar";
@@ -418,16 +458,38 @@ function renderTable() {
     person.append(personWrap);
     email.textContent = record.email;
     email.title = record.email;
-    joined.textContent = dateTimeFormatter.format(new Date(record.createdAt));
-    sourceBadge.textContent = record.source === "google" ? "Google" : record.source;
+    const sources = Array.isArray(record.sources) ? record.sources : [record.source];
+    sourceBadge.textContent = sources.includes("google") && sources.includes("make-a-build")
+      ? "Google + build interest"
+      : sources.includes("google")
+        ? "Google sign-in"
+        : "Build interest";
     source.append(sourceBadge);
-    row.append(person, email, joined, source);
+    firstContact.textContent = formatTimestamp(record.createdAt);
+    firstBuilder.textContent = formatTimestamp(record.firstBuilderSeenAt);
+    lastActivity.textContent = formatTimestamp(record.lastActivityAt);
+    projects.textContent = numberFormatter.format(Number(record.buildCount) || 0);
+    projects.className = "project-count";
+    latestProject.className = "latest-project";
+    latestProject.textContent = record.latestProject
+      ? `${record.latestProject} · ${formatTimestamp(record.latestProjectAt)}`
+      : "—";
+    row.append(
+      person,
+      email,
+      source,
+      firstContact,
+      firstBuilder,
+      lastActivity,
+      projects,
+      latestProject,
+    );
     els.signupRows.append(row);
   });
   els.emptyState.hidden = filtered.length > 0;
   els.signupRows.closest("table").hidden = filtered.length === 0;
   els.resultCount.textContent = `${numberFormatter.format(filtered.length)} ${
-    filtered.length === 1 ? "result" : "results"
+    filtered.length === 1 ? "contact" : "contacts"
   }`;
 }
 
@@ -455,7 +517,7 @@ async function downloadCsv() {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-    showToast(`Downloaded ${numberFormatter.format(state.records.length)} signups`);
+    showToast(`Downloaded ${numberFormatter.format(state.records.length)} contacts`);
   } catch (error) {
     showToast(error instanceof Error ? error.message : "The CSV could not be downloaded.");
   } finally {
@@ -469,6 +531,8 @@ async function signOut() {
     await fetch("/api/dashboard/session", { method: "DELETE" });
   } finally {
     state.records = [];
+    state.activity = [];
+    state.report = null;
     showAuth();
     els.authError.textContent = "";
     els.signOutButton.disabled = false;
@@ -501,7 +565,7 @@ function showChartTooltip(event, point) {
   const value = document.createElement("strong");
   const date = document.createElement("span");
   value.textContent = `${numberFormatter.format(point.value)} total`;
-  date.textContent = chartDateFormatter.format(point.date);
+  date.textContent = `${chartDateFormatter.format(point.date)} · ${point.newContacts} contacts · ${point.newBuilders} builders · ${point.projects} projects`;
   els.chartTooltip.append(value, date);
   els.chartTooltip.style.left = `${left}px`;
   els.chartTooltip.style.top = `${top}px`;
@@ -564,6 +628,12 @@ function emailName(email) {
     .filter(Boolean)
     .map((part) => `${part[0]?.toUpperCase() || ""}${part.slice(1)}`)
     .join(" ") || "Subscriber";
+}
+
+function formatTimestamp(value) {
+  if (!value) return "—";
+  const timestamp = new Date(value);
+  return Number.isNaN(timestamp.getTime()) ? "—" : dateTimeFormatter.format(timestamp);
 }
 
 function initials(value) {

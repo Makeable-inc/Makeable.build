@@ -99,28 +99,52 @@
       </header>
 
       <div class="dashboard-content">
-        <section class="metric-rail" aria-label="Waitlist summary">
-          <article class="metric">
-            <p>Total signups</p>
+        <section class="metric-rail" aria-label="Customer and builder summary">
+          <article class="metric metric-featured">
+            <p>All contacts</p>
             <strong id="totalMetric">-</strong>
+            <span>unique verified emails</span>
           </article>
           <article class="metric">
-            <p>Last 7 days</p>
-            <strong id="weekMetric">-</strong>
+            <p>Builder accounts</p>
+            <strong id="builderMetric">-</strong>
+            <span>verified Google builders</span>
           </article>
           <article class="metric">
-            <p>Last 30 days</p>
-            <strong id="monthMetric">-</strong>
+            <p>Public projects</p>
+            <strong id="projectMetric">-</strong>
+            <span>genuine generated builds</span>
+          </article>
+          <article class="metric">
+            <p>Project owners</p>
+            <strong id="ownerMetric">-</strong>
+            <span>builders who published</span>
+          </article>
+          <article class="metric">
+            <p>New today</p>
+            <strong id="todayMetric">-</strong>
+            <span>new contacts, Pacific time</span>
+          </article>
+          <article class="metric">
+            <p>Active today</p>
+            <strong id="activeMetric">-</strong>
+            <span>login or project activity</span>
           </article>
         </section>
 
         <section class="panel chart-panel" aria-labelledby="chartTitle">
           <div class="panel-heading chart-heading">
             <div>
-              <h2 id="chartTitle">Signup growth</h2>
+              <h2 id="chartTitle">Contacts and builder activity</h2>
               <p id="lastUpdated" class="sr-only">Loading verified signups…</p>
             </div>
             <div class="chart-controls">
+              <div class="chart-legend" aria-label="Chart legend">
+                <span class="legend-contact">Contacts</span>
+                <span class="legend-builder">Builders</span>
+                <span class="legend-project">Projects</span>
+                <span class="legend-total">Total</span>
+              </div>
               <div class="range-toggle" role="group" aria-label="Chart range">
                 <button type="button" data-range="7">7D</button>
                 <button class="is-selected" type="button" data-range="30">30D</button>
@@ -141,7 +165,7 @@
               aria-labelledby="chartTitle chartDescription"
               preserveAspectRatio="none"
             >
-              <desc id="chartDescription">Cumulative verified waitlist signups over time.</desc>
+              <desc id="chartDescription">Daily contacts, builders, projects, and cumulative verified contacts.</desc>
             </svg>
             <div id="chartTooltip" class="chart-tooltip" role="status" hidden></div>
           </div>
@@ -150,8 +174,8 @@
         <section class="panel table-panel" aria-labelledby="tableTitle">
           <div class="panel-heading table-heading">
             <div>
-              <h2 id="tableTitle">Recent signups</h2>
-              <p class="sr-only">Verified people, newest first</p>
+              <h2 id="tableTitle">Customer activity</h2>
+              <p class="sr-only">Verified contacts and their builds, newest activity first</p>
             </div>
             <span id="resultCount" class="result-count">-</span>
           </div>
@@ -165,9 +189,9 @@
                 id="searchInput"
                 type="search"
                 autocomplete="off"
-                placeholder="Search name or email"
+                placeholder="Search name, email, or project"
               />
-              <span class="sr-only">Search signups by name or email</span>
+              <span class="sr-only">Search contacts by name, email, or project</span>
             </label>
           </div>
           <div class="table-scroll">
@@ -176,15 +200,12 @@
                 <tr>
                   <th scope="col">Person</th>
                   <th scope="col">Email</th>
-                  <th scope="col">
-                    <span class="sorted-column">
-                      Joined
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 5v14M7 14l5 5 5-5"></path>
-                      </svg>
-                    </span>
-                  </th>
                   <th scope="col">Source</th>
+                  <th scope="col">First contact</th>
+                  <th scope="col">First builder login</th>
+                  <th scope="col">Last activity</th>
+                  <th scope="col">Projects</th>
+                  <th scope="col">Latest project</th>
                 </tr>
               </thead>
               <tbody id="signupRows"></tbody>
@@ -200,6 +221,7 @@
               <p>Try a different name or email.</p>
             </div>
           </div>
+          <p id="dataHealth" class="data-health">Email addresses stay inside this authenticated dashboard and are not sent to PostHog.</p>
         </section>
       </div>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

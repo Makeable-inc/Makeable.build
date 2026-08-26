@@ -18,3 +18,20 @@ export function captureMakeableEvent(event: string, properties: AnalyticsPropert
 export function makeableDistinctId() {
   return posthog.get_distinct_id();
 }
+
+export function identifyMakeableAccount(analyticsId: string) {
+  if (!/^makeable_account_[a-f0-9]{40}$/.test(analyticsId)) return;
+  posthog.identify(analyticsId);
+}
+
+export function makeableReferringDomain() {
+  if (typeof document === "undefined" || !document.referrer) return "$direct";
+  try {
+    const referrer = new URL(document.referrer);
+    return referrer.hostname === window.location.hostname
+      ? "$direct"
+      : referrer.hostname.toLowerCase();
+  } catch {
+    return "$direct";
+  }
+}

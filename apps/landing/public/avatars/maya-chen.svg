@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Maya Chen profile avatar">
+  <defs><linearGradient id="a" x1="8" y1="4" x2="56" y2="60"><stop stop-color="#5fe0ff"/><stop offset="1" stop-color="#6557ff"/></linearGradient></defs>
+  <rect width="64" height="64" rx="32" fill="url(#a)"/>
+  <circle cx="32" cy="25" r="12" fill="#ffe1c7"/>
+  <path d="M18 25c0-12 7-18 15-18 11 0 15 8 14 19-4-2-7-5-9-9-5 6-11 8-20 8Z" fill="#20203b"/>
+  <path d="M12 64c2-17 10-25 20-25s18 8 20 25" fill="#ff6a8e"/>
+  <circle cx="27" cy="26" r="1.4" fill="#32251f"/><circle cx="38" cy="26" r="1.4" fill="#32251f"/>
+  <path d="M28 32c2.6 2 5.4 2 8 0" fill="none" stroke="#b85f61" stroke-linecap="round" stroke-width="1.4"/>
+</svg>

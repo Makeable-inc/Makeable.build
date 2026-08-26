@@ -1,5 +1,5 @@
 [build]
-  publish = "dist"
+  publish = "release-dist"
   functions = "netlify/functions"
   command = "npm run build"
 
@@ -8,10 +8,23 @@
 
 [functions]
   node_bundler = "esbuild"
+  included_files = ["lib/verified-parts-catalog.csv"]
+
+[functions."build-background"]
+  included_files = ["lib/verified-parts-catalog.csv"]
+
+[functions."build-cleanup"]
+  included_files = ["lib/verified-parts-catalog.csv"]
 
 [[redirects]]
   from = "/pilot"
-  to = "/pilot-coming-soon.html"
+  to = "/pilot-app.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/dashboard"
+  to = "/dashboard/index.html"
   status = 200
   force = true
 
@@ -29,12 +42,12 @@
 
 [[redirects]]
   from = "/ember/download"
-  to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v1.0.12/Claude-Burner-1.0.12-arm64.dmg"
+  to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg"
   status = 302
   force = true
 
 [[headers]]
-  for = "/dashboard/*"
+  for = "/dashboard*"
   [headers.values]
     Cache-Control = "no-store"
     Content-Security-Policy = "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -62,16 +75,6 @@
 
 [[headers]]
   for = "/_next/static/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/frames-v2/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/frames-mobile/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 

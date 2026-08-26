@@ -1,0 +1,7 @@
+# Makeable build workspace concept prompt
+
+Design a polished desktop web-app screen for Makeable, a friendly hardware-building service. Use a dark navy vertical project sidebar and a warm cream workspace. Show the selected build as a large, crisp, realistic FDM-printable enclosure render; beside it show a plain-language overview and a compact parts list where the friendly role appears first (`The brain`, `The display`, `Distance sensor`, `User control`) and the technical listing name appears second. Each part row includes quantity, purpose, catalog checked date, verified price where available, and a clear marketplace action.
+
+Include project navigation for Overview, Parts, Enclosure, Wiring, and Code; a visible `10 free builds` usage indicator; a `Full Build Coming Soon` banner explaining that CAD/STL, wiring, firmware, and assembly instructions are not supplied yet; and a persistent bottom-right `Back to main page` action. Use generous spacing, rounded but disciplined cards, real hierarchy, accessible contrast, quiet blue and coral accents, and no dense developer jargon. The result should feel like a trustworthy consumer product workspace, not a generic admin dashboard.
+
+Do not invent brand marks, fake technical diagrams, fake marketplace prices, illegible text, glass domes, literal animals, ornamental 3D characters, exposed breadboards, or non-printable geometry. Avoid AI-style glow, grain, visual noise, excessive gradients, overcrowding, and tiny controls.

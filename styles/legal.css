@@ -65,14 +65,24 @@ a {
 .makeable-wordmark {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   text-decoration: none;
+  color: var(--legal-ink);
+  font-family: Fredoka, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
-.makeable-legal-logo {
-  display: block;
-  width: clamp(9rem, 16vw, 13rem);
-  height: auto;
-  object-fit: contain;
+.makeable-wordmark-text {
+  letter-spacing: -0.02em;
+}
+
+.makeable-logo-spark {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: radial-gradient(circle at 35% 35%, #fff, #ffd6e7 28%, var(--legal-accent) 100%);
+  box-shadow: 0 0 0 1px rgba(239, 45, 131, 0.12);
 }
 
 .legal-link {

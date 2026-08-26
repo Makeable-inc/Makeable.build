@@ -1,37 +1,51 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dist = path.join(root, "dist");
 
-test("the deployed homepage is the Moment in Motion experience", async () => {
-  const html = await readFile(path.join(dist, "index.html"), "utf8");
-  assert.match(html, /<title>Makeable — Feed Ember Tokens\.<\/title>/);
-  assert.match(html, /_next\/static/);
-  await access(path.join(dist, "build-catalogue-page.png"));
-  await access(path.join(dist, "makeable-logo.png"));
-});
+test("the public landing bundle contains every referenced local asset", async () => {
+  await import(`../scripts/build-production-static.mjs?landing-test=${Date.now()}`);
+  const landingHtml = await readFile(path.join(root, "release-dist", "index.html"), "utf8");
+  assert.match(landingHtml, /\/_next\/static\/chunks\//);
 
-test("both optimized animation sequences are included in the deployment", async () => {
-  const desktopFrames = await readdir(path.join(dist, "frames-v2"));
-  const mobileFrames = await readdir(path.join(dist, "frames-mobile"));
-  assert.equal(desktopFrames.filter((name) => name.endsWith(".webp")).length, 301);
-  assert.equal(mobileFrames.filter((name) => name.endsWith(".webp")).length, 300);
-  await access(path.join(dist, "frames-v2", "frame_301.webp"));
-  await access(path.join(dist, "frames-mobile", "frame_300.webp"));
-});
+  const references = [
+    "/makeable-logo.png",
+    "/concepts/homepage-v2/ember-flagship-hero-v2.webp",
+    "/concepts/homepage-v2/study-desk-companion-v2.webp",
+    "/concepts/homepage-v2/plant-companion-v2.webp",
+    "/concepts/homepage-v2/motion-light-v2.webp",
+    "/avatars/maya-chen.svg",
+    "/avatars/noor-ali.svg",
+    "/avatars/leo-park.svg",
+    "/assets/landing/gallery-v2/window-air.webp",
+    "/assets/landing/gallery-v2/pet-water.webp",
+    "/assets/landing/gallery-v2/quiet-chime.webp",
+  ];
 
-test("all existing public pages remain in the combined deployment", async () => {
-  for (const routeFile of [
-    "privacy/index.html",
-    "terms/index.html",
-    "ember/index.html",
-    "dashboard/index.html",
-    "pilot-app.html",
-  ]) {
-    await access(path.join(dist, routeFile));
+  for (const reference of references) {
+    await access(path.join(root, "release-dist", reference));
   }
+});
+
+test("the landing bundle does not expose the pilot or builder source entrypoints", async () => {
+  const landingScript = await readFile(path.join(root, "landing.js"), "utf8");
+  assert.doesNotMatch(landingScript, /makeable\.pilot|\/build\/new|intent:\s*["']pilot/);
+  await assert.rejects(access(path.join(root, "release-dist", "app.js")));
+  await assert.rejects(access(path.join(root, "release-dist", "styles.css")));
+});
+
+test("production Google sign-in uses the SDK-rendered popup flow", async () => {
+  const landingSource = await readFile(
+    path.join(root, "apps", "landing", "app", "page.tsx"),
+    "utf8",
+  );
+  assert.match(landingSource, /window\.google\.accounts\.id\.renderButton\(/);
+  assert.match(landingSource, /ux_mode:\s*"popup"/);
+  assert.match(landingSource, /fetch\(apiUrl\("\/api\/auth\/google"\)/);
+  assert.match(landingSource, /generationAbortRef = useRef<AbortController/);
+  assert.match(landingSource, /fetch\(apiUrl\("\/api\/build-jobs"\)/);
+  assert.doesNotMatch(landingSource, /window\.google\.accounts\.id\.prompt\(/);
 });

@@ -3,6 +3,45 @@ import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createGoogleWaitlistResult } from "../../lib/acquisition.mjs";
 import {
+  clearBuilderSessionCookie,
+  createBuilderSession,
+  builderSessionStoreNameForFunctionContext,
+  forgetBuilderSession,
+  normalizeGoogleBuilderIdentity,
+  publicBuilderProfile,
+  resolveBuilderSession,
+} from "../../lib/builder-session.mjs";
+import {
+  createBuild,
+} from "../../lib/makeable-builds.mjs";
+import {
+  BUILD_JOB_LIMITS,
+  BUILD_JOB_STATES,
+  accountBuildQuota,
+  buildCommunityStoreNameForFunctionContext,
+  buildJobImageStoreNameForFunctionContext,
+  buildJobQuotaStoreNameForFunctionContext,
+  buildJobStateStoreNameForFunctionContext,
+  builderDisabled,
+  cancelBuildJob,
+  claimSuccessfulBuildJob,
+  completeBuildJob,
+  createBackgroundBuildDispatch,
+  createAnonymousBuildJob,
+  createRoutedBuildStateStore,
+  failBuildJob,
+  getBuildJob,
+  getDraftJobImage,
+  getGalleryImage,
+  getPublicGalleryBuild,
+  hidePublicGalleryBuild,
+  listAccountGalleryBuilds,
+  listPublicGalleryBuilds,
+  markBuildJobState,
+  publicBuildJob,
+  resolveBuildJobAccess,
+} from "../../lib/build-jobs.mjs";
+import {
   clearDashboardSessionCookie,
   createDashboardSessionCookie,
   dashboardAccessConfigured,
@@ -15,8 +54,12 @@ import {
 } from "../../lib/waitlist-storage.mjs";
 import {
   readVerifiedWaitlist,
-  waitlistCsv,
 } from "../../lib/waitlist-report.mjs";
+import {
+  buildDashboardReport,
+  dashboardCsv,
+  readJsonBlobRecords,
+} from "../../lib/dashboard-report.mjs";
 import {
   clearWaitlistSessionCookie,
   createWaitlistSession,
@@ -30,6 +73,12 @@ const googleVerifiers = new Map();
 const EMBER_OFFER_VERSION = "ember_usd_3499_free_shipping_oct_2026_v1";
 const POSTHOG_PROJECT_TOKEN = "phc_rfcnAWiEY6337gWcv54R8JHBNQ5K2iYy2Hd76ZUM6CJH";
 const POSTHOG_CAPTURE_URL = "https://us.i.posthog.com/capture/";
+const PUBLIC_PRICE_LISTING_IDS = new Set([
+  "amz-us-xiao-s3-pre-soldered-v1",
+  "amz-us-hcsr04p-2pk-v1",
+  "amz-us-esp32-2432s028r-v1",
+]);
+const PRICE_STORE_NAME = "makeable-price-current";
 
 export default async function handler(req, context = {}) {
   try {
@@ -55,6 +104,59 @@ export default async function handler(req, context = {}) {
 
     if (localApiPath === "/api/checkout/status") {
       return await emberCheckoutStatus(req, env);
+    }
+
+    if (localApiPath === "/api/account") {
+      return await accountStatus(req, env, context);
+    }
+
+    if (localApiPath === "/api/auth/session") {
+      return await authSession(req, context);
+    }
+
+    if (localApiPath === "/api/build-jobs") {
+      return await buildJobs(req, env, context);
+    }
+
+    if (localApiPath === "/api/builds") {
+      return await communityBuilds(req, env, context);
+    }
+
+    if (localApiPath === "/api/account/builds") {
+      return await accountBuilds(req, env, context);
+    }
+
+    const buildImageMatch = localApiPath.match(/^\/api\/builds\/([^/]+)\/image$/);
+    if (buildImageMatch) {
+      return await communityBuildImage(req, context, buildImageMatch[1]);
+    }
+
+    const buildMatch = localApiPath.match(/^\/api\/builds\/([^/]+)$/);
+    if (buildMatch) {
+      return await communityBuild(req, context, buildMatch[1]);
+    }
+
+    const jobImageMatch = localApiPath.match(/^\/api\/build-jobs\/([^/]+)\/image$/);
+    if (jobImageMatch) {
+      return await buildJobImage(req, env, context, jobImageMatch[1]);
+    }
+
+    const jobClaimMatch = localApiPath.match(/^\/api\/build-jobs\/([^/]+)\/claim$/);
+    if (jobClaimMatch) {
+      return await claimBuildJob(req, env, context, jobClaimMatch[1]);
+    }
+
+    const jobCancelMatch = localApiPath.match(/^\/api\/build-jobs\/([^/]+)\/cancel$/);
+    if (jobCancelMatch) {
+      return await cancelDraftBuildJob(req, env, context, jobCancelMatch[1]);
+    }
+
+    const jobMatch = localApiPath.match(/^\/api\/build-jobs\/([^/]+)$/);
+    if (jobMatch) {
+      if (req.method === "DELETE") {
+        return await cancelDraftBuildJob(req, env, context, jobMatch[1]);
+      }
+      return await buildJobStatus(req, env, context, jobMatch[1]);
     }
 
     if (localApiPath === "/api/build-interest") {
@@ -100,6 +202,16 @@ export default async function handler(req, context = {}) {
       return await completeGoogleWaitlist(req, env, context);
     }
 
+    if (localApiPath === "/api/part-prices") {
+      if (req.method !== "GET") {
+        return jsonResponse({ error: "Method not allowed" }, 405, {
+          Allow: "GET",
+          "Cache-Control": "no-store",
+        });
+      }
+      return await publicPartPrices(url, context);
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return await proxyMakeableApi(req, env);
     }
@@ -134,6 +246,7 @@ const DEFAULT_OPENAI_SERVICE_TIER = "priority";
 function getEnv() {
   const keys = [
     "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
     "OPENAI_MODEL",
     "OPENAI_REASONING_MODEL",
     "OPENAI_REASONING_EFFORT",
@@ -151,6 +264,21 @@ function getEnv() {
     "DASHBOARD_SESSION_SECRET",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
+    "OPENAI_BUILD_MODEL",
+    "OPENAI_BUILD_SERVICE_TIER",
+    "OPENAI_IMAGE_MODEL",
+    "OPENAI_IMAGE_SIZE",
+    "OPENAI_IMAGE_QUALITY",
+    "MAKEABLE_FORCE_BUILD_FALLBACK",
+    "MAKEABLE_SKIP_IMAGE_GENERATION",
+    "MAKEABLE_DRAFT_COOKIE_SECRET",
+    "MAKEABLE_ANALYTICS_ID_SECRET",
+    "MAKEABLE_BACKGROUND_SECRET",
+    "MAKEABLE_BUILD_GENERATION_ENABLED",
+    "MAKEABLE_ANONYMOUS_GENERATION_ENABLED",
+    "NODE_ENV",
+    "NETLIFY",
+    "CONTEXT",
   ];
   return Object.fromEntries(keys.map((key) => [key, envValue(key)]));
 }
@@ -373,6 +501,30 @@ function safeAnalyticsDistinctId(value) {
     : "";
 }
 
+function analyticsAccountId(sub, env) {
+  const normalizedSub = typeof sub === "string" ? sub.trim().slice(0, 255) : "";
+  const secret = String(
+    env.MAKEABLE_ANALYTICS_ID_SECRET
+      || env.MAKEABLE_DRAFT_COOKIE_SECRET
+      || env.DASHBOARD_SESSION_SECRET
+      || "",
+  );
+  if (!normalizedSub || secret.length < 32) return "";
+  return `makeable_account_${createHmac("sha256", secret)
+    .update(`posthog-account:${normalizedSub}`)
+    .digest("hex")
+    .slice(0, 40)}`;
+}
+
+function normalizedReferringDomain(value) {
+  if (value === "$direct") return "$direct";
+  if (typeof value !== "string") return "";
+  const domain = value.trim().toLowerCase().slice(0, 253);
+  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)
+    ? domain
+    : "";
+}
+
 function isEmberCheckout(checkout) {
   return Boolean(checkout && new Set(["sage", "bone", "blush"])
     .has(checkout?.metadata?.ember_color)
@@ -428,12 +580,14 @@ async function captureRefundAnalytics(charge, env, insertId) {
   }
 }
 
-function queueAnalyticsCapture(context, event, distinctId, properties) {
+async function queueAnalyticsCapture(context, event, distinctId, properties, insertId = "") {
   if (!distinctId) return;
-  const capture = capturePosthogEvent(event, distinctId, properties);
+  const capture = capturePosthogEvent(event, distinctId, properties, insertId);
   if (typeof context?.waitUntil === "function") {
     context.waitUntil(capture);
+    return;
   }
+  await capture;
 }
 
 async function capturePosthogEvent(event, distinctId, properties, insertId = "") {
@@ -592,6 +746,514 @@ function normalizeSignupEmail(value) {
   return email;
 }
 
+async function communityBuilds(req, env, context) {
+  if (req.method === "GET") {
+    return jsonResponse({ builds: await listPublicGalleryBuilds(buildStateStore(context)) }, 200, {
+      "Cache-Control": "no-store",
+    });
+  }
+  if (req.method === "POST") {
+    return startAnonymousBuildJob(req, env, context);
+  }
+  return jsonResponse({ error: "Method not allowed" }, 405, {
+    Allow: "GET, POST",
+    "Cache-Control": "no-store",
+  });
+}
+
+async function buildJobs(req, env, context) {
+  if (req.method === "POST") {
+    return startAnonymousBuildJob(req, env, context);
+  }
+  return jsonResponse({ error: "Method not allowed" }, 405, {
+    Allow: "POST",
+    "Cache-Control": "no-store",
+  });
+}
+
+async function startAnonymousBuildJob(req, env, context) {
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+
+  const body = await readLimitedJsonRequest(req, 8 * 1024);
+  const stateStore = buildStateStore(context);
+  const imageStore = buildImageStore(context);
+  const auth = await optionalBuilderSession(req, context);
+  if (auth.user) {
+    const quota = await accountBuildQuota(stateStore, auth.user.sub);
+    if (quota.remaining <= 0) {
+      return jsonResponse({ error: `This Google account has used its ${quota.limit} successful builds.` }, 429, {
+        "Cache-Control": "no-store",
+      });
+    }
+  }
+  const start = await createAnonymousBuildJob({
+    request: req,
+    stateStore,
+    env,
+    idea: body?.idea,
+    user: auth.user,
+  });
+  if (!start.ok) {
+    const activeJob = start.activeJob || null;
+    const dispatch = activeJob?.state === BUILD_JOB_STATES.queued && shouldUseNetlifyBackground(env, context)
+      ? createBackgroundBuildDispatch(env, activeJob.id)
+      : null;
+    return jsonResponse({ error: start.error, activeJob, dispatch }, start.status, {
+      "Cache-Control": "no-store",
+      ...(start.headers || {}),
+    });
+  }
+  const dispatch = shouldUseNetlifyBackground(env, context)
+    ? createBackgroundBuildDispatch(env, start.job.id)
+    : null;
+  if (!dispatch) {
+    scheduleBuildExecution(context, {
+      jobId: start.job.id,
+      idea: start.job.idea,
+      env,
+      stateStore,
+      imageStore,
+    });
+  }
+  return jsonResponse(
+    {
+      job: publicBuildJob(start.job),
+      dispatch,
+      limits: {
+        startsPerWindow: auth.user
+          ? BUILD_JOB_LIMITS.successfulClaimsPerAccount
+          : BUILD_JOB_LIMITS.startsPerWindow,
+        windowHours: 24,
+      },
+    },
+    202,
+    {
+      "Cache-Control": "no-store",
+      "Set-Cookie": start.cookie,
+    },
+  );
+}
+
+async function accountBuilds(req, env, context) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  const auth = await requireBuilderSession(req, context);
+  if (!auth.ok) return auth.response;
+  const stateStore = buildStateStore(context);
+  const profile = publicBuilderProfile(auth.user);
+  const quota = await accountBuildQuota(stateStore, auth.user.sub);
+  const userBuilds = await listAccountGalleryBuilds(stateStore, auth.user.sub);
+  return jsonResponse(
+    {
+      authenticated: true,
+      profile,
+      user: profile,
+      analyticsId: analyticsAccountId(auth.user.sub, env),
+      builds: userBuilds,
+      quota,
+    },
+    200,
+    { "Cache-Control": "no-store", Vary: "Cookie" },
+  );
+}
+
+async function communityBuild(req, context, id) {
+  if (req.method === "GET") {
+    const build = await getPublicGalleryBuild(buildStateStore(context), id);
+    return build
+      ? jsonResponse({ build }, 200, { "Cache-Control": "no-store" })
+      : jsonResponse({ error: "Build not found" }, 404, { "Cache-Control": "no-store" });
+  }
+
+  if (req.method === "DELETE") {
+    const csrfFailure = sameOriginFailure(req);
+    if (csrfFailure) return csrfFailure;
+
+    const auth = await requireBuilderSession(req, context);
+    if (!auth.ok) return auth.response;
+    const stateStore = buildStateStore(context);
+    const result = await hidePublicGalleryBuild({
+      stateStore,
+      buildId: id,
+      user: auth.user,
+    });
+    if (!result.ok) {
+      return jsonResponse({ error: result.error }, result.status, {
+        "Cache-Control": "no-store",
+        Vary: "Cookie",
+      });
+    }
+    return jsonResponse(
+      {
+        ok: true,
+        build: result.build,
+        quota: await accountBuildQuota(stateStore, auth.user.sub),
+      },
+      200,
+      { "Cache-Control": "no-store", Vary: "Cookie" },
+    );
+  }
+
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET, DELETE",
+      "Cache-Control": "no-store",
+    });
+  }
+}
+
+async function communityBuildImage(req, context, id) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  const build = await getPublicGalleryBuild(buildStateStore(context), id);
+  if (!build) {
+    return jsonResponse({ error: "Build image not found" }, 404, {
+      "Cache-Control": "no-store",
+    });
+  }
+  const image = await getGalleryImage(buildImageStore(context), id);
+  if (!image) {
+    return jsonResponse({ error: "Build image not found" }, 404, {
+      "Cache-Control": "no-store",
+    });
+  }
+  return binaryResponse(image.bytes, image.contentType, {
+    "Cache-Control": "public, max-age=3600",
+  });
+}
+
+async function buildJobStatus(req, env, context, jobId) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  const auth = await optionalBuilderSession(req, context);
+  const access = await resolveBuildJobAccess({
+    request: req,
+    stateStore: buildStateStore(context),
+    env,
+    jobId,
+    user: auth.user,
+  });
+  if (!access.ok) {
+    return jsonResponse({ error: access.error }, access.status, {
+      "Cache-Control": "no-store",
+      Vary: "Cookie",
+      ...(access.headers || {}),
+      ...(auth.clearCookie ? { "Set-Cookie": clearBuilderSessionCookie() } : {}),
+    });
+  }
+  return jsonResponse({ job: publicBuildJob(access.job) }, 200, {
+    "Cache-Control": "no-store",
+    Vary: "Cookie",
+  });
+}
+
+async function buildJobImage(req, env, context, jobId) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  const auth = await optionalBuilderSession(req, context);
+  const result = await getDraftJobImage({
+    request: req,
+    stateStore: buildStateStore(context),
+    imageStore: buildImageStore(context),
+    env,
+    jobId,
+    user: auth.user,
+  });
+  if (!result.ok) {
+    return jsonResponse({ error: result.error }, result.status, {
+      "Cache-Control": "no-store",
+      Vary: "Cookie",
+      ...(result.headers || {}),
+    });
+  }
+  return binaryResponse(result.image.bytes, result.image.contentType, {
+    "Cache-Control": "private, no-store",
+    Vary: "Cookie",
+  });
+}
+
+async function claimBuildJob(req, env, context, jobId) {
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "POST",
+      "Cache-Control": "no-store",
+    });
+  }
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+
+  const auth = await requireBuilderSession(req, context);
+  if (!auth.ok) return auth.response;
+  const body = await readLimitedJsonRequest(req, 4 * 1024);
+  if (
+    !body
+    || typeof body !== "object"
+    || Array.isArray(body)
+    || Object.keys(body).some((key) => !new Set([
+      "galleryName",
+      "name",
+      "posthogDistinctId",
+      "referringDomain",
+    ]).has(key))
+  ) {
+    return jsonResponse({ error: "Build claim request is invalid." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+  const result = await claimSuccessfulBuildJob({
+    request: req,
+    stateStore: buildStateStore(context),
+    imageStore: buildImageStore(context),
+    env,
+    jobId,
+    user: auth.user,
+    galleryName: body?.galleryName || body?.name,
+  });
+  if (!result.ok) {
+    return jsonResponse({ error: result.error }, result.status, {
+      "Cache-Control": "no-store",
+      ...(result.headers || {}),
+    });
+  }
+  const buildId = String(result.build?.id || result.job?.buildId || "");
+  const analyticsId = analyticsAccountId(auth.user.sub, env)
+    || safeAnalyticsDistinctId(body.posthogDistinctId);
+  await queueAnalyticsCapture(
+    context,
+    "makeable build claimed",
+    analyticsId,
+    {
+      product_id: "makeable_builder",
+      offer_version: "makeable_builder_v1",
+      build_id: buildId,
+      source: result.build?.image?.source || "unknown",
+      parts_count: Array.isArray(result.build?.parts) ? result.build.parts.length : 0,
+      referring_domain: normalizedReferringDomain(body.referringDomain) || "$direct",
+      claim_method: "server",
+    },
+    buildId ? `makeable-build-claimed:${buildId}` : `makeable-build-claimed:${jobId}`,
+  );
+  return jsonResponse(
+    { job: result.job, build: result.build, quota: result.quota },
+    200,
+    { "Cache-Control": "no-store", Vary: "Cookie" },
+  );
+}
+
+async function cancelDraftBuildJob(req, env, context, jobId) {
+  if (!new Set(["POST", "DELETE"]).has(req.method)) {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "POST, DELETE",
+      "Cache-Control": "no-store",
+    });
+  }
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+
+  const auth = await optionalBuilderSession(req, context);
+  const result = await cancelBuildJob({
+    request: req,
+    stateStore: buildStateStore(context),
+    env,
+    jobId,
+    user: auth.user,
+  });
+  if (!result.ok) {
+    return jsonResponse({ error: result.error }, result.status, {
+      "Cache-Control": "no-store",
+      Vary: "Cookie",
+      ...(result.headers || {}),
+    });
+  }
+  return jsonResponse({ job: result.job }, 200, {
+    "Cache-Control": "no-store",
+    Vary: "Cookie",
+  });
+}
+
+async function accountStatus(req, env, context) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  const session = await resolveBuilderSession(req, builderSessionStore(context));
+  if (!session.authenticated) {
+    const quota = await accountBuildQuota(buildStateStore(context), "");
+    return jsonResponse(
+      { authenticated: false, profile: null, user: null, quota, builds: [] },
+      200,
+      {
+        "Cache-Control": "no-store",
+        Vary: "Cookie",
+        ...(session.clearCookie ? { "Set-Cookie": clearBuilderSessionCookie() } : {}),
+      },
+    );
+  }
+  const stateStore = buildStateStore(context);
+  const profile = publicBuilderProfile(session.user);
+  const quota = await accountBuildQuota(stateStore, session.user.sub);
+  const builds = await listAccountGalleryBuilds(stateStore, session.user.sub);
+  return jsonResponse(
+    {
+      authenticated: true,
+      profile,
+      user: profile,
+      analyticsId: analyticsAccountId(session.user.sub, env),
+      quota,
+      builds,
+    },
+    200,
+    { "Cache-Control": "no-store", Vary: "Cookie" },
+  );
+}
+
+async function authSession(req, context) {
+  if (req.method !== "DELETE") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "DELETE",
+      "Cache-Control": "no-store",
+    });
+  }
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+
+  await forgetBuilderSession(req, builderSessionStore(context));
+  return jsonResponse({ ok: true }, 200, {
+    "Cache-Control": "no-store",
+    "Set-Cookie": clearBuilderSessionCookie(),
+  });
+}
+
+function buildStateStore(context) {
+  return createRoutedBuildStateStore({
+    jobStore: getStore({
+      name: buildJobStateStoreNameForFunctionContext(context),
+      consistency: "strong",
+    }),
+    quotaStore: getStore({
+      name: buildJobQuotaStoreNameForFunctionContext(context),
+      consistency: "strong",
+    }),
+    communityStore: getStore({
+      name: buildCommunityStoreNameForFunctionContext(context),
+      consistency: "strong",
+    }),
+  });
+}
+
+function buildImageStore(context) {
+  return getStore({
+    name: buildJobImageStoreNameForFunctionContext(context),
+    consistency: "strong",
+  });
+}
+
+function builderSessionStore(context) {
+  return getStore({
+    name: builderSessionStoreNameForFunctionContext(context),
+    consistency: "strong",
+  });
+}
+
+async function requireBuilderSession(req, context) {
+  const session = await resolveBuilderSession(req, builderSessionStore(context));
+  if (session.authenticated) return { ok: true, user: session.user };
+  return {
+    ok: false,
+    response: jsonResponse(
+      { error: "Log in with Google to create builds." },
+      401,
+      {
+        "Cache-Control": "no-store",
+        Vary: "Cookie",
+        ...(session.clearCookie ? { "Set-Cookie": clearBuilderSessionCookie() } : {}),
+      },
+    ),
+  };
+}
+
+async function optionalBuilderSession(req, context) {
+  const session = await resolveBuilderSession(req, builderSessionStore(context));
+  return session.authenticated
+    ? { user: session.user, clearCookie: false }
+    : { user: null, clearCookie: session.clearCookie };
+}
+
+function scheduleBuildExecution(context, params) {
+  const promise = runCommunityBuildJob(params);
+  if (typeof context?.waitUntil === "function") context.waitUntil(promise);
+  else {
+    promise.catch((error) => {
+      console.error("Background build failed", error);
+    });
+  }
+}
+
+function shouldUseNetlifyBackground(env, context) {
+  return env.NETLIFY === "true"
+    || Boolean(env.CONTEXT)
+    || Boolean(context?.deploy)
+    || typeof context?.waitUntil === "function"
+    || typeof globalThis.Netlify?.env?.get === "function";
+}
+
+async function runCommunityBuildJob({ jobId, idea, env, stateStore, imageStore }) {
+  try {
+    const planning = await markBuildJobState(stateStore, jobId, BUILD_JOB_STATES.planning);
+    if (!planning || planning.state === BUILD_JOB_STATES.cancelled) return;
+
+    const captureStore = {
+      saved: null,
+      async save(build) {
+        this.saved = build;
+        return build;
+      },
+    };
+    const result = await createBuild(
+      { idea },
+      {
+        env,
+        store: captureStore,
+        fetchFn: fetch,
+        allowAnonymous: true,
+        onPhase: (state) => markBuildJobState(stateStore, jobId, state),
+      },
+    );
+    if (result.status !== 201) {
+      throw new Error(result.body?.error || "Build generation failed.");
+    }
+    const latest = await getBuildJob(stateStore, jobId);
+    if (!latest || latest.state === BUILD_JOB_STATES.cancelled) return;
+    await completeBuildJob({
+      stateStore,
+      imageStore,
+      jobId,
+      build: captureStore.saved || result.body,
+    });
+  } catch (error) {
+    await failBuildJob(stateStore, jobId, error);
+  }
+}
+
 async function dashboardSession(req, env) {
   if (req.method === "DELETE") {
     return jsonResponse({ ok: true }, 200, {
@@ -659,12 +1321,9 @@ async function dashboardSession(req, env) {
 async function dashboardData(req, env, context) {
   const authFailure = dashboardAuthorizationFailure(req, env, "GET");
   if (authFailure) return authFailure;
-  const records = await loadDashboardRecords(context);
+  const report = await loadDashboardReport(context);
   return jsonResponse(
-    {
-      generatedAt: new Date().toISOString(),
-      records,
-    },
+    report,
     200,
     {
       "Cache-Control": "no-store",
@@ -676,9 +1335,9 @@ async function dashboardData(req, env, context) {
 async function dashboardExport(req, env, context) {
   const authFailure = dashboardAuthorizationFailure(req, env, "GET");
   if (authFailure) return authFailure;
-  const records = await loadDashboardRecords(context);
+  const report = await loadDashboardReport(context);
   return textResponse(
-    waitlistCsv(records),
+    dashboardCsv(report.records),
     "text/csv; charset=utf-8",
     200,
     {
@@ -717,13 +1376,25 @@ function dashboardAuthorizationFailure(req, env, allowedMethod) {
   });
 }
 
-async function loadDashboardRecords(context) {
-  const store = getStore({
+async function loadDashboardReport(context) {
+  const waitlistStore = getStore({
     name: waitlistStoreNameForFunctionContext(context),
     consistency: "strong",
   });
-  const records = await readVerifiedWaitlist(store);
-  return records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const sessionsStore = getStore({
+    name: builderSessionStoreNameForFunctionContext(context),
+    consistency: "strong",
+  });
+  const galleryStore = getStore({
+    name: buildCommunityStoreNameForFunctionContext(context),
+    consistency: "strong",
+  });
+  const [waitlistRecords, builderSessions, galleryRecords] = await Promise.all([
+    readVerifiedWaitlist(waitlistStore),
+    readJsonBlobRecords(sessionsStore, "builder-session-"),
+    readJsonBlobRecords(galleryStore, "gallery/"),
+  ]);
+  return buildDashboardReport(waitlistRecords, builderSessions, galleryRecords);
 }
 
 function publicConfig(env) {
@@ -737,7 +1408,7 @@ function publicConfig(env) {
     hasOpenAIKey: Boolean(env.OPENAI_API_KEY),
     hasGithubToken: Boolean(env.GITHUB_TOKEN),
     hasVoice: Boolean(env.MAKEABLE_API_BASE_URL),
-    hasAccounts: Boolean(env.COGNITO_DOMAIN && env.COGNITO_CLIENT_ID),
+    hasAccounts: Boolean(env.GOOGLE_CLIENT_ID || (env.COGNITO_DOMAIN && env.COGNITO_CLIENT_ID)),
     cognitoDomain: env.COGNITO_DOMAIN || "",
     cognitoClientId: env.COGNITO_CLIENT_ID || "",
     cognitoRedirectUri: env.COGNITO_REDIRECT_URI || "",
@@ -772,6 +1443,9 @@ async function resolvedPublicConfig(env) {
 }
 
 async function completeGoogleWaitlist(req, env, context) {
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+
   if (!env.GOOGLE_CLIENT_ID) {
     return jsonResponse({ error: "Google sign-in is not configured." }, 503, {
       "Cache-Control": "no-store",
@@ -786,7 +1460,12 @@ async function completeGoogleWaitlist(req, env, context) {
     !body.credential ||
     body.credential.length > 16_384 ||
     typeof body.intent !== "string" ||
-    Object.keys(body).some((key) => !["credential", "intent"].includes(key))
+    !new Set(["waitlist", "build", "account"]).has(body.intent) ||
+    Object.keys(body).some((key) => ![
+      "credential",
+      "intent",
+      "posthogDistinctId",
+    ].includes(key))
   ) {
     return jsonResponse({ error: "Google sign-in request is invalid." }, 400, {
       "Cache-Control": "no-store",
@@ -805,6 +1484,53 @@ async function completeGoogleWaitlist(req, env, context) {
     return jsonResponse({ error: "Google could not verify this sign-in." }, 401, {
       "Cache-Control": "no-store",
     });
+  }
+
+  if (body.intent === "build" || body.intent === "account") {
+    const result = normalizeGoogleBuilderIdentity(identity);
+    if (!result.ok) {
+      return jsonResponse({ error: result.error }, result.status, {
+        "Cache-Control": "no-store",
+      });
+    }
+    const record = {
+      email: result.value.email,
+      name: result.value.name,
+      source: "google",
+      createdAt: result.value.createdAt,
+    };
+    const delivery = await deliverWaitlistRecord(record, env, context);
+    if (!delivery.ok) {
+      return jsonResponse({ error: delivery.error }, delivery.status, {
+        "Cache-Control": "no-store",
+      });
+    }
+    const session = await createBuilderSession(builderSessionStore(context), result.value);
+    const profile = publicBuilderProfile(session.record.user);
+    const analyticsId = analyticsAccountId(result.value.sub, env);
+    if (delivery.created) {
+      await queueAnalyticsCapture(
+        context,
+        "make a build interest submitted",
+        analyticsId || safeAnalyticsDistinctId(body.posthogDistinctId),
+        {
+          product_id: "makeable_builder",
+          offer_version: "makeable_google_waitlist_v1",
+          signup_method: "google",
+          signup_date: record.createdAt.slice(0, 10),
+          source: body.intent === "account" ? "account_login" : "build_login",
+        },
+        delivery.key,
+      );
+    }
+    return jsonResponse(
+      { ok: true, created: delivery.created, user: profile, analyticsId },
+      200,
+      {
+        "Cache-Control": "no-store",
+        "Set-Cookie": session.cookie,
+      },
+    );
   }
 
   const result = createGoogleWaitlistResult(identity, body.intent);
@@ -1045,12 +1771,13 @@ function openAIServiceTier(env) {
 }
 
 async function requestOpenAIResponse(payload, env) {
-  const upstream = await fetch("https://api.openai.com/v1/responses", {
+  const requestPayload = openAIRequestPayload(payload, env);
+  const upstream = await fetch(openAIEndpoint(env, "/v1/responses"), {
     method: "POST",
     headers: openAIHeaders(env),
-    body: JSON.stringify(payload),
+    body: JSON.stringify(requestPayload),
   });
-  if (openAIServiceTier(env) !== "priority" || upstream.ok) return upstream;
+  if (!usesDirectOpenAI(env) || openAIServiceTier(env) !== "priority" || upstream.ok) return upstream;
 
   const failure = await upstream.clone().text();
   if (!/service[_\s-]*tier|priority.*(?:unavailable|not enabled|not supported)/i.test(failure)) {
@@ -1058,7 +1785,7 @@ async function requestOpenAIResponse(payload, env) {
   }
 
   console.warn("OpenAI priority tier is unavailable; retrying this request on the standard tier.");
-  return fetch("https://api.openai.com/v1/responses", {
+  return fetch(openAIEndpoint(env, "/v1/responses"), {
     method: "POST",
     headers: openAIHeaders(env),
     body: JSON.stringify({ ...payload, service_tier: "default" }),
@@ -1070,7 +1797,7 @@ async function retrieveOpenAIResponse(responseId, env) {
   if (missing) return missing;
 
   const id = encodeURIComponent(decodeURIComponent(responseId));
-  const upstream = await fetch(`https://api.openai.com/v1/responses/${id}`, {
+  const upstream = await fetch(openAIEndpoint(env, `/v1/responses/${id}`), {
     headers: openAIHeaders(env),
   });
   return pipeJson(upstream);
@@ -1085,7 +1812,30 @@ function openAIHeaders(env) {
   return {
     Authorization: `Bearer ${env.OPENAI_API_KEY}`,
     "Content-Type": "application/json",
+    Accept: "application/json",
   };
+}
+
+function openAIEndpoint(env, pathname) {
+  return `${openAIBaseUrl(env)}${pathname}`;
+}
+
+function openAIBaseUrl(env) {
+  const raw = String(env.OPENAI_BASE_URL || "https://api.openai.com").trim().replace(/\/+$/, "");
+  const parsed = new URL(raw);
+  if (parsed.protocol !== "https:") throw new Error("The OpenAI endpoint must use HTTPS.");
+  return parsed.toString().replace(/\/+$/, "");
+}
+
+function usesDirectOpenAI(env) {
+  return new URL(openAIBaseUrl(env)).hostname === "api.openai.com";
+}
+
+function openAIRequestPayload(payload, env) {
+  if (usesDirectOpenAI(env)) return payload;
+  const gatewayPayload = { ...payload };
+  delete gatewayPayload.service_tier;
+  return gatewayPayload;
 }
 
 function streamJsonUpstream(upstreamPromise) {
@@ -1207,6 +1957,110 @@ function githubHeaders(env) {
   };
 }
 
+function sameOriginFailure(req) {
+  const origin = req.headers.get("origin");
+  if (!origin) return null;
+  let expected;
+  try {
+    expected = new URL(req.url).origin;
+  } catch {
+    return jsonResponse({ error: "Origin not allowed." }, 403, {
+      "Cache-Control": "no-store",
+    });
+  }
+  return origin === expected
+    ? null
+    : jsonResponse({ error: "Origin not allowed." }, 403, {
+      "Cache-Control": "no-store",
+    });
+}
+
+async function publicPartPrices(url, context) {
+  const requested = String(url.searchParams.get("listingIds") || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const listingIds = [...new Set(requested)];
+  if (!listingIds.length || listingIds.length > 30) {
+    return jsonResponse({ error: "Provide between 1 and 30 approved listing IDs." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+  if (listingIds.some((listingId) => !PUBLIC_PRICE_LISTING_IDS.has(listingId))) {
+    return jsonResponse({ error: "One or more listing IDs are not approved." }, 400, {
+      "Cache-Control": "no-store",
+    });
+  }
+
+  try {
+    const store = getStore({
+      name: priceStoreNameForFunctionContext(context),
+      consistency: "strong",
+    });
+    const quotes = [];
+    for (const listingId of listingIds) {
+      const value = await store.get(`v1/us/${listingId}.json`, {
+        type: "json",
+        consistency: "strong",
+      });
+      const quote = publicPriceQuote(value, listingId);
+      if (quote) quotes.push(quote);
+    }
+    return jsonResponse(
+      { quotes, generatedAt: new Date().toISOString() },
+      200,
+      { "Cache-Control": "public, max-age=60, stale-while-revalidate=180" },
+    );
+  } catch (error) {
+    console.error("Public part-price lookup failed", error);
+    return jsonResponse({ quotes: [], generatedAt: new Date().toISOString() }, 200, {
+      "Cache-Control": "no-store",
+    });
+  }
+}
+
+function priceStoreNameForFunctionContext(context = {}) {
+  return context?.deploy?.context === "production"
+    ? PRICE_STORE_NAME
+    : `${PRICE_STORE_NAME}-preview`;
+}
+
+function publicPriceQuote(value, expectedListingId) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (value.listingId !== expectedListingId) return null;
+  const displayState = String(value.displayState || "");
+  if (!new Set(["fresh", "recent", "stale", "unavailable", "review-required"]).has(displayState)) {
+    return null;
+  }
+  const destinationUrl = approvedAmazonDestination(value.destinationUrl);
+  if (!destinationUrl) return null;
+  const quote = {
+    listingId: expectedListingId,
+    displayState,
+    asOf: validIsoDate(value.asOf) ? value.asOf : null,
+    expiresAt: validIsoDate(value.expiresAt) ? value.expiresAt : null,
+    destinationUrl,
+  };
+  if (Number.isInteger(value.amount) && value.amount > 0 && value.currency === "USD") {
+    quote.price = { amount: value.amount, currency: value.currency };
+  }
+  return quote;
+}
+
+function approvedAmazonDestination(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.toLowerCase();
+    return host === "amazon.com" || host.endsWith(".amazon.com") ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function validIsoDate(value) {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
 async function pipeJson(upstream) {
   return new Response(await upstream.text(), {
     status: upstream.status,
@@ -1230,6 +2084,16 @@ function textResponse(text, contentType, status = 200, headers = {}) {
     status,
     headers: {
       "Content-Type": contentType,
+      ...headers,
+    },
+  });
+}
+
+function binaryResponse(bytes, contentType, headers = {}) {
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType || "application/octet-stream",
       ...headers,
     },
   });

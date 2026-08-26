@@ -1,9 +1,67 @@
 export const BOARD_PROFILES = Object.freeze({
-  esp32: Object.freeze({ id: "esp32", label: "ESP32", fqbn: "esp32:esp32:esp32" }),
-  esp32s2: Object.freeze({ id: "esp32s2", label: "ESP32-S2", fqbn: "esp32:esp32:esp32s2" }),
-  esp32s3: Object.freeze({ id: "esp32s3", label: "ESP32-S3", fqbn: "esp32:esp32:esp32s3" }),
-  esp32c3: Object.freeze({ id: "esp32c3", label: "ESP32-C3", fqbn: "esp32:esp32:esp32c3" }),
-  esp32c6: Object.freeze({ id: "esp32c6", label: "ESP32-C6", fqbn: "esp32:esp32:esp32c6" }),
+  esp32: board({
+    id: "esp32",
+    label: "ESP32",
+    fqbn: "esp32:esp32:esp32",
+    supportStatus: "compatible_with_differences",
+    usbConnector: "Confirm the connector shown on your exact board",
+    resetLabel: "EN / RESET",
+    bootLabel: "BOOT",
+    labelNote: "Some boards print D25 while others print 25 or GPIO25.",
+  }),
+  esp32s2: board({
+    id: "esp32s2",
+    label: "ESP32-S2",
+    fqbn: "esp32:esp32:esp32s2",
+    supportStatus: "compatible_with_differences",
+    usbConnector: "Usually USB-C or Micro-USB; confirm the photo",
+    resetLabel: "RESET / RST",
+    bootLabel: "BOOT / 0",
+  }),
+  esp32s3: board({
+    id: "esp32s3",
+    label: "ESP32-S3",
+    fqbn: "esp32:esp32:esp32s3",
+    supportStatus: "compatible_with_differences",
+    usbConnector: "Usually USB-C; confirm which of the board’s ports is marked USB",
+    resetLabel: "RESET / RST",
+    bootLabel: "BOOT / 0",
+  }),
+  "esp32-s3-n16r8": board({
+    id: "esp32-s3-n16r8",
+    label: "Waveshare ESP32-S3-DEV-KIT-N16R8-M (SKU 28836)",
+    fqbn:
+      "esp32:esp32:esp32s3:FlashMode=qio,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi",
+    supportStatus: "compatible_with_differences",
+    usbConnector: "USB Type-C data port on the documented Waveshare carrier",
+    resetLabel: "RESET",
+    bootLabel: "BOOT",
+    labelNote:
+      "Use only the Acacia-loaned Waveshare N16R8-M carrier (SKU 28836) and match every printed label before wiring.",
+    // Match the flash arguments emitted by Arduino-ESP32 for its QIO
+    // bootloader profile; the image header itself is written as DIO.
+    flashMode: "dio",
+    flashFrequency: "80m",
+    flashSize: "16MB",
+  }),
+  esp32c3: board({
+    id: "esp32c3",
+    label: "ESP32-C3",
+    fqbn: "esp32:esp32:esp32c3",
+    supportStatus: "compatible_with_differences",
+    usbConnector: "Usually USB-C; confirm the photo",
+    resetLabel: "RESET / RST",
+    bootLabel: "BOOT / 9",
+  }),
+  esp32c6: board({
+    id: "esp32c6",
+    label: "ESP32-C6",
+    fqbn: "esp32:esp32:esp32c6",
+    supportStatus: "compatible_with_differences",
+    usbConnector: "Usually USB-C; confirm the photo",
+    resetLabel: "RESET / RST",
+    bootLabel: "BOOT / 9",
+  }),
 });
 
 export const USB_SERIAL_FILTERS = Object.freeze([
@@ -21,6 +79,8 @@ export function getBoardProfile(value) {
 }
 
 export function selectBoardProfile(plan) {
+  const explicitProfile = getBoardProfile(plan?.boardProfile?.profileId || plan?.boardProfile?.id);
+  if (explicitProfile) return explicitProfile;
   const description = [
     plan?.summary,
     plan?.firmware?.notes,
@@ -39,5 +99,48 @@ export function selectBoardProfile(plan) {
 }
 
 export function supportedBoardSummary() {
-  return Object.values(BOARD_PROFILES).map(({ id, label, fqbn }) => ({ id, label, fqbn }));
+  return Object.values(BOARD_PROFILES).map(
+    ({
+      id,
+      label,
+      fqbn,
+      supportStatus,
+      usbConnector,
+      flashMode,
+      flashFrequency,
+      flashSize,
+    }) => ({
+      id,
+      label,
+      fqbn,
+      supportStatus,
+      usbConnector,
+      flashMode,
+      flashFrequency,
+      flashSize,
+    }),
+  );
+}
+
+export function boardHumanGuide(value) {
+  const profile = getBoardProfile(value) || BOARD_PROFILES.esp32;
+  return {
+    id: profile.id,
+    label: profile.label,
+    supportStatus: profile.supportStatus,
+    usbConnector: profile.usbConnector,
+    resetLabel: profile.resetLabel,
+    bootLabel: profile.bootLabel,
+    labelNote: profile.labelNote,
+  };
+}
+
+function board(profile) {
+  return Object.freeze({
+    labelNote: "Use the label printed on this exact board; layout varies by manufacturer and revision.",
+    flashMode: "dio",
+    flashFrequency: "40m",
+    flashSize: "4MB",
+    ...profile,
+  });
 }
