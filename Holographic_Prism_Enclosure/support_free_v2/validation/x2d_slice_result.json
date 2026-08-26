@@ -1,0 +1,89 @@
+{
+    "error_string": "Success.",
+    "export_time": 775,
+    "layer_height": 0.20000000298023224,
+    "plate_index": 0,
+    "prepare_time": 59,
+    "return_code": 0,
+    "sliced_plates": [
+        {
+            "feature_type_times": {
+                "Bottom surface": 298.1109924316406,
+                "Bridge": 382.6669006347656,
+                "Custom": 3.377368927001953,
+                "Inner wall": 2222.359619140625,
+                "Internal solid infill": 2017.0955810546875,
+                "Outer wall": 2315.769775390625,
+                "Skirt": 11.80357551574707,
+                "Sparse infill": 2106.927490234375,
+                "Top surface": 407.0535888671875,
+                "Travel": 3126.82958984375,
+                "Undefined": 3125.4814453125
+            },
+            "filament_change_times": 0,
+            "filaments": [
+                {
+                    "filament_id": "",
+                    "id": 1,
+                    "main_used_g": 0.0,
+                    "total_used_g": 0.0
+                }
+            ],
+            "generate_support_material_time": 52,
+            "id": 1,
+            "infill_time": 192,
+            "layer_filament_change": 0,
+            "main_predication": 12888.6943359375,
+            "make_perimeters_time": 403,
+            "obj_cached_cnt": 0,
+            "objects": [
+                {
+                    "bbox": {
+                        "depth": 62.999996185302734,
+                        "height": 40.29999923706055,
+                        "width": 47.99999237060547,
+                        "x": 136.1999969482422,
+                        "y": 111.59998321533203,
+                        "z": 0.0
+                    },
+                    "id": 57,
+                    "name": "01_support_free_base.stl",
+                    "triangle_count": 7912
+                },
+                {
+                    "bbox": {
+                        "depth": 57.90000534057617,
+                        "height": 6.5,
+                        "width": 42.89999771118164,
+                        "x": 92.30000305175781,
+                        "y": 116.69996643066406,
+                        "z": 0.0
+                    },
+                    "id": 68,
+                    "name": "02_support_free_optical_frame.stl",
+                    "triangle_count": 536
+                },
+                {
+                    "bbox": {
+                        "depth": 34.29999923706055,
+                        "height": 4.0,
+                        "width": 34.29999923706055,
+                        "x": 100.9000015258789,
+                        "y": 81.4000015258789,
+                        "z": 0.0
+                    },
+                    "id": 79,
+                    "name": "03_prism_fit_ring.stl",
+                    "triangle_count": 40
+                }
+            ],
+            "sliced_time": 1321,
+            "sliced_time_with_cache": 594,
+            "total_predication": 12890.7236328125,
+            "triangle_count": 8488,
+            "warning_message": ""
+        }
+    ],
+    "sparse_infill_density": 20.0,
+    "wall_loops": 2
+}

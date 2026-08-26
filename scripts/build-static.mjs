@@ -12,6 +12,7 @@ await cp(landingOutput, output, { recursive: true });
 await cp(path.join(root, "privacy"), path.join(output, "privacy"), { recursive: true });
 await cp(path.join(root, "terms"), path.join(output, "terms"), { recursive: true });
 await cp(path.join(root, "ember"), path.join(output, "ember"), { recursive: true });
+await cp(path.join(root, "hologram"), path.join(output, "hologram"), { recursive: true });
 await cp(path.join(root, "robots.txt"), path.join(output, "robots.txt"));
 await cp(path.join(root, "sitemap.xml"), path.join(output, "sitemap.xml"));
 await cp(path.join(root, "styles"), path.join(output, "styles"), { recursive: true });

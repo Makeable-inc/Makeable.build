@@ -22,6 +22,12 @@
   force = true
 
 [[redirects]]
+  from = "/hologram"
+  to = "/hologram/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/ember/download"
   to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v1.0.12/Claude-Burner-1.0.12-arm64.dmg"
   status = 302
@@ -68,3 +74,20 @@
   for = "/frames-mobile/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/hologram/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Permissions-Policy = "bluetooth=(self), camera=(), microphone=(), geolocation=(), payment=()"
+    X-Frame-Options = "DENY"
+
+[[headers]]
+  for = "/hologram/firmware/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/hologram/sw.js"
+  [headers.values]
+    Service-Worker-Allowed = "/hologram"

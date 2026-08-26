@@ -12,3 +12,8 @@ data/
 .claude/
 __pycache__/
 *.pyc
+test-results/
+playwright-report/
+hardware/hologram/firmware/**/build/
+Holographic_Prism_Enclosure/**/__pycache__/
+Holographic_Prism_Enclosure/**/validation/*.gcode

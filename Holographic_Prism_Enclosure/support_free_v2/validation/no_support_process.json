@@ -1,0 +1,12 @@
+{
+  "type": "process",
+  "name": "0.20mm Standard SUPPORTS OFF @BBL X2D",
+  "inherits": "0.20mm Standard @BBL X2D",
+  "from": "User",
+  "instantiation": "true",
+  "enable_support": "0",
+  "support_type": "normal(auto)",
+  "compatible_printers": [
+    "Bambu Lab X2D 0.4 nozzle"
+  ]
+}

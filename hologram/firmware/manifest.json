@@ -1,0 +1,13 @@
+{
+  "name": "Makeable Hologram",
+  "version": "1.0.0",
+  "board": "Nologo ESP32C3 Super Mini",
+  "fqbn": "esp32:esp32:nologo_esp32c3_super_mini",
+  "display": "GoldenMorning GME128128-01-1-IIC / SH1107 / 128x128",
+  "file": "hologram-c3-supermini.bin",
+  "source": "hologram-c3-source.zip",
+  "format": "merged flash image",
+  "flashOffset": "0x0",
+  "sizeBytes": 4194304,
+  "sha256": "37b99687921729411891ab1877a8b5681ca5f2797728dc8b85fa1aa436b19133"
+}

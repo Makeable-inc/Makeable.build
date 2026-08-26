@@ -1,0 +1,13 @@
+{
+  "name": "Makeable Hologram Studio",
+  "short_name": "Hologram",
+  "description": "Stream drawings, messages, GIFs, and video to a 128×128 OLED hologram over BLE.",
+  "start_url": "/hologram",
+  "scope": "/hologram",
+  "display": "standalone",
+  "background_color": "#080b0d",
+  "theme_color": "#080b0d",
+  "icons": [
+    { "src": "/hologram/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

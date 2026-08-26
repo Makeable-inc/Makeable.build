@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080b0d" />
+    <meta name="color-scheme" content="dark" />
+    <title>Hologram Studio — Makeable</title>
+    <meta name="description" content="Draw, animate lyrics, and stream GIFs or video to a Makeable 128×128 hologram display over Bluetooth." />
+    <link rel="canonical" href="https://makeable.build/hologram" />
+    <link rel="icon" href="/hologram/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/hologram/manifest.webmanifest" />
+    <link rel="stylesheet" href="/hologram/hologram.css" />
+    <script type="module" src="/hologram/hologram.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#studio">Skip to studio</a>
+    <div class="ambient ambient--one" aria-hidden="true"></div>
+    <div class="ambient ambient--two" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Makeable home">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 2.8 28 9.6v12.8L16 29.2 4 22.4V9.6L16 2.8Z" />
+          <path d="m4 9.6 12 6.8 12-6.8M16 16.4v12.8" />
+        </svg>
+        <span>Makeable</span>
+      </a>
+      <button class="connect-button" id="connectButton" type="button">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span data-connect-label>Connect</span>
+      </button>
+    </header>
+
+    <main id="studio" class="studio">
+      <section class="intro" aria-labelledby="pageTitle">
+        <div>
+          <p class="eyebrow">Hologram Studio</p>
+          <h1 id="pageTitle">Put anything in the cube.</h1>
+          <p>Sketch with your finger, animate a message, or turn a GIF or video into live OLED light.</p>
+        </div>
+        <button class="icon-button" id="helpButton" type="button" aria-label="Open setup and wiring instructions">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17h.01M9.1 9a3 3 0 1 1 4.5 2.6c-1 .6-1.6 1.1-1.6 2.4M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z" /></svg>
+        </button>
+      </section>
+
+      <section class="compatibility" id="compatibilityNotice" hidden>
+        <strong>Bluetooth preview only in this browser</strong>
+        <p>You can create and preview here, but direct BLE needs Chrome or Edge on Android, macOS, or Windows. iPhone and iPad browsers do not currently expose Web Bluetooth.</p>
+      </section>
+
+      <section class="display-card" aria-label="Hologram OLED preview">
+        <div class="display-shell">
+          <div class="display-bezel">
+            <canvas id="displayCanvas" width="128" height="128" aria-label="128 by 128 monochrome OLED preview"></canvas>
+            <span class="glass-sheen" aria-hidden="true"></span>
+          </div>
+          <div class="cube-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+        </div>
+        <div class="display-meta">
+          <div>
+            <span class="connection-pill" id="connectionPill">Preview mode</span>
+            <strong id="modeLabel">Draw</strong>
+          </div>
+          <p id="streamStats" aria-live="polite">128 × 128 · 1-bit</p>
+        </div>
+      </section>
+
+      <nav class="mode-tabs" aria-label="Content mode">
+        <button class="mode-tab is-active" type="button" data-mode="draw" aria-selected="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 6.3 3 3M4 20l3.5-.7L19 7.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" /></svg>
+          Draw
+        </button>
+        <button class="mode-tab" type="button" data-mode="message" aria-selected="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M9 5v14m-3 0h6" /></svg>
+          Message
+        </button>
+        <button class="mode-tab" type="button" data-mode="media" aria-selected="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 8 6 4-6 4V8ZM4 4h16v16H4V4Z" /></svg>
+          GIF / Video
+        </button>
+      </nav>
+
+      <section class="control-panel" data-panel="draw">
+        <div class="section-heading">
+          <div><p class="eyebrow">Live canvas</p><h2>Draw with your finger</h2></div>
+          <button class="text-button" id="clearDrawButton" type="button">Clear</button>
+        </div>
+        <div class="draw-wrap">
+          <canvas id="drawCanvas" width="128" height="128" aria-label="Touch drawing canvas"></canvas>
+          <p>Anything white is light. Changes stream as you draw.</p>
+        </div>
+        <div class="control-row">
+          <label class="range-control">
+            <span>Brush</span>
+            <input id="brushSize" type="range" min="1" max="14" value="5" />
+          </label>
+          <div class="segmented" aria-label="Drawing tool">
+            <button type="button" class="is-active" data-tool="pen">Pen</button>
+            <button type="button" data-tool="eraser">Erase</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-panel" data-panel="message" hidden>
+        <div class="section-heading">
+          <div><p class="eyebrow">Kinetic type</p><h2>Animate a message</h2></div>
+          <button class="play-button" id="messagePlayButton" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7Z" /></svg>
+            Play
+          </button>
+        </div>
+        <label class="field">
+          <span>One beat per line</span>
+          <textarea id="messageInput" rows="5" maxlength="280" placeholder="LIGHT UP&#10;THE&#10;NIGHT">MAKE IT
+FEEL
+MAGIC</textarea>
+        </label>
+        <div class="template-row" aria-label="Message examples">
+          <button type="button" data-message-template="MAKE IT\nFEEL\nMAGIC">Magic</button>
+          <button type="button" data-message-template="HELLO\nFROM THE\nFUTURE">Future</button>
+          <button type="button" data-message-template="YOUR WORDS\nGO\nHERE">Your words</button>
+        </div>
+        <div class="two-up">
+          <label class="field field--select"><span>Motion</span><select id="messageStyle"><option value="punch">Punch</option><option value="stack">Stack</option><option value="ticker">Ticker</option></select></label>
+          <label class="field field--select"><span>Speed</span><select id="messageSpeed"><option value="900">Relaxed</option><option value="600" selected>Pop</option><option value="360">Fast</option></select></label>
+        </div>
+        <p class="fine-print">Use words you wrote or have permission to display.</p>
+      </section>
+
+      <section class="control-panel" data-panel="media" hidden>
+        <div class="section-heading">
+          <div><p class="eyebrow">Local conversion</p><h2>GIF, image, or video</h2></div>
+          <button class="play-button" id="mediaPlayButton" type="button" disabled aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7Z" /></svg>
+            Play
+          </button>
+        </div>
+        <label class="drop-zone" id="mediaDropZone">
+          <input id="mediaInput" type="file" accept="image/*,video/*,.gif" />
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" /></svg>
+          <strong>Choose a GIF or video</strong>
+          <span>Processed on this device — never uploaded</span>
+        </label>
+        <div class="media-name" id="mediaName" hidden></div>
+        <div class="two-up">
+          <label class="field field--select"><span>Crop</span><select id="mediaFit"><option value="cover">Fill square</option><option value="contain">Fit all</option></select></label>
+          <label class="field field--select"><span>Frame rate</span><select id="mediaFps"><option value="6">6 FPS</option><option value="8">8 FPS</option><option value="10" selected>10 FPS</option><option value="12">12 FPS</option></select></label>
+        </div>
+        <label class="range-control range-control--wide"><span>Light threshold <output id="thresholdOutput">132</output></span><input id="threshold" type="range" min="35" max="225" value="132" /></label>
+        <label class="toggle-row"><span><strong>Pixel dithering</strong><small>Preserves detail in photos and video.</small></span><input id="ditherToggle" type="checkbox" checked /></label>
+        <img id="imageSource" alt="" hidden />
+        <video id="videoSource" muted loop playsinline hidden></video>
+        <canvas id="sourceCanvas" width="128" height="128" hidden></canvas>
+      </section>
+
+      <section class="control-panel settings-panel">
+        <div class="section-heading"><div><p class="eyebrow">Optics</p><h2>Display alignment</h2></div></div>
+        <label class="range-control range-control--wide"><span>Brightness <output id="brightnessOutput">72%</output></span><input id="brightness" type="range" min="8" max="255" value="184" /></label>
+        <div class="toggle-grid">
+          <label class="toggle-row"><span><strong>Mirror for cube</strong><small>Corrects the beam-splitter reflection.</small></span><input id="mirrorToggle" type="checkbox" checked /></label>
+          <label class="toggle-row"><span><strong>Invert light</strong><small>Swap lit and dark pixels.</small></span><input id="invertToggle" type="checkbox" /></label>
+        </div>
+        <label class="field field--select"><span>Rotation</span><select id="rotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Makeable Hologram · BLE-only</span>
+      <button id="footerHelpButton" type="button">Firmware &amp; wiring</button>
+    </footer>
+
+    <dialog id="helpDialog" class="help-dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Build guide</p><h2>Firmware &amp; wiring</h2></div>
+        <button id="closeHelpButton" class="icon-button" type="button" aria-label="Close instructions">×</button>
+      </div>
+      <ol class="setup-steps">
+        <li><span>1</span><div><strong>Flash the ESP32-C3</strong><p>Use the compiled firmware or build the included Arduino source.</p><a href="/hologram/firmware/hologram-c3-supermini.bin" download>Download firmware binary</a></div></li>
+        <li><span>2</span><div><strong>Wire the SH1107 OLED</strong><p>VCC → 3.3V · GND → GND · SDA → GPIO 8 · SCL → GPIO 9. Firmware probes 0x3C, then 0x3D.</p></div></li>
+        <li><span>3</span><div><strong>Power and connect</strong><p>Power the Super Mini by rear-facing USB-C, open this page in a supported browser, and tap Connect.</p></div></li>
+      </ol>
+      <div class="browser-note"><strong>Browser support</strong><p>Direct BLE works in Chrome or Edge on Android, macOS, and Windows. iOS Safari/Chrome do not expose Web Bluetooth; preview remains available.</p></div>
+      <a class="source-link" href="/hologram/firmware/hologram-c3-source.zip" download>Download firmware source and protocol documentation</a>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>
