@@ -133,6 +133,43 @@ test("deterministic fallback adds an FS90R wheel kit without inventing a two-pin
   }
 });
 
+test("deterministic display selection follows the interface instead of defaulting to a tiny OLED", async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), "makeable-builds-"));
+  const store = createLocalBuildStore(path.join(temp, "builds.jsonl"));
+  const build = async (idea) => createBuild(
+    { idea, email: "maker@example.com" },
+    { env: { MAKEABLE_FORCE_BUILD_FALLBACK: "1" }, store },
+  );
+
+  try {
+    const dashboard = await build("a vertical air quality dashboard with color trends and touch controls");
+    assert.ok(dashboard.body.parts.some((part) => /ESP32-C6 1\.47inch IPS Touch Display/i.test(part.name)));
+    assert.ok(!dashboard.body.parts.some((part) => /0\.91-inch/i.test(part.name)));
+    assert.equal(dashboard.body.parts.filter((part) => part.category === "controller").length, 1);
+
+    const timer = await build("a retro kitchen countdown timer with a 16x2 character LCD");
+    assert.ok(timer.body.parts.some((part) => /16x2|LC1602/i.test(`${part.name} ${part.subtype}`)));
+    assert.ok(!timer.body.parts.some((part) => /0\.91-inch/i.test(part.name)));
+
+    const companion = await build("a friendly desk companion with a color animated face");
+    assert.ok(companion.body.parts.some((part) => part.asin === "B0H2HL5ZQY"));
+    assert.ok(!companion.body.parts.some((part) => /0\.91-inch/i.test(part.name)));
+
+    const wearable = await build("a tiny wearable single-line status tag");
+    assert.ok(wearable.body.parts.some((part) => /0\.91-inch/i.test(part.name)));
+
+    const lamp = await build("a motion-triggered bedside lamp");
+    assert.ok(!lamp.body.parts.some((part) => part.category === "display" || /display|oled|lcd|tft|ips/i.test(`${part.name} ${part.subtype}`)));
+
+    const plant = await build("a compact plant soil moisture monitor placed directly in the soil");
+    assert.ok(plant.body.parts.some((part) => /ESP32-C6 1\.47inch IPS Touch Display/i.test(part.name)));
+    assert.ok(!plant.body.parts.some((part) => /0\.91-inch/i.test(part.name)));
+    assert.ok(plant.body.warnings.some((warning) => /does not currently include a dimension-verified capacitive soil-moisture sensor/i.test(warning)));
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
 test("servo and Dupont geometry is dimension-backed without exposing the internal cable", async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), "makeable-builds-"));
   const store = createLocalBuildStore(path.join(temp, "builds.jsonl"));
@@ -328,9 +365,9 @@ test("ESP32-compatible peripherals stay peripherals and fill explicit input/outp
 
     assert.equal(result.status, 201);
     assert.equal(result.body.parts.filter((part) => part.category === "controller").length, 1);
-    assert.ok(result.body.parts.some((part) => part.category === "input" && /touch/i.test(part.name)));
+    assert.ok(result.body.parts.some((part) => /touch/i.test(`${part.name} ${part.subtype}`)));
     assert.ok(result.body.parts.some((part) => part.category === "output" && /rgb.*led/i.test(part.name)));
-    assert.ok(result.body.parts.some((part) => part.category === "display"));
+    assert.ok(result.body.parts.some((part) => /display|oled|lcd|tft|ips/i.test(`${part.name} ${part.subtype}`)));
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
@@ -424,7 +461,7 @@ test("image prompt stays inside a printable enclosure and avoids literal pets or
     );
 
     assert.equal(result.status, 201);
-    assert.equal(imagePayload.quality, "low");
+    assert.equal(imagePayload.quality, "medium");
     assert.match(imagePayload.prompt, /physically credible project-documentation photograph/i);
     assert.match(imagePayload.prompt, /User intent:/i);
     assert.match(imagePayload.prompt, /without turning every idea into the same box/i);
@@ -433,7 +470,7 @@ test("image prompt stays inside a printable enclosure and avoids literal pets or
     assert.match(imagePayload.prompt, /no physical mascot/i);
     assert.match(imagePayload.prompt, /only as a simple low-resolution pixel graphic inside the selected display/i);
     assert.match(imagePayload.prompt, /zero screws, zero bolts/i);
-    assert.match(imagePayload.prompt, /seamless white-to-light-gray cyclorama/i);
+    assert.match(imagePayload.prompt, /seamless medium cool-gray sweep/i);
     assert.match(imagePayload.prompt, /No wooden table/i);
     assert.match(imagePayload.prompt, /USB-C cutout belongs on the unseen rear or underside/i);
     assert.match(imagePayload.prompt, /must not be visible anywhere in the final hero photograph/i);
@@ -545,9 +582,29 @@ test("render brief separates retro Macintosh, exposed mechanisms, and translucen
     behavior: "Shows status on the selected display.",
     parts: [controller, display, cable],
   });
-  assert.match(translucent.designBrief.visibilityStrategy, /translucent PETG rear\/service shell/i);
+  assert.match(translucent.designBrief.visibilityStrategy, /translucent PETG service panel/i);
   assert.match(translucent.prompt, /reveals only exact selected dimension-verified parts/i);
   assert.match(translucent.prompt, /never a dome or decorative bubble/i);
+});
+
+test("plant renders use one compact soil stake and fail closed without a verified sensor", () => {
+  const catalog = verifiedPartsCatalog();
+  const displayController = catalog.find((part) => /ESP32-C6 1\.47inch IPS Touch Display/i.test(part.name));
+  assert.ok(displayController);
+
+  const plant = createBuildImagePrompt({
+    idea: "a compact plant soil moisture monitor placed directly in the soil",
+    title: "Plant soil monitor",
+    behavior: "Shows plant status on the selected display.",
+    parts: [displayController],
+  });
+
+  assert.match(plant.prompt, /Plant\/soil fail-closed contract/i);
+  assert.match(plant.prompt, /one compact above-soil environmental stake/i);
+  assert.match(plant.prompt, /do not show a sensing blade, separate probe, external cable/i);
+  assert.match(plant.prompt, /seamless medium cool-gray sweep/i);
+  assert.match(plant.designBrief.signatureSilhouette, /compact upright above-soil environmental stake/i);
+  assert.doesNotMatch(plant.designBrief.signatureSilhouette, /leaf-like arch/i);
 });
 
 test("Netlify AI Gateway routing is honored without a direct-OpenAI service tier", async () => {
