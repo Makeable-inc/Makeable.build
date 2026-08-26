@@ -132,6 +132,20 @@ test("rear USB and magnetic reed sensing remain hidden in hero guidance", () => 
   assert.match(promptBlock, /service opening must be completely outside the hero camera view/i);
 });
 
+test("qualified soil-moisture sensor has a connector-aware geometry profile", () => {
+  const sensor = verifiedPartsCatalog().find((part) => part.asin === "B0DYDN9RG4");
+  assert.ok(sensor);
+
+  const geometry = componentGeometryForPart(sensor);
+  assert.equal(geometry.verified, true);
+  assert.equal(geometry.profileId, "diyables-capacitive-soil-moisture-tlc555i");
+  assert.equal(geometry.body.widthMm, 23);
+  assert.equal(geometry.body.heightMm, 98);
+  assert.match(geometry.pinOrientation, /factory-soldered/i);
+  assert.ok(geometry.keepouts.some((item) => item.type === "connector-cable-bend"));
+  assert.equal(geometry.dimensionSourceUrl, "https://diyables.io/products/capacitive-soil-moisture-sensor-module");
+});
+
 function assertAabbContains(container, item, label) {
   assert.ok(item.minX >= container.minX, `${label} minX`);
   assert.ok(item.maxX <= container.maxX, `${label} maxX`);

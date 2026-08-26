@@ -18,15 +18,16 @@ test("verified parts catalog exposes the full pre-soldered source library", () =
   const stats = catalogStats();
   const catalog = verifiedPartsCatalog();
 
-  assert.equal(stats.total, 80);
-  assert.equal(stats.presolderedVerified, 80);
-  assert.equal(catalog.length, 80);
+  assert.equal(stats.total, 81);
+  assert.equal(stats.presolderedVerified, 81);
+  assert.equal(catalog.length, 81);
   assert.ok(catalog.every((part) => part.presoldered));
   assert.ok(catalog.filter((part) => part.modelSelectable).every((part) => /^\d{4}-\d{2}-\d{2}$/.test(part.checkedDate)));
   assert.ok(catalog.some((part) => part.name.includes("Seeed Studio XIAO ESP32C3")));
   assert.ok(catalog.some((part) => /VL53L1X/i.test(`${part.name} ${part.subtype}`)));
   assert.ok(catalog.some((part) => /FS90R/i.test(`${part.name} ${part.subtype}`)));
   assert.ok(catalog.some((part) => /2P.*Female-to-Female Dupont/i.test(`${part.name} ${part.subtype}`)));
+  assert.ok(catalog.some((part) => part.asin === "B0DYDN9RG4" && /soil moisture/i.test(part.name)));
 
   const bme280 = catalog.find((part) => /BME280/i.test(part.name));
   const ambientLight = catalog.find((part) => /BH1750/i.test(`${part.name} ${part.subtype}`));
@@ -163,8 +164,9 @@ test("deterministic display selection follows the interface instead of defaultin
 
     const plant = await build("a compact plant soil moisture monitor placed directly in the soil");
     assert.ok(plant.body.parts.some((part) => /ESP32-C6 1\.47inch IPS Touch Display/i.test(part.name)));
+    assert.ok(plant.body.parts.some((part) => part.asin === "B0DYDN9RG4"));
     assert.ok(!plant.body.parts.some((part) => /0\.91-inch/i.test(part.name)));
-    assert.ok(plant.body.warnings.some((warning) => /does not currently include a dimension-verified capacitive soil-moisture sensor/i.test(warning)));
+    assert.ok(!plant.body.warnings.some((warning) => /does not currently include a dimension-verified capacitive soil-moisture sensor/i.test(warning)));
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
