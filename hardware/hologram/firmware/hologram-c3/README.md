@@ -27,6 +27,15 @@ Required Arduino libraries:
 - Adafruit GFX Library
 - Adafruit SH110X
 
+Use Espressif's Arduino-ESP32 core `3.3.6` for this ESP32-C3 build. Core
+`3.3.7` and later can crash inside the Bluetooth controller during
+`NimBLEDevice::init()` on affected hardware revisions. Install the pinned core
+before compiling:
+
+```sh
+arduino-cli core install esp32:esp32@3.3.6
+```
+
 From the Makeable repository root:
 
 ```sh
@@ -55,4 +64,3 @@ presented it.
 
 See `protocol.h` and `/hologram/ble-protocol.js` for the matching binary
 protocol constants.
-
