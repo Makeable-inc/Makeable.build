@@ -1,6 +1,6 @@
 {
   "name": "Makeable Hologram",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "board": "Nologo ESP32C3 Super Mini",
   "fqbn": "esp32:esp32:nologo_esp32c3_super_mini",
   "arduinoCore": "esp32:esp32@3.3.6",
@@ -10,5 +10,5 @@
   "format": "merged flash image",
   "flashOffset": "0x0",
   "sizeBytes": 4194304,
-  "sha256": "ae2e356733e4cdb50755f043f2006594c64a8d579593e20c1ff41fba5bfb8f46"
+  "sha256": "6468cada505550af252c33fe7c18d9dfd1f1c09f52c398697d06407badf52cb7"
 }

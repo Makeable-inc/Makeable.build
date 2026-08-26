@@ -289,6 +289,10 @@ void loop() {
   if (framePending) {
     const uint32_t startedAt = millis();
     const uint16_t sequence = pendingFrameSequence;
+    // Direct buffer writes bypass Adafruit_GrayOLED's dirty-window tracking.
+    // clearDisplay() marks the complete panel dirty before the received frame
+    // replaces the cleared bytes, ensuring display() transfers every page.
+    display.clearDisplay();
     memcpy(display.getBuffer(), stagingFrame, FRAME_BYTES);
     display.display();
     const uint8_t renderMs = static_cast<uint8_t>(min<uint32_t>(255, millis() - startedAt));
