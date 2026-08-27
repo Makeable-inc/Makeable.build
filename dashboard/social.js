@@ -1,5 +1,6 @@
 import { buildSocialView, mediaKind } from "./social-model.js";
 import { renderSocialAccounts } from "./social-account-table.js";
+import { renderSocialChart } from "./social-chart.js";
 
 const numberFormatter = new Intl.NumberFormat();
 const compactFormatter = new Intl.NumberFormat(undefined, {
@@ -99,7 +100,7 @@ function socialElements() {
     ...elementMap("social", [
       "importButton", "csvInput", "importStatus", "rankBy", "exposures",
       "engagementRate", "websiteSessions", "websiteVisitRate", "followers",
-      "posts", "updated", "chartWrap", "chart", "chartDescription",
+      "posts", "updated", "chartWrap", "chart",
       "accountRows", "accountCount", "contentGrid", "contentCount", "emptyState",
     ]),
     ...elementMap("media", [
@@ -157,90 +158,7 @@ function render(state, els, options) {
 }
 
 function renderChart(state, els) {
-  const chart = els.chart;
-  chart.replaceChildren();
-  const data = state.view.daily;
-  const width = Math.max(320, Math.round(els.chartWrap.clientWidth || 1200));
-  const height = Math.max(220, Math.round(els.chartWrap.clientHeight || 286));
-  const padding = { top: 18, right: width < 600 ? 40 : 48, bottom: 34, left: width < 600 ? 38 : 50 };
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-  const impressionsMax = niceMaximum(Math.max(1, ...data.map((point) => point.impressions)));
-  const rates = data.map((point) => point.engagementRate).filter(Number.isFinite);
-  const rateMax = Math.max(0.1, ...rates);
-  const xStep = innerWidth / Math.max(data.length, 1);
-  chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  for (let index = 0; index <= 4; index += 1) {
-    const y = padding.top + innerHeight - (innerHeight * index) / 4;
-    chart.append(svg("line", {
-      class: "social-chart-grid",
-      x1: padding.left,
-      x2: width - padding.right,
-      y1: y,
-      y2: y,
-    }));
-    const label = svg("text", {
-      class: "social-chart-label",
-      x: padding.left - 10,
-      y: y + 4,
-      "text-anchor": "end",
-    });
-    label.textContent = compactFormatter.format((impressionsMax * index) / 4);
-    chart.append(label);
-    const rateLabel = svg("text", {
-      class: "social-chart-label social-chart-rate-label",
-      x: width - padding.right + 9,
-      y: y + 4,
-      "text-anchor": "start",
-    });
-    rateLabel.textContent = optionalPercent((rateMax * index) / 4);
-    chart.append(rateLabel);
-  }
-  data.forEach((point, index) => {
-    const barWidth = Math.max(3, Math.min(18, xStep * 0.64));
-    const barHeight = (point.impressions / impressionsMax) * innerHeight;
-    const bar = svg("rect", {
-      class: "social-chart-bar",
-      x: padding.left + index * xStep + (xStep - barWidth) / 2,
-      y: padding.top + innerHeight - barHeight,
-      width: barWidth,
-      height: barHeight,
-      rx: Math.min(3, barWidth / 3),
-    });
-    const title = svg("title");
-    title.textContent = `${dateFormatter.format(new Date(`${point.date}T00:00:00Z`))}: ${numberFormatter.format(point.impressions)} content exposures`;
-    bar.append(title);
-    chart.append(bar);
-  });
-  const points = data.flatMap((point, index) => Number.isFinite(point.engagementRate)
-    ? [{
-        index,
-        position: [
-          padding.left + index * xStep + xStep / 2,
-          padding.top + innerHeight - (point.engagementRate / rateMax) * innerHeight,
-        ],
-      }]
-    : []);
-  if (points.length) {
-    chart.append(svg("path", {
-      class: "social-chart-line",
-      d: linePath(points.map((point) => point.position)),
-    }));
-    points.forEach(({ index, position }) => {
-      const dot = svg("circle", {
-        class: "social-chart-dot",
-        cx: position[0],
-        cy: position[1],
-        r: data.length < 16 ? 3 : 2,
-      });
-      const title = svg("title");
-      title.textContent = `${dateFormatter.format(new Date(`${data[index].date}T00:00:00Z`))}: ${optionalPercent(data[index].engagementRate)} engagement rate`;
-      dot.append(title);
-      chart.append(dot);
-    });
-  }
-  labelDates(chart, data, padding, innerWidth, height, width < 600 ? 4 : 7);
-  els.chartDescription.textContent = `${data.length} daily points showing content exposures as blue bars and measured engagement rate as a green line.`;
+  renderSocialChart({ chart: els.chart, chartWrap: els.chartWrap, data: state.view.daily });
 }
 
 function renderContent(view, els) {
@@ -373,23 +291,6 @@ function setImportState(els, busy, message, tone = "") {
   els.importStatus.className = `import-status${tone ? ` is-${tone}` : ""}`;
 }
 
-function labelDates(chart, data, padding, innerWidth, height, maximum) {
-  if (!data.length) return;
-  const count = Math.min(maximum, data.length);
-  const indexes = [...new Set(Array.from({ length: count }, (_, index) =>
-    Math.round((index / Math.max(1, count - 1)) * (data.length - 1))))];
-  indexes.forEach((index) => {
-    const label = svg("text", {
-      class: "social-chart-label",
-      x: padding.left + ((index + 0.5) / data.length) * innerWidth,
-      y: height - 9,
-      "text-anchor": index === 0 ? "start" : index === data.length - 1 ? "end" : "middle",
-    });
-    label.textContent = dateFormatter.format(new Date(`${data[index].date}T00:00:00Z`));
-    chart.append(label);
-  });
-}
-
 function metaRow(record) {
   const row = document.createElement("div");
   row.className = "content-card-meta";
@@ -418,18 +319,6 @@ function textElement(name, value, className = "") {
   if (className) element.className = className;
   element.textContent = value;
   return element;
-}
-function svg(name, attributes = {}) {
-  const element = document.createElementNS("http://www.w3.org/2000/svg", name);
-  Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
-  return element;
-}
-function linePath(points) {
-  return points.map((point, index) => `${index ? "L" : "M"} ${point[0]} ${point[1]}`).join(" ");
-}
-function niceMaximum(value) {
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  return Math.ceil(value / magnitude) * magnitude;
 }
 function compact(value) {
   return compactFormatter.format(Number(value) || 0);

@@ -275,8 +275,19 @@
   font-size: 11px;
 }
 
+.social-chart-axis-name {
+  fill: var(--text-soft);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 560;
+}
+
 .social-chart-rate-label {
   fill: var(--success);
+}
+
+.chart-legend .legend-social-engagement::before {
+  background: var(--success);
 }
 
 .social-chart-bar {

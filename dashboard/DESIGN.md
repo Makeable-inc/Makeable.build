@@ -172,6 +172,20 @@ Spacing intent derives from a 4px base.
 - **Accessibility**: status is visible text, not color alone, and follows the
   content-exposure metric in reading order.
 
+### Social performance chart
+
+- **Structure**: blue content-exposure bars, a green measured engagement-rate
+  line, explicit left-axis name `Content exposures`, explicit right-axis name
+  `Engagement rate`, date labels, and a persistent SVG description.
+- **Metric truth**: an unknown or partial engagement-rate day breaks the green
+  line. Separate measured runs render as separate path segments so the chart
+  never implies continuity through an unmeasured day.
+- **Accessibility**: the rendered SVG retains the description referenced by
+  `aria-labelledby`; the description names both measures and both axes. Axis
+  names are exposed as text in the SVG rather than inferred from numeric ticks.
+- **Color**: the engagement-rate line, dots, and legend swatch use the existing
+  `--success` percentage/status token. Content exposures use `--accent`.
+
 ### Social content card
 
 - **Structure**: 16:9 media frame, play control, platform/account metadata,

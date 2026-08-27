@@ -1,4 +1,6 @@
+import { createOverview } from "./overview.js";
 import { createSocialDashboard } from "./social.js";
+import { createWaitlistView } from "./waitlist.js";
 
 const state = {
   records: [],
@@ -54,30 +56,12 @@ const els = {
 };
 
 const numberFormatter = new Intl.NumberFormat();
-const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
-const chartDateFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-});
-const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, {
-  numeric: "auto",
-});
-const compactFormatter = new Intl.NumberFormat(undefined, {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const MS_PER_DAY = 86_400_000;
-
+const overview = createOverview({ state, els });
+const waitlist = createWaitlistView({ state, els });
 const socialDashboard = createSocialDashboard({
   onReport(view) {
     state.socialView = view;
-    renderOverview();
+    overview.render();
   },
   onUnauthorized() {
     showAuth();
@@ -97,7 +81,7 @@ els.dashboardSection.addEventListener("change", () => {
 document.querySelectorAll("[data-open-section]").forEach((button) => {
   button.addEventListener("click", () => setDashboardSection(button.dataset.openSection));
 });
-els.searchInput.addEventListener("input", renderTable);
+els.searchInput.addEventListener("input", waitlist.renderTable);
 els.rangeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     state.chartRange = button.dataset.range === "all" ? "all" : Number(button.dataset.range);
@@ -105,10 +89,10 @@ els.rangeButtons.forEach((button) => {
       item.classList.toggle("is-selected", item === button);
       item.setAttribute("aria-pressed", String(item === button));
     });
-    renderChart();
+    waitlist.renderChart();
   });
 });
-window.addEventListener("resize", renderChart);
+window.addEventListener("resize", waitlist.renderChart);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && !els.dashboardView.hidden) {
     void refreshActiveSection();
@@ -147,10 +131,7 @@ async function authenticate(event) {
   try {
     const response = await fetch("/api/dashboard/session", {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({ accessKey }),
     });
     const payload = await response.json().catch(() => ({}));
@@ -173,10 +154,7 @@ function toggleAccessKeyVisibility() {
   const isVisible = els.accessKey.type === "text";
   els.accessKey.type = isVisible ? "password" : "text";
   els.toggleAccessKey.setAttribute("aria-pressed", String(!isVisible));
-  els.toggleAccessKey.setAttribute(
-    "aria-label",
-    isVisible ? "Show access key" : "Hide access key",
-  );
+  els.toggleAccessKey.setAttribute("aria-label", isVisible ? "Show access key" : "Hide access key");
   els.accessKey.focus();
 }
 
@@ -201,9 +179,7 @@ function showAuth() {
 async function loadDashboard(options = {}) {
   if (options.manageButton !== false) setButtonBusy(els.refreshButton, true);
   try {
-    const response = await fetch("/api/dashboard", {
-      headers: { Accept: "application/json" },
-    });
+    const response = await fetch("/api/dashboard", { headers: { Accept: "application/json" } });
     if (response.status === 401) {
       showAuth();
       els.authError.textContent = "Your dashboard session expired. Enter the access key again.";
@@ -211,13 +187,12 @@ async function loadDashboard(options = {}) {
     }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || "Live signup data could not be loaded.");
-    state.records = Array.isArray(payload.records)
-      ? payload.records.filter(validRecord)
-      : [];
+    state.records = Array.isArray(payload.records) ? payload.records.filter(validRecord) : [];
     state.activity = Array.isArray(payload.activity) ? payload.activity : [];
     state.report = payload;
     state.generatedAt = payload.generatedAt || new Date().toISOString();
-    renderDashboard();
+    waitlist.renderDashboard();
+    overview.render();
   } catch (error) {
     showToast(error instanceof Error ? error.message : "Dashboard refresh failed");
   } finally {
@@ -233,10 +208,7 @@ async function refreshActiveSection(options = {}) {
     } else if (state.currentSection === "waitlist") {
       await loadDashboard({ manageButton: false });
     } else {
-      await Promise.all([
-        loadDashboard({ manageButton: false }),
-        socialDashboard.load(),
-      ]);
+      await Promise.all([loadDashboard({ manageButton: false }), socialDashboard.load()]);
     }
     if (options.announce) showToast("Dashboard refreshed");
   } finally {
@@ -256,393 +228,18 @@ function setDashboardSection(section) {
   els.downloadButton.hidden = next !== "waitlist";
   document.title = `${next === "social" ? "Social" : next === "waitlist" ? "Waitlist" : "Growth"} dashboard · Makeable`;
   if (next === "social") socialDashboard.show();
-  if (next === "waitlist") window.requestAnimationFrame(renderChart);
+  if (next === "waitlist") window.requestAnimationFrame(waitlist.renderChart);
 }
 
 function validRecord(record) {
-  return (
-    record &&
-    typeof record.email === "string" &&
-    typeof record.createdAt === "string" &&
-    !Number.isNaN(new Date(record.createdAt).getTime())
-  );
-}
-
-function renderDashboard() {
-  const report = state.report || {};
-  els.totalMetric.textContent = numberFormatter.format(Number(report.total) || 0);
-  els.builderMetric.textContent = numberFormatter.format(Number(report.builderAccountsTotal) || 0);
-  els.projectMetric.textContent = numberFormatter.format(Number(report.publicProjectsTotal) || 0);
-  els.ownerMetric.textContent = numberFormatter.format(Number(report.projectOwnersTotal) || 0);
-  els.todayMetric.textContent = numberFormatter.format(Number(report.todayTotal) || 0);
-  els.activeMetric.textContent = numberFormatter.format(Number(report.activeTodayTotal) || 0);
-  els.chartTotal.textContent = numberFormatter.format(Number(report.total) || 0);
-  els.lastUpdated.textContent = `Updated ${relativeTimestamp(state.generatedAt)}`;
-  const health = report.dataHealth || {};
-  const missing = Number(health.builderAccountsMissingFromWaitlist) || 0;
-  const unmatched = Number(health.unmatchedProjectOwners) || 0;
-  els.dataHealth.textContent = missing || unmatched
-    ? `Data check: ${numberFormatter.format(missing)} builder accounts are not yet stored in the waitlist and ${numberFormatter.format(unmatched)} project owners could not be matched. Email addresses stay inside this authenticated dashboard.`
-    : "Data check passed: every builder account and project owner is matched. Email addresses stay inside this authenticated dashboard and are not sent to PostHog.";
-  renderChart();
-  renderTable();
-  renderOverview();
-}
-
-function renderOverview() {
-  const report = state.report || {};
-  const social = state.socialView || {
-    totalExposures: 0,
-    totalEngagements: 0,
-    engagementRate: null,
-    attributionStatus: "not_connected",
-    websiteSessions: null,
-    websiteVisitRate: null,
-    followersGained: 0,
-  };
-  els.overviewExposures.textContent = compactFormatter.format(social.totalExposures || 0);
-  els.overviewEngagements.textContent = compactFormatter.format(social.totalEngagements || 0);
-  els.overviewEngagementRate.textContent = formatOptionalPercent(social.engagementRate);
-  els.overviewFollowers.textContent = formatOptionalSigned(social.followersGained);
-  els.overviewContacts.textContent = numberFormatter.format(Number(report.total) || 0);
-  els.overviewBuilders.textContent = numberFormatter.format(Number(report.builderAccountsTotal) || 0);
-  els.overviewSocialRows.replaceChildren();
-  appendPulseRow(
-    els.overviewSocialRows,
-    "Content exposures",
-    compactFormatter.format(social.totalExposures || 0),
-  );
-  appendPulseRow(
-    els.overviewSocialRows,
-    "Engagement rate",
-    formatOptionalPercent(social.engagementRate),
-  );
-  if (social.attributionStatus === "connected") {
-    appendPulseRow(
-      els.overviewSocialRows,
-      "Website conversions",
-      numberFormatter.format(social.websiteSessions),
-    );
-    appendPulseRow(
-      els.overviewSocialRows,
-      "Website visit rate",
-      formatOptionalPercent(social.websiteVisitRate),
-    );
-  } else {
-    appendPulseRow(
-      els.overviewSocialRows,
-      "Website attribution",
-      social.attributionStatus === "unavailable" ? "Unavailable" : "Not connected",
-    );
-  }
-  els.overviewWaitlistRows.replaceChildren();
-  appendPulseRow(els.overviewWaitlistRows, "New contacts today", numberFormatter.format(Number(report.todayTotal) || 0));
-  appendPulseRow(els.overviewWaitlistRows, "Active today", numberFormatter.format(Number(report.activeTodayTotal) || 0));
-  appendPulseRow(els.overviewWaitlistRows, "Published projects", numberFormatter.format(Number(report.publicProjectsTotal) || 0));
-}
-
-function appendPulseRow(container, label, value) {
-  const row = document.createElement("div");
-  const name = document.createElement("strong");
-  const metric = document.createElement("span");
-  row.className = "pulse-row";
-  name.textContent = label;
-  metric.textContent = value;
-  row.append(name, metric);
-  container.append(row);
-}
-
-function formatOptionalPercent(value) {
-  return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "—";
-}
-
-function formatOptionalSigned(value) {
-  if (!Number.isFinite(value)) return "—";
-  return `${value > 0 ? "+" : ""}${numberFormatter.format(value)}`;
-}
-
-function countSince(date) {
-  const threshold = date.getTime();
-  return state.records.reduce(
-    (count, record) =>
-      new Date(record.createdAt).getTime() >= threshold ? count + 1 : count,
-    0,
-  );
-}
-
-function renderChart() {
-  const chart = els.growthChart;
-  chart.replaceChildren();
-  const data = chartSeries(state.records, state.chartRange);
-  const width = Math.max(320, Math.round(els.chartWrap.clientWidth || 1200));
-  const height = Math.max(220, Math.round(els.chartWrap.clientHeight || 320));
-  const padding = {
-    top: 18,
-    right: 12,
-    bottom: width < 600 ? 34 : 38,
-    left: width < 600 ? 36 : 49,
-  };
-  chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-  const maximum = Math.max(1, ...data.map((point) => point.value));
-  const yMaximum = niceMaximum(maximum);
-  const xAt = (index) =>
-    padding.left + (data.length <= 1 ? 0 : (index / (data.length - 1)) * innerWidth);
-  const yAt = (value) =>
-    padding.top + innerHeight - (value / yMaximum) * innerHeight;
-
-  const defs = svgElement("defs");
-  const gradient = svgElement("linearGradient", {
-    id: "areaGradient",
-    x1: "0",
-    x2: "0",
-    y1: "0",
-    y2: "1",
-  });
-  gradient.append(
-    svgElement("stop", {
-      offset: "0%",
-      "stop-color": "#247cff",
-      "stop-opacity": "0.48",
-    }),
-    svgElement("stop", {
-      offset: "52%",
-      "stop-color": "#1d64c8",
-      "stop-opacity": "0.17",
-    }),
-    svgElement("stop", {
-      offset: "100%",
-      "stop-color": "#10243d",
-      "stop-opacity": "0",
-    }),
-  );
-  defs.append(gradient);
-  chart.append(defs);
-
-  for (let index = 0; index <= 4; index += 1) {
-    const value = (yMaximum / 4) * index;
-    const y = yAt(value);
-    chart.append(
-      svgElement("line", {
-        class: "chart-grid",
-        x1: padding.left,
-        x2: width - padding.right,
-        y1: y,
-        y2: y,
-      }),
-    );
-    const label = svgElement("text", {
-      class: "chart-label",
-      x: padding.left - 12,
-      y: y + 4,
-      "text-anchor": "end",
-    });
-    label.textContent = compactNumber(value);
-    chart.append(label);
-  }
-
-  const xLabelIndexes = evenlySpacedIndexes(data.length, width < 600 ? 4 : 7);
-  xLabelIndexes.forEach((index) => {
-    const label = svgElement("text", {
-      class: "chart-label",
-      x: xAt(index),
-      y: height - 10,
-      "text-anchor":
-        index === 0 ? "start" : index === data.length - 1 ? "end" : "middle",
-    });
-    label.textContent = chartDateFormatter.format(data[index].date);
-    chart.append(label);
-  });
-
-  const dailyMaximum = Math.max(1, ...data.flatMap((point) => [
-    point.newContacts,
-    point.newBuilders,
-    point.projects,
-  ]));
-  const stepWidth = innerWidth / Math.max(data.length - 1, 1);
-  const groupWidth = Math.max(4.5, Math.min(28, stepWidth * 0.72));
-  const barWidth = groupWidth / 3;
-  data.forEach((point, index) => {
-    const values = [
-      ["contact", point.newContacts, "new contacts"],
-      ["builder", point.newBuilders, "new builders"],
-      ["project", point.projects, "projects"],
-    ];
-    values.forEach(([kind, rawValue, label], seriesIndex) => {
-      const value = Number(rawValue) || 0;
-      const barHeight = value ? Math.max(3, (innerHeight * 0.32 * value) / dailyMaximum) : 0;
-      const bar = svgElement("rect", {
-        class: `chart-bar chart-bar-${kind}`,
-        x: xAt(index) - groupWidth / 2 + seriesIndex * barWidth,
-        y: padding.top + innerHeight - barHeight,
-        width: barWidth,
-        height: barHeight,
-        rx: Math.min(2, Math.max(0.5, barWidth * 0.15)),
-      });
-      const title = svgElement("title");
-      title.textContent = `${chartDateFormatter.format(point.date)}: ${value} ${label}`;
-      bar.append(title);
-      chart.append(bar);
-    });
-  });
-
-  const points = data.map((point, index) => [xAt(index), yAt(point.value)]);
-  const linePath = smoothPath(points);
-  const baseline = yAt(0);
-  const areaPath = `${linePath} L ${points.at(-1)[0]} ${baseline} L ${points[0][0]} ${baseline} Z`;
-  chart.append(
-    svgElement("path", { class: "chart-area", d: areaPath }),
-    svgElement("path", { class: "chart-line-glow", d: linePath }),
-    svgElement("path", { class: "chart-line", d: linePath }),
-  );
-
-  const focusLine = svgElement("line", {
-    class: "chart-focus-line",
-    x1: points.at(-1)[0],
-    x2: points.at(-1)[0],
-    y1: padding.top,
-    y2: baseline,
-  });
-  const focusDot = svgElement("circle", {
-    class: "chart-focus-dot",
-    cx: points.at(-1)[0],
-    cy: points.at(-1)[1],
-    r: 4,
-  });
-  focusLine.setAttribute("visibility", "hidden");
-  focusDot.setAttribute("visibility", "hidden");
-  chart.append(focusLine, focusDot);
-
-  const hitArea = svgElement("rect", {
-    class: "chart-hit-area",
-    x: padding.left,
-    y: padding.top,
-    width: innerWidth,
-    height: innerHeight,
-  });
-  hitArea.addEventListener("pointermove", (event) => {
-    const rect = chart.getBoundingClientRect();
-    const relativeX = Math.min(
-      innerWidth,
-      Math.max(0, ((event.clientX - rect.left) / rect.width) * width - padding.left),
-    );
-    const index = Math.round((relativeX / innerWidth) * (data.length - 1));
-    const point = points[index];
-    focusLine.setAttribute("visibility", "visible");
-    focusDot.setAttribute("visibility", "visible");
-    focusLine.setAttribute("x1", point[0]);
-    focusLine.setAttribute("x2", point[0]);
-    focusDot.setAttribute("cx", point[0]);
-    focusDot.setAttribute("cy", point[1]);
-    showChartTooltip(event, data[index]);
-  });
-  hitArea.addEventListener("pointerleave", () => {
-    focusLine.setAttribute("visibility", "hidden");
-    focusDot.setAttribute("visibility", "hidden");
-    els.chartTooltip.hidden = true;
-  });
-  chart.append(hitArea);
-}
-
-function chartSeries(_records, range) {
-  const activity = state.activity.map((point) => ({
-    date: new Date(`${point.date}T00:00:00.000Z`),
-    value: Number(point.totalContacts) || 0,
-    newContacts: Number(point.newContacts) || 0,
-    newBuilders: Number(point.newBuilders) || 0,
-    projects: Number(point.projects) || 0,
-  }));
-  if (!activity.length) {
-    return [{
-      date: startOfLocalDay(new Date()),
-      value: 0,
-      newContacts: 0,
-      newBuilders: 0,
-      projects: 0,
-    }];
-  }
-  return range === "all" ? activity : activity.slice(-range);
-}
-
-function renderTable() {
-  const query = els.searchInput.value.trim().toLowerCase();
-  const filtered = query
-    ? state.records.filter((record) =>
-        `${record.name || ""} ${record.email} ${record.latestProject || ""}`
-          .toLowerCase()
-          .includes(query),
-      )
-    : state.records;
-  els.signupRows.replaceChildren();
-  filtered.forEach((record) => {
-    const row = document.createElement("tr");
-    const person = document.createElement("td");
-    const personWrap = document.createElement("div");
-    const avatar = document.createElement("span");
-    const name = document.createElement("span");
-    const email = document.createElement("td");
-    const source = document.createElement("td");
-    const sourceBadge = document.createElement("span");
-    const firstContact = document.createElement("td");
-    const firstBuilder = document.createElement("td");
-    const lastActivity = document.createElement("td");
-    const projects = document.createElement("td");
-    const latestProject = document.createElement("td");
-
-    personWrap.className = "person-cell";
-    avatar.className = "person-avatar";
-    name.className = "person-name";
-    sourceBadge.className = "source-badge";
-    const displayName = record.name || emailName(record.email);
-    avatar.textContent = initials(displayName);
-    name.textContent = displayName;
-    name.title = displayName;
-    personWrap.append(avatar, name);
-    person.append(personWrap);
-    email.textContent = record.email;
-    email.title = record.email;
-    const sources = Array.isArray(record.sources) ? record.sources : [record.source];
-    sourceBadge.textContent = sources.includes("google") && sources.includes("make-a-build")
-      ? "Google + build interest"
-      : sources.includes("google")
-        ? "Google sign-in"
-        : "Build interest";
-    source.append(sourceBadge);
-    firstContact.textContent = formatTimestamp(record.createdAt);
-    firstBuilder.textContent = formatTimestamp(record.firstBuilderSeenAt);
-    lastActivity.textContent = formatTimestamp(record.lastActivityAt);
-    projects.textContent = numberFormatter.format(Number(record.buildCount) || 0);
-    projects.className = "project-count";
-    latestProject.className = "latest-project";
-    latestProject.textContent = record.latestProject
-      ? `${record.latestProject} · ${formatTimestamp(record.latestProjectAt)}`
-      : "Not available";
-    row.append(
-      person,
-      email,
-      source,
-      firstContact,
-      firstBuilder,
-      lastActivity,
-      projects,
-      latestProject,
-    );
-    els.signupRows.append(row);
-  });
-  els.emptyState.hidden = filtered.length > 0;
-  els.signupRows.closest("table").hidden = filtered.length === 0;
-  els.resultCount.textContent = `${numberFormatter.format(filtered.length)} ${
-    filtered.length === 1 ? "contact" : "contacts"
-  }`;
+  return record && typeof record.email === "string" && typeof record.createdAt === "string"
+    && !Number.isNaN(new Date(record.createdAt).getTime());
 }
 
 async function downloadCsv() {
   setButtonBusy(els.downloadButton, true);
   try {
-    const response = await fetch("/api/dashboard/export", {
-      headers: { Accept: "text/csv" },
-    });
+    const response = await fetch("/api/dashboard/export", { headers: { Accept: "text/csv" } });
     if (response.status === 401) {
       showAuth();
       els.authError.textContent = "Your dashboard session expired. Enter the access key again.";
@@ -698,106 +295,4 @@ function showToast(message) {
   state.toastTimer = window.setTimeout(() => {
     els.toast.hidden = true;
   }, 3_200);
-}
-
-function showChartTooltip(event, point) {
-  const wrapRect = els.chartWrap.getBoundingClientRect();
-  const left = Math.min(
-    wrapRect.width - 70,
-    Math.max(70, event.clientX - wrapRect.left),
-  );
-  const top = Math.max(60, event.clientY - wrapRect.top);
-  els.chartTooltip.replaceChildren();
-  const value = document.createElement("strong");
-  const date = document.createElement("span");
-  value.textContent = `${numberFormatter.format(point.value)} total`;
-  date.textContent = `${chartDateFormatter.format(point.date)} · ${point.newContacts} contacts · ${point.newBuilders} builders · ${point.projects} projects`;
-  els.chartTooltip.append(value, date);
-  els.chartTooltip.style.left = `${left}px`;
-  els.chartTooltip.style.top = `${top}px`;
-  els.chartTooltip.hidden = false;
-}
-
-function svgElement(name, attributes = {}) {
-  const element = document.createElementNS("http://www.w3.org/2000/svg", name);
-  Object.entries(attributes).forEach(([key, value]) => {
-    element.setAttribute(key, String(value));
-  });
-  return element;
-}
-
-function smoothPath(points) {
-  if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`;
-  return points.reduce((path, point, index) => {
-    if (index === 0) return `M ${point[0]} ${point[1]}`;
-    const previous = points[index - 1];
-    const midpointX = (previous[0] + point[0]) / 2;
-    return `${path} C ${midpointX} ${previous[1]}, ${midpointX} ${point[1]}, ${point[0]} ${point[1]}`;
-  }, "");
-}
-
-function niceMaximum(value) {
-  return Math.max(4, Math.ceil(value * 1.08));
-}
-
-function compactNumber(value) {
-  if (value >= 1_000_000) return `${Math.round(value / 100_000) / 10}M`;
-  if (value >= 1_000) return `${Math.round(value / 100) / 10}K`;
-  return numberFormatter.format(Math.round(value));
-}
-
-function evenlySpacedIndexes(length, maximumLabels) {
-  if (length <= 1) return [0];
-  const count = Math.min(maximumLabels, length);
-  return [...new Set(
-    Array.from({ length: count }, (_, index) =>
-      Math.round((index / (count - 1)) * (length - 1)),
-    ),
-  )];
-}
-
-function startOfLocalDay(date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function localDateKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function emailName(email) {
-  return email
-    .split("@")[0]
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((part) => `${part[0]?.toUpperCase() || ""}${part.slice(1)}`)
-    .join(" ") || "Subscriber";
-}
-
-function formatTimestamp(value) {
-  if (!value) return "Not available";
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime())
-    ? "Not available"
-    : dateTimeFormatter.format(timestamp);
-}
-
-function initials(value) {
-  const parts = value.trim().split(/\s+/).filter(Boolean);
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("") || "M";
-}
-
-function relativeTimestamp(value) {
-  const date = new Date(value);
-  const seconds = Math.round((date.getTime() - Date.now()) / 1_000);
-  if (!Number.isFinite(seconds)) return "just now";
-  if (Math.abs(seconds) < 60) return relativeTimeFormatter.format(seconds, "second");
-  const minutes = Math.round(seconds / 60);
-  if (Math.abs(minutes) < 60) return relativeTimeFormatter.format(minutes, "minute");
-  return dateTimeFormatter.format(date);
 }

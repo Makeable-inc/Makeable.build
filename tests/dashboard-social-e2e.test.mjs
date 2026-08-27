@@ -24,7 +24,10 @@ browserTest("dashboard switches sections and plays a social clip without leaving
     : playwright.chromium;
   const channel = process.env.MAKEABLE_BROWSER_CHANNEL;
   browser = await browserType.launch({ headless: true, ...(channel ? { channel } : {}) });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({
+    locale: "en-US",
+    viewport: { width: 1280, height: 900 },
+  });
   let attributionStatus = "not_connected";
   page.setDefaultTimeout(3_000);
   await page.route("**/api/dashboard/session", async (route) => {
