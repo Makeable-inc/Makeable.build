@@ -1,3 +1,4 @@
+// allow: SIZE_OK — the opt-in browser narrative keeps its deterministic API fixtures co-located.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { mkdir, readFile } from "node:fs/promises";
@@ -107,21 +108,12 @@ browserTest("dashboard switches sections and plays a social clip without leaving
   await portraitDialog.waitFor();
 
   // Then: the active media stays inside the frame and cannot cover the copy below it.
-  const geometry = await portraitDialog.evaluate((element) => {
-    const frame = element.querySelector(".media-dialog-frame").getBoundingClientRect();
-    const media = element.querySelector("video:not([hidden]), img:not([hidden])").getBoundingClientRect();
-    const copy = element.querySelector(".media-dialog-copy").getBoundingClientRect();
-    return {
-      contained: media.left >= frame.left - 0.5 && media.top >= frame.top - 0.5
-        && media.right <= frame.right + 0.5 && media.bottom <= frame.bottom + 0.5,
-      copyBelowFrame: copy.top >= frame.bottom - 0.5,
-      frameOverflow: getComputedStyle(element.querySelector(".media-dialog-frame")).overflow,
-      unnecessaryScroll: element.scrollHeight > element.clientHeight + 1,
-    };
-  });
+  const geometry = await readPortraitDialogGeometry(portraitDialog);
   assert.deepEqual(geometry, {
     contained: true,
     copyBelowFrame: true,
+    dialogOwnsVerticalScroll: true,
+    dialogWithinViewport: true,
     frameOverflow: "hidden",
     unnecessaryScroll: false,
   });
@@ -144,6 +136,41 @@ browserTest("dashboard switches sections and plays a social clip without leaving
     await page.screenshot({ path: path.join(artifactDir, "social-mobile-375.png"), fullPage: true });
   }
 
+  // When: the same portrait clip reopens at the 375x812 viewport.
+  const mobilePortraitPlayButton = page.getByRole("button", { name: "Play Portrait Zak brand workshop" });
+  await mobilePortraitPlayButton.click();
+  const mobilePortraitDialog = page.getByRole("dialog", { name: "Portrait Zak brand workshop" });
+  await mobilePortraitDialog.waitFor();
+
+  // Then: the dialog contains its media and owns any required viewport scrolling.
+  const mobileGeometry = await readPortraitDialogGeometry(mobilePortraitDialog);
+  assert.deepEqual(mobileGeometry, {
+    contained: true,
+    copyBelowFrame: true,
+    dialogOwnsVerticalScroll: true,
+    dialogWithinViewport: true,
+    frameOverflow: "hidden",
+    unnecessaryScroll: false,
+  });
+  await mobilePortraitDialog.getByRole("button", { name: "Close preview" }).click();
+  assert.deepEqual(await page.evaluate(() => ({
+    bodyLocked: document.body.classList.contains("is-media-viewer-open"),
+    bodyOverflow: document.body.style.overflow,
+    documentLocked: document.documentElement.classList.contains("is-media-viewer-open"),
+    documentOverflow: document.documentElement.style.overflow,
+    position: document.body.style.position,
+  })), {
+    bodyLocked: false,
+    bodyOverflow: "",
+    documentLocked: false,
+    documentOverflow: "",
+    position: "",
+  });
+  assert.equal(
+    await mobilePortraitPlayButton.evaluate((button) => document.activeElement === button),
+    true,
+  );
+
   // When: attribution fails, then reconnects with a measured zero.
   attributionStatus = "unavailable";
   await page.getByRole("button", { name: "Refresh" }).click();
@@ -161,6 +188,36 @@ browserTest("dashboard switches sections and plays a social clip without leaving
   assert.equal(await page.getByRole("heading", { name: "Customer activity" }).isVisible(), true);
   assert.equal(await page.locator("[data-dashboard-section='waitlist']").isVisible(), true);
 });
+
+async function readPortraitDialogGeometry(dialog) {
+  return dialog.evaluate((element) => {
+    const dialogRect = element.getBoundingClientRect();
+    const frameElement = element.querySelector(".media-dialog-frame");
+    const frame = frameElement.getBoundingClientRect();
+    const media = element
+      .querySelector("video:not([hidden]), img:not([hidden])")
+      .getBoundingClientRect();
+    const copy = element.querySelector(".media-dialog-copy").getBoundingClientRect();
+    const dialogOverflow = getComputedStyle(element).overflowY;
+    const visualViewport = window.visualViewport;
+    const viewportLeft = visualViewport?.offsetLeft || 0;
+    const viewportTop = visualViewport?.offsetTop || 0;
+    const viewportWidth = visualViewport?.width || window.innerWidth;
+    const viewportHeight = visualViewport?.height || window.innerHeight;
+    return {
+      contained: media.left >= frame.left - 0.5 && media.top >= frame.top - 0.5
+        && media.right <= frame.right + 0.5 && media.bottom <= frame.bottom + 0.5,
+      copyBelowFrame: copy.top >= frame.bottom - 0.5,
+      dialogOwnsVerticalScroll: dialogOverflow === "auto" || dialogOverflow === "scroll",
+      dialogWithinViewport: dialogRect.left >= viewportLeft - 0.5
+        && dialogRect.top >= viewportTop - 0.5
+        && dialogRect.right <= viewportLeft + viewportWidth + 0.5
+        && dialogRect.bottom <= viewportTop + viewportHeight + 0.5,
+      frameOverflow: getComputedStyle(frameElement).overflow,
+      unnecessaryScroll: element.scrollHeight > element.clientHeight + 1,
+    };
+  });
+}
 
 async function startDashboardServer() {
   const server = createServer(async (request, response) => {
