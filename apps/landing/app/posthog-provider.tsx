@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import posthog from "posthog-js";
 import { EMBER_OFFER_VERSION } from "./analytics";
+import { landingEventKey, readSocialAttribution } from "./social-attribution";
 
 // A PostHog project token is intentionally public: it can only write events to
 // this project. Server-side payment events are still verified by Stripe.
@@ -14,7 +15,7 @@ export default function PostHogProvider({ children }: Readonly<{ children: React
       api_host: "https://us.i.posthog.com",
       defaults: "2026-05-30",
       person_profiles: "identified_only",
-      capture_pageview: true,
+      capture_pageview: false,
       capture_pageleave: true,
       session_recording: {
         maskAllInputs: true,
@@ -25,6 +26,25 @@ export default function PostHogProvider({ children }: Readonly<{ children: React
       offer_version: EMBER_OFFER_VERSION,
       site: "makeable.build",
     });
+
+    const attribution = readSocialAttribution(new URL(window.location.href));
+    if (attribution) posthog.register_for_session(attribution);
+    posthog.capture("$pageview", attribution ?? {});
+
+    if (!attribution) return;
+
+    const key = landingEventKey(posthog.get_session_id(), attribution);
+    try {
+      if (sessionStorage.getItem(key)) return;
+      posthog.capture("social_landing_view", attribution);
+      sessionStorage.setItem(key, "1");
+    } catch (error) {
+      if (error instanceof DOMException) {
+        posthog.capture("social_landing_view", attribution);
+        return;
+      }
+      throw error;
+    }
   }, []);
 
   return <>{children}</>;
