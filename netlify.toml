@@ -41,6 +41,18 @@
   force = true
 
 [[redirects]]
+  from = "/r/ig/makeable-build"
+  to = "/?utm_source=instagram&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_build_bio&social_account=makeable_build&social_placement=bio"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/r/ig/makeable-zak"
+  to = "/?utm_source=instagram&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_zak_bio&social_account=makeable_zak&social_placement=bio"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "/ember/download"
   to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg"
   status = 302

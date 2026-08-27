@@ -24,6 +24,7 @@ import {
   dashboardSessionState,
   verifyDashboardAccessKey,
 } from "./lib/dashboard-auth.mjs";
+import { socialLinkRedirect } from "./lib/social-links.mjs";
 import { waitlistSignupKey } from "./lib/waitlist-storage.mjs";
 import { readVerifiedWaitlist, waitlistCsv } from "./lib/waitlist-report.mjs";
 import {
@@ -89,8 +90,12 @@ async function handleHttpRequest(req, res) {
     const env = getEnv();
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     const localApiPath = normalizedLocalApiPath(url.pathname);
+    const socialRedirect = url.search ? null : socialLinkRedirect(url.pathname);
 
     applyCors(req, res, env);
+    if (socialRedirect && (req.method === "GET" || req.method === "HEAD")) {
+      return sendSocialRedirect(res, socialRedirect.location);
+    }
     if (req.method === "OPTIONS") return sendText(res, "", "text/plain; charset=utf-8", 204);
 
     if (url.pathname === "/config.local.js") {
@@ -1395,6 +1400,11 @@ async function readJsonBody(req, maxBytes = MAX_REQUEST_BYTES) {
 
 function sendJson(res, data, status = 200) {
   sendText(res, JSON.stringify(data), "application/json; charset=utf-8", status);
+}
+
+function sendSocialRedirect(res, location) {
+  res.writeHead(302, { Location: location, "Cache-Control": "no-store" });
+  res.end();
 }
 
 function sendText(res, text, contentType, status = 200) {
