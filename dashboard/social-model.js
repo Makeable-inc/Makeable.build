@@ -5,6 +5,7 @@ const RANK_FIELDS = new Set([
   "followersGained",
   "websiteSessions",
   "websiteVisitRate",
+  "posts",
 ]);
 const COVERAGE_STATES = new Set([
   "connected",
@@ -40,6 +41,12 @@ export function buildSocialView(records, options = {}) {
     ? accounts.reduce((total, account) => total + account.websiteSessions, 0)
     : null;
   return {
+    rankBy,
+    attributionStatus: attributionConnected
+      ? "connected"
+      : options.attribution?.status === "unavailable"
+        ? "unavailable"
+        : "not_connected",
     totalImpressions,
     totalExposures: totalImpressions,
     totalEngagements,
@@ -169,17 +176,25 @@ function dailyRows(records, days, now) {
       date,
       impressions: 0,
       engagements: 0,
+      completeExposures: 0,
+      completeEngagements: 0,
       clicks: 0,
       posts: 0,
     };
     point.impressions += number(record.impressions);
     point.engagements += number(record.engagements);
+    if (record.engagementsComplete !== false) {
+      point.completeExposures += number(record.impressions);
+      point.completeEngagements += number(record.engagements);
+    }
     point.clicks = optionalAdd(point.clicks, optionalNumber(record.clicks));
     point.posts += 1;
     points.set(date, point);
   });
   if (days === "all") {
-    return [...points.values()].sort((left, right) => left.date.localeCompare(right.date));
+    return [...points.values()]
+      .sort((left, right) => left.date.localeCompare(right.date))
+      .map(dailyPoint);
   }
   const output = [];
   const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
@@ -190,11 +205,27 @@ function dailyRows(records, days, now) {
       date,
       impressions: 0,
       engagements: 0,
+      completeExposures: 0,
+      completeEngagements: 0,
       clicks: 0,
       posts: 0,
     });
   }
-  return output;
+  return output.map(dailyPoint);
+}
+
+function dailyPoint(point) {
+  const {
+    completeExposures,
+    completeEngagements,
+    ...summary
+  } = point;
+  return {
+    ...summary,
+    engagementRate: completeExposures
+      ? completeEngagements / completeExposures
+      : null,
+  };
 }
 
 function sum(records, key) {

@@ -1,3 +1,5 @@
+import { createSocialDashboard } from "./social.js";
+
 const state = {
   records: [],
   activity: [],
@@ -6,6 +8,8 @@ const state = {
   generatedAt: "",
   refreshTimer: null,
   toastTimer: null,
+  currentSection: "overview",
+  socialView: null,
 };
 
 const els = {
@@ -16,6 +20,8 @@ const els = {
   authSubmit: document.querySelector("#authSubmit"),
   toggleAccessKey: document.querySelector("#toggleAccessKey"),
   dashboardView: document.querySelector("#dashboardView"),
+  dashboardSection: document.querySelector("#dashboardSection"),
+  dashboardSections: [...document.querySelectorAll("[data-dashboard-section]")],
   refreshButton: document.querySelector("#refreshButton"),
   downloadButton: document.querySelector("#downloadButton"),
   signOutButton: document.querySelector("#signOutButton"),
@@ -36,6 +42,14 @@ const els = {
   resultCount: document.querySelector("#resultCount"),
   dataHealth: document.querySelector("#dataHealth"),
   rangeButtons: [...document.querySelectorAll("[data-range]")],
+  overviewExposures: document.querySelector("#overviewExposures"),
+  overviewEngagements: document.querySelector("#overviewEngagements"),
+  overviewEngagementRate: document.querySelector("#overviewEngagementRate"),
+  overviewFollowers: document.querySelector("#overviewFollowers"),
+  overviewContacts: document.querySelector("#overviewContacts"),
+  overviewBuilders: document.querySelector("#overviewBuilders"),
+  overviewSocialRows: document.querySelector("#overviewSocialRows"),
+  overviewWaitlistRows: document.querySelector("#overviewWaitlistRows"),
   toast: document.querySelector("#toast"),
 };
 
@@ -54,27 +68,50 @@ const chartDateFormatter = new Intl.DateTimeFormat(undefined, {
 const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, {
   numeric: "auto",
 });
+const compactFormatter = new Intl.NumberFormat(undefined, {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 const MS_PER_DAY = 86_400_000;
+
+const socialDashboard = createSocialDashboard({
+  onReport(view) {
+    state.socialView = view;
+    renderOverview();
+  },
+  onUnauthorized() {
+    showAuth();
+    els.authError.textContent = "Your dashboard session expired. Enter the access key again.";
+  },
+  showToast,
+});
 
 els.authForm.addEventListener("submit", authenticate);
 els.toggleAccessKey.addEventListener("click", toggleAccessKeyVisibility);
-els.refreshButton.addEventListener("click", () => loadDashboard({ announce: true }));
+els.refreshButton.addEventListener("click", () => refreshActiveSection({ announce: true }));
 els.downloadButton.addEventListener("click", downloadCsv);
 els.signOutButton.addEventListener("click", signOut);
+els.dashboardSection.addEventListener("change", () => {
+  setDashboardSection(els.dashboardSection.value);
+});
+document.querySelectorAll("[data-open-section]").forEach((button) => {
+  button.addEventListener("click", () => setDashboardSection(button.dataset.openSection));
+});
 els.searchInput.addEventListener("input", renderTable);
 els.rangeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     state.chartRange = button.dataset.range === "all" ? "all" : Number(button.dataset.range);
     els.rangeButtons.forEach((item) => {
       item.classList.toggle("is-selected", item === button);
+      item.setAttribute("aria-pressed", String(item === button));
     });
     renderChart();
   });
 });
 window.addEventListener("resize", renderChart);
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && state.records.length) {
-    void loadDashboard();
+  if (document.visibilityState === "visible" && !els.dashboardView.hidden) {
+    void refreshActiveSection();
   }
 });
 
@@ -88,7 +125,7 @@ async function initialize() {
     const payload = await response.json().catch(() => ({}));
     if (response.ok && payload.authenticated) {
       showDashboard();
-      await loadDashboard();
+      await refreshActiveSection();
       return;
     }
     if (response.status === 503) {
@@ -124,7 +161,7 @@ async function authenticate(event) {
     }
     els.accessKey.value = "";
     showDashboard();
-    await loadDashboard();
+    await refreshActiveSection();
   } catch {
     els.authError.textContent = "The dashboard could not connect. Please try again.";
   } finally {
@@ -146,9 +183,10 @@ function toggleAccessKeyVisibility() {
 function showDashboard() {
   els.authView.hidden = true;
   els.dashboardView.hidden = false;
+  setDashboardSection("overview");
   window.clearInterval(state.refreshTimer);
   state.refreshTimer = window.setInterval(() => {
-    if (document.visibilityState === "visible") void loadDashboard();
+    if (document.visibilityState === "visible") void refreshActiveSection();
   }, 60_000);
 }
 
@@ -161,7 +199,7 @@ function showAuth() {
 }
 
 async function loadDashboard(options = {}) {
-  setButtonBusy(els.refreshButton, true);
+  if (options.manageButton !== false) setButtonBusy(els.refreshButton, true);
   try {
     const response = await fetch("/api/dashboard", {
       headers: { Accept: "application/json" },
@@ -180,12 +218,45 @@ async function loadDashboard(options = {}) {
     state.report = payload;
     state.generatedAt = payload.generatedAt || new Date().toISOString();
     renderDashboard();
-    if (options.announce) showToast("Dashboard refreshed");
   } catch (error) {
     showToast(error instanceof Error ? error.message : "Dashboard refresh failed");
   } finally {
+    if (options.manageButton !== false) setButtonBusy(els.refreshButton, false);
+  }
+}
+
+async function refreshActiveSection(options = {}) {
+  setButtonBusy(els.refreshButton, true);
+  try {
+    if (state.currentSection === "social") {
+      await socialDashboard.load();
+    } else if (state.currentSection === "waitlist") {
+      await loadDashboard({ manageButton: false });
+    } else {
+      await Promise.all([
+        loadDashboard({ manageButton: false }),
+        socialDashboard.load(),
+      ]);
+    }
+    if (options.announce) showToast("Dashboard refreshed");
+  } finally {
     setButtonBusy(els.refreshButton, false);
   }
+}
+
+function setDashboardSection(section) {
+  const next = new Set(["overview", "social", "waitlist"]).has(section)
+    ? section
+    : "overview";
+  state.currentSection = next;
+  els.dashboardSection.value = next;
+  els.dashboardSections.forEach((element) => {
+    element.hidden = element.dataset.dashboardSection !== next;
+  });
+  els.downloadButton.hidden = next !== "waitlist";
+  document.title = `${next === "social" ? "Social" : next === "waitlist" ? "Waitlist" : "Growth"} dashboard · Makeable`;
+  if (next === "social") socialDashboard.show();
+  if (next === "waitlist") window.requestAnimationFrame(renderChart);
 }
 
 function validRecord(record) {
@@ -215,6 +286,79 @@ function renderDashboard() {
     : "Data check passed: every builder account and project owner is matched. Email addresses stay inside this authenticated dashboard and are not sent to PostHog.";
   renderChart();
   renderTable();
+  renderOverview();
+}
+
+function renderOverview() {
+  const report = state.report || {};
+  const social = state.socialView || {
+    totalExposures: 0,
+    totalEngagements: 0,
+    engagementRate: null,
+    attributionStatus: "not_connected",
+    websiteSessions: null,
+    websiteVisitRate: null,
+    followersGained: 0,
+  };
+  els.overviewExposures.textContent = compactFormatter.format(social.totalExposures || 0);
+  els.overviewEngagements.textContent = compactFormatter.format(social.totalEngagements || 0);
+  els.overviewEngagementRate.textContent = formatOptionalPercent(social.engagementRate);
+  els.overviewFollowers.textContent = formatOptionalSigned(social.followersGained);
+  els.overviewContacts.textContent = numberFormatter.format(Number(report.total) || 0);
+  els.overviewBuilders.textContent = numberFormatter.format(Number(report.builderAccountsTotal) || 0);
+  els.overviewSocialRows.replaceChildren();
+  appendPulseRow(
+    els.overviewSocialRows,
+    "Content exposures",
+    compactFormatter.format(social.totalExposures || 0),
+  );
+  appendPulseRow(
+    els.overviewSocialRows,
+    "Engagement rate",
+    formatOptionalPercent(social.engagementRate),
+  );
+  if (social.attributionStatus === "connected") {
+    appendPulseRow(
+      els.overviewSocialRows,
+      "Website conversions",
+      numberFormatter.format(social.websiteSessions),
+    );
+    appendPulseRow(
+      els.overviewSocialRows,
+      "Website visit rate",
+      formatOptionalPercent(social.websiteVisitRate),
+    );
+  } else {
+    appendPulseRow(
+      els.overviewSocialRows,
+      "Website attribution",
+      social.attributionStatus === "unavailable" ? "Unavailable" : "Not connected",
+    );
+  }
+  els.overviewWaitlistRows.replaceChildren();
+  appendPulseRow(els.overviewWaitlistRows, "New contacts today", numberFormatter.format(Number(report.todayTotal) || 0));
+  appendPulseRow(els.overviewWaitlistRows, "Active today", numberFormatter.format(Number(report.activeTodayTotal) || 0));
+  appendPulseRow(els.overviewWaitlistRows, "Published projects", numberFormatter.format(Number(report.publicProjectsTotal) || 0));
+}
+
+function appendPulseRow(container, label, value) {
+  const row = document.createElement("div");
+  const name = document.createElement("strong");
+  const metric = document.createElement("span");
+  row.className = "pulse-row";
+  name.textContent = label;
+  metric.textContent = value;
+  row.append(name, metric);
+  container.append(row);
+}
+
+function formatOptionalPercent(value) {
+  return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "—";
+}
+
+function formatOptionalSigned(value) {
+  if (!Number.isFinite(value)) return "—";
+  return `${value > 0 ? "+" : ""}${numberFormatter.format(value)}`;
 }
 
 function countSince(date) {
@@ -473,7 +617,7 @@ function renderTable() {
     latestProject.className = "latest-project";
     latestProject.textContent = record.latestProject
       ? `${record.latestProject} · ${formatTimestamp(record.latestProjectAt)}`
-      : "—";
+      : "Not available";
     row.append(
       person,
       email,
@@ -533,6 +677,8 @@ async function signOut() {
     state.records = [];
     state.activity = [];
     state.report = null;
+    state.socialView = null;
+    socialDashboard.clear();
     showAuth();
     els.authError.textContent = "";
     els.signOutButton.disabled = false;
@@ -631,9 +777,11 @@ function emailName(email) {
 }
 
 function formatTimestamp(value) {
-  if (!value) return "—";
+  if (!value) return "Not available";
   const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? "—" : dateTimeFormatter.format(timestamp);
+  return Number.isNaN(timestamp.getTime())
+    ? "Not available"
+    : dateTimeFormatter.format(timestamp);
 }
 
 function initials(value) {

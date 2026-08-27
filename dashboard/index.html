@@ -6,9 +6,11 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#07090e" />
-    <title>Waitlist dashboard · Makeable</title>
+    <title>Growth dashboard · Makeable</title>
     <link rel="stylesheet" href="/dashboard/styles.css" />
-    <script src="/dashboard/app.js" defer></script>
+    <link rel="stylesheet" href="/dashboard/social.css" />
+    <link rel="stylesheet" href="/dashboard/social-media.css" />
+    <script src="/dashboard/app.js" type="module"></script>
   </head>
   <body>
     <div class="ambient-glow" aria-hidden="true"></div>
@@ -23,7 +25,7 @@
             </svg>
           </div>
           <h1 id="authTitle">Private dashboard</h1>
-          <p>Enter the owner access key to view verified waitlist signups.</p>
+          <p>Enter the owner access key to view Makeable growth, social, and customer activity.</p>
         </div>
         <form id="authForm" class="auth-form">
           <label for="accessKey">Access key</label>
@@ -71,7 +73,15 @@
         <div class="topbar-identity">
           <a class="brand" href="/" aria-label="Makeable home">MAKEABLE</a>
           <span class="topbar-rule" aria-hidden="true"></span>
-          <h1>Waitlist dashboard</h1>
+          <label class="section-picker">
+            <span class="sr-only">Dashboard section</span>
+            <select id="dashboardSection" aria-label="Dashboard section">
+              <option value="overview">Overview</option>
+              <option value="social">Social</option>
+              <option value="waitlist">Waitlist</option>
+            </select>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5"></path></svg>
+          </label>
         </div>
         <div class="topbar-actions">
           <div class="live-status" aria-label="Live data">
@@ -84,7 +94,7 @@
             </svg>
             <span>Refresh</span>
           </button>
-          <button id="downloadButton" class="button button-primary" type="button">
+          <button id="downloadButton" class="button button-primary" type="button" hidden>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3v12M7 10l5 5 5-5M4 19h16"></path>
             </svg>
@@ -99,6 +109,89 @@
       </header>
 
       <div class="dashboard-content">
+        <section id="overviewSection" class="dashboard-section" data-dashboard-section="overview">
+          <div class="view-heading">
+            <div>
+              <h2>Growth overview</h2>
+              <p>One place to see how attention turns into Makeable customers and builders.</p>
+            </div>
+          </div>
+          <section class="overview-metric-rail" aria-label="Growth summary">
+            <article class="overview-metric"><p>Content exposures</p><strong id="overviewExposures">-</strong><span>selected social range</span></article>
+            <article class="overview-metric"><p>Engagements</p><strong id="overviewEngagements">-</strong><span>likes, comments, shares</span></article>
+            <article class="overview-metric"><p>Engagement rate</p><strong id="overviewEngagementRate">-</strong><span>engagements per measured exposure</span></article>
+            <article class="overview-metric"><p>Followers gained</p><strong id="overviewFollowers">-</strong><span>across connected accounts</span></article>
+            <article class="overview-metric"><p>All contacts</p><strong id="overviewContacts">-</strong><span>verified customer emails</span></article>
+            <article class="overview-metric"><p>Builder accounts</p><strong id="overviewBuilders">-</strong><span>verified Google builders</span></article>
+          </section>
+          <div class="overview-grid">
+            <section class="panel pulse-panel" aria-labelledby="socialPulseTitle">
+              <div class="pulse-panel-header"><h3 id="socialPulseTitle">Social pulse</h3><button class="text-button" type="button" data-open-section="social">Open Social</button></div>
+              <div id="overviewSocialRows" class="pulse-list"></div>
+            </section>
+            <section class="panel pulse-panel" aria-labelledby="waitlistPulseTitle">
+              <div class="pulse-panel-header"><h3 id="waitlistPulseTitle">Customer pulse</h3><button class="text-button" type="button" data-open-section="waitlist">Open Waitlist</button></div>
+              <div id="overviewWaitlistRows" class="pulse-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="socialSection" class="dashboard-section" data-dashboard-section="social" hidden>
+          <div class="view-heading">
+            <div>
+              <h2>Social performance</h2>
+              <p>Compare every account, rank the content that works, and preview videos without leaving the dashboard. Instagram contributes views and interactions; LinkedIn contributes impressions.</p>
+            </div>
+            <div class="view-heading-actions">
+              <input id="socialCsvInput" type="file" accept=".csv,text/csv" hidden />
+              <a class="button button-secondary" href="/dashboard/social-template.csv" download><span>CSV template</span></a>
+              <button id="socialImportButton" class="button button-primary" type="button"><span>Import CSV</span></button>
+            </div>
+          </div>
+          <div class="social-controls">
+            <div class="range-toggle" role="group" aria-label="Social reporting range">
+              <button type="button" data-social-range="7" aria-pressed="false">7D</button>
+              <button class="is-selected" type="button" data-social-range="30" aria-pressed="true">30D</button>
+              <button type="button" data-social-range="90" aria-pressed="false">90D</button>
+              <button type="button" data-social-range="all" aria-pressed="false">All</button>
+            </div>
+            <label class="social-tool-label" for="socialRankBy">Rank accounts by
+              <select id="socialRankBy" class="compact-select">
+                <option value="impressions">Content exposures</option>
+                <option value="engagementRate">Engagement rate</option>
+                <option value="websiteSessions">Website conversions</option>
+                <option value="websiteVisitRate">Website visit rate</option>
+                <option value="followersGained">Followers gained</option>
+                <option value="posts">Posts</option>
+              </select>
+            </label>
+          </div>
+          <p id="socialImportStatus" class="import-status" role="status" aria-live="polite"></p>
+          <section class="social-metric-rail" aria-label="Social media summary">
+            <article class="social-metric"><p>Content exposures</p><strong id="socialExposures">-</strong><span>times content was displayed</span></article>
+            <article class="social-metric"><p>Engagement rate</p><strong id="socialEngagementRate">-</strong><span>engagements per measured exposure</span></article>
+            <article class="social-metric"><p>Website conversions</p><strong id="socialWebsiteSessions">-</strong><span>attributed website sessions</span></article>
+            <article class="social-metric"><p>Website visit rate</p><strong id="socialWebsiteVisitRate">-</strong><span>website sessions per exposure</span></article>
+            <article class="social-metric"><p>Followers gained</p><strong id="socialFollowers">-</strong><span>net growth in range</span></article>
+            <article class="social-metric"><p>Published posts</p><strong id="socialPosts">-</strong><span>content in this range</span></article>
+          </section>
+          <section class="panel social-chart-panel" aria-labelledby="socialChartTitle">
+            <div class="panel-heading"><div><h2 id="socialChartTitle">Content exposures and engagement</h2><p id="socialUpdated">No social data imported yet</p></div><div class="chart-legend"><span class="legend-builder">Content exposures</span><span class="legend-social-engagement">Engagement rate</span></div></div>
+            <div id="socialChartWrap" class="social-chart-wrap"><svg id="socialChart" class="social-chart" viewBox="0 0 1200 286" role="img" aria-labelledby="socialChartTitle socialChartDescription" preserveAspectRatio="none"><desc id="socialChartDescription">Daily content exposures shown as blue bars and engagement rate shown as a green line.</desc></svg></div>
+          </section>
+          <section class="panel table-panel" aria-labelledby="socialAccountsTitle">
+            <div class="panel-heading table-heading"><div><h2 id="socialAccountsTitle">Account ranking</h2><p>Best-performing accounts in the selected range</p></div><span id="socialAccountCount" class="result-count">-</span></div>
+            <div class="table-scroll" tabindex="0" role="region" aria-labelledby="socialAccountsTitle"><table class="social-table"><thead><tr><th scope="col">Rank</th><th scope="col">Account</th><th scope="col">Platform</th><th scope="col" data-rank-field="impressions" aria-sort="descending">Content exposures</th><th scope="col" data-rank-field="engagementRate" aria-sort="none">Engagement rate</th><th scope="col">Platform link clicks</th><th scope="col" data-rank-field="websiteSessions" aria-sort="none">Website conversions</th><th scope="col" data-rank-field="websiteVisitRate" aria-sort="none">Website visit rate</th><th scope="col" data-rank-field="followersGained" aria-sort="none">Followers gained</th><th scope="col" data-rank-field="posts" aria-sort="none">Posts</th></tr></thead><tbody id="socialAccountRows"></tbody></table></div>
+          </section>
+          <section class="panel content-panel" aria-labelledby="topContentTitle">
+            <div class="panel-heading"><div><h2 id="topContentTitle">Top content</h2><p>Click play to watch the preview inside this dashboard</p></div><span id="socialContentCount" class="result-count">-</span></div>
+            <div id="socialContentGrid" class="content-grid"></div>
+            <div id="socialEmptyState" class="empty-state social-empty" hidden><div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5Z"></path></svg></div><h3>No social data yet</h3><p>Download the template, add your platform exports, then import the CSV.</p></div>
+          </section>
+        </section>
+
+        <section id="waitlistSection" class="dashboard-section" data-dashboard-section="waitlist" hidden>
+          <div class="view-heading"><div><h2>Waitlist and builders</h2><p>Verified contacts, builder activity, and published projects.</p></div></div>
         <section class="metric-rail" aria-label="Customer and builder summary">
           <article class="metric metric-featured">
             <p>All contacts</p>
@@ -146,9 +239,9 @@
                 <span class="legend-total">Total</span>
               </div>
               <div class="range-toggle" role="group" aria-label="Chart range">
-                <button type="button" data-range="7">7D</button>
-                <button class="is-selected" type="button" data-range="30">30D</button>
-                <button type="button" data-range="all">All</button>
+                <button type="button" data-range="7" aria-pressed="false">7D</button>
+                <button class="is-selected" type="button" data-range="30" aria-pressed="true">30D</button>
+                <button type="button" data-range="all" aria-pressed="false">All</button>
               </div>
               <div class="chart-total">
                 <span>Total</span>
@@ -223,7 +316,13 @@
           </div>
           <p id="dataHealth" class="data-health">Email addresses stay inside this authenticated dashboard and are not sent to PostHog.</p>
         </section>
+        </section>
       </div>
+      <dialog id="mediaDialog" class="media-dialog" aria-labelledby="mediaDialogTitle">
+        <div class="media-dialog-header"><h2 id="mediaDialogTitle">Content preview</h2><button id="mediaDialogClose" class="icon-button" type="button" aria-label="Close preview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg></button></div>
+        <div id="mediaDialogFrame" class="media-dialog-frame"><video id="mediaDialogVideo" controls playsinline preload="metadata" hidden></video><img id="mediaDialogImage" alt="" hidden /><p id="mediaDialogUnavailable" class="media-unavailable" hidden>Preview unavailable</p></div>
+        <div class="media-dialog-copy"><p id="mediaDialogCaption"></p><div class="media-dialog-metrics"><span id="mediaDialogImpressions"></span><span id="mediaDialogEngagements"></span></div></div>
+      </dialog>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </main>
   </body>
