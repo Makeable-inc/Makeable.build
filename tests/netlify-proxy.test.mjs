@@ -395,6 +395,8 @@ test("dashboard routes stay private and issue signed owner sessions", async (t) 
     DASHBOARD_ACCESS_KEY: dashboardAccessKey,
     DASHBOARD_SESSION_SECRET:
       "dashboard-session-secret-with-at-least-32-characters",
+    POSTHOG_PERSONAL_API_KEY: "phx_private_value",
+    POSTHOG_PROJECT_ID: "12345",
   });
   let fetchCalls = 0;
   globalThis.fetch = async () => {
@@ -409,6 +411,15 @@ test("dashboard routes stay private and issue signed owner sessions", async (t) 
   assert.deepEqual(await unauthorized.json(), {
     error: "Dashboard authentication required.",
   });
+
+  const unauthorizedSocial = await handler(
+    new Request(`${productionOrigin}/api/dashboard/social`),
+  );
+  assert.equal(unauthorizedSocial.status, 401);
+  assert.deepEqual(await unauthorizedSocial.json(), {
+    error: "Dashboard authentication required.",
+  });
+  assert.equal(fetchCalls, 0);
 
   const wrongKey = await handler(
     new Request(`${productionOrigin}/api/dashboard/session`, {

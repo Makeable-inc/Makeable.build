@@ -24,6 +24,10 @@ import {
   dashboardSessionState,
   verifyDashboardAccessKey,
 } from "./lib/dashboard-auth.mjs";
+import {
+  dashboardSocialResult,
+} from "./lib/social-dashboard.mjs";
+import { readSocialWebsiteSessions } from "./lib/posthog-social.mjs";
 import { socialLinkRedirect } from "./lib/social-links.mjs";
 import { waitlistSignupKey } from "./lib/waitlist-storage.mjs";
 import { readVerifiedWaitlist, waitlistCsv } from "./lib/waitlist-report.mjs";
@@ -112,6 +116,10 @@ async function handleHttpRequest(req, res) {
 
     if (localApiPath === "/api/dashboard/export") {
       return localDashboardExport(req, res, env);
+    }
+
+    if (localApiPath === "/api/dashboard/social") {
+      return localDashboardSocial(req, res, env);
     }
 
     if (localApiPath === "/api/dashboard") {
@@ -507,9 +515,31 @@ async function localDashboardExport(req, res, env) {
   return sendText(res, waitlistCsv(records), "text/csv; charset=utf-8");
 }
 
-function localDashboardAuthorized(req, res, env) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
+async function localDashboardSocial(req, res, env) {
+  if (!localDashboardAuthorized(req, res, env, ["GET", "POST"])) return;
+  const origin = String(req.headers.origin || "");
+  if (req.method === "POST" && origin && !isAllowedBrowserOrigin(origin, env)) {
+    return sendJson(res, { error: "Origin not allowed." }, 403);
+  }
+  const body = req.method === "POST"
+    ? await readJsonBody(req, (2 * 1024 * 1024) + 8 * 1024)
+    : null;
+  const attribution = await readSocialWebsiteSessions({
+    personalApiKey: env.POSTHOG_PERSONAL_API_KEY,
+    projectId: env.POSTHOG_PROJECT_ID,
+    fetchImpl: globalThis.fetch,
+  });
+  const result = await dashboardSocialResult(
+    { method: req.method, body },
+    { store: localSocialAnalyticsStore, attribution },
+  );
+  if (result.headers?.Allow) res.setHeader("Allow", result.headers.Allow);
+  return sendJson(res, result.body, result.status);
+}
+
+function localDashboardAuthorized(req, res, env, methods = ["GET"]) {
+  if (!methods.includes(req.method)) {
+    res.setHeader("Allow", methods.join(", "));
     sendJson(res, { error: "Method not allowed" }, 405);
     return false;
   }
@@ -641,6 +671,27 @@ const localWaitlistSignupStore = {
       })),
       directories: [],
     };
+  },
+};
+
+const localSocialAnalyticsStore = {
+  async get() {
+    try {
+      return JSON.parse(
+        await readFile(path.join(__dirname, "data", "social-analytics.json"), "utf8"),
+      );
+    } catch {
+      return null;
+    }
+  },
+  async setJSON(_key, value) {
+    const directory = path.join(__dirname, "data");
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      path.join(directory, "social-analytics.json"),
+      `${JSON.stringify(value, null, 2)}\n`,
+      { encoding: "utf8", mode: 0o600 },
+    );
   },
 };
 

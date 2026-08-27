@@ -61,6 +61,11 @@ import {
   readJsonBlobRecords,
 } from "../../lib/dashboard-report.mjs";
 import {
+  dashboardSocialResult,
+  socialStoreNameForFunctionContext,
+} from "../../lib/social-dashboard.mjs";
+import { readSocialWebsiteSessions } from "../../lib/posthog-social.mjs";
+import {
   clearWaitlistSessionCookie,
   createWaitlistSession,
   forgetWaitlistSession,
@@ -171,6 +176,10 @@ export default async function handler(req, context = {}) {
       return await dashboardExport(req, env, context);
     }
 
+    if (localApiPath === "/api/dashboard/social") {
+      return await dashboardSocial(req, env, context);
+    }
+
     if (localApiPath === "/api/dashboard") {
       return await dashboardData(req, env, context);
     }
@@ -262,6 +271,8 @@ function getEnv() {
     "WAITLIST_WEBHOOK_SECRET",
     "DASHBOARD_ACCESS_KEY",
     "DASHBOARD_SESSION_SECRET",
+    "POSTHOG_PERSONAL_API_KEY",
+    "POSTHOG_PROJECT_ID",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "OPENAI_BUILD_MODEL",
@@ -1348,6 +1359,44 @@ async function dashboardExport(req, env, context) {
       Vary: "Cookie",
     },
   );
+}
+
+async function dashboardSocial(req, env, context) {
+  if (!new Set(["GET", "POST"]).has(req.method)) {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET, POST",
+      "Cache-Control": "no-store",
+    });
+  }
+  const authFailure = dashboardAuthorizationFailure(req, env, req.method);
+  if (authFailure) return authFailure;
+  if (req.method === "POST") {
+    const csrfFailure = sameOriginFailure(req);
+    if (csrfFailure) return csrfFailure;
+  }
+  const body = req.method === "POST"
+    ? await readLimitedJsonRequest(req, (2 * 1024 * 1024) + 8 * 1024)
+    : null;
+  const attribution = await readSocialWebsiteSessions({
+    personalApiKey: env.POSTHOG_PERSONAL_API_KEY,
+    projectId: env.POSTHOG_PROJECT_ID,
+    fetchImpl: fetch,
+  });
+  const result = await dashboardSocialResult(
+    { method: req.method, body },
+    {
+      store: getStore({
+        name: socialStoreNameForFunctionContext(context),
+        consistency: "strong",
+      }),
+      attribution,
+    },
+  );
+  return jsonResponse(result.body, result.status, {
+    ...result.headers,
+    "Cache-Control": "no-store",
+    Vary: "Cookie",
+  });
 }
 
 function dashboardAuthorizationFailure(req, env, allowedMethod) {
