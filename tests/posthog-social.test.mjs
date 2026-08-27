@@ -76,6 +76,51 @@ test("PostHog attribution rejects unsafe project identifiers without fetching", 
   assert.equal(calls, 0);
 });
 
+test("PostHog attribution rejects incomplete paginated aggregates", async () => {
+  // Given: PostHog reports that more aggregate rows are available.
+  const fetchImpl = async () => Response.json({
+    results: [["2026-08-26", "instagram", "makeable_zak", 3]],
+    hasMore: true,
+  });
+
+  // When: the server reads the first incomplete result page.
+  const result = await readSocialWebsiteSessions({
+    personalApiKey: "phx_test_secret",
+    projectId: "12345",
+    fetchImpl,
+  });
+
+  // Then: partial aggregates are never presented as a connected result.
+  assert.deepEqual(result, { status: "unavailable", daily: [] });
+});
+
+test("PostHog attribution aborts a stalled request within its timeout", async () => {
+  // Given: an upstream request that settles only when its signal is aborted.
+  let requestSignal;
+  const fetchImpl = async (_url, options) => new Promise((resolve, reject) => {
+    requestSignal = options.signal;
+    requestSignal?.addEventListener("abort", () => reject(requestSignal.reason), {
+      once: true,
+    });
+  });
+
+  // When: the configured request timeout expires.
+  const result = await Promise.race([
+    readSocialWebsiteSessions({
+      personalApiKey: "phx_test_secret",
+      projectId: "12345",
+      fetchImpl,
+      timeoutMs: 5,
+    }),
+    new Promise((resolve) => setTimeout(() => resolve("request remained pending"), 100)),
+  ]);
+
+  // Then: the service fails closed without exposing the abort error.
+  assert.deepEqual(result, { status: "unavailable", daily: [] });
+  assert.equal(requestSignal instanceof AbortSignal, true);
+  assert.equal(requestSignal.aborted, true);
+});
+
 test("PostHog attribution hides network, HTTP, and schema failures", async (t) => {
   const cases = [
     {
