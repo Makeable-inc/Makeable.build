@@ -202,11 +202,19 @@ Spacing intent derives from a 4px base.
 
 - **Structure**: native `dialog`, heading, close control, media frame, caption,
   and post metrics.
-- **States**: closed, opening, playing, paused, unavailable, closing.
+- **States**: closed, opening, playing, paused, playback unavailable, opening
+  failed, closing. Playback failure hides and stops the failed video, reveals a
+  clear unavailable message, and resets before the next media item opens.
 - **Accessibility**: focus is trapped by native dialog behavior, Escape closes,
-  focus returns to the invoking play button, and background scrolling is locked.
+  focus returns to the invoking play button, and the unavailable message uses a
+  polite atomic status announcement. Background scrolling is locked only while
+  the dialog is open.
 - **Motion**: 180ms opacity and transform entrance; reduced motion is instant.
-- **Layout**: centered imposter with a bounded 16:9 frame.
+- **Layout**: centered imposter with a bounded 16:9 frame. The explicit
+  `is-media-viewer-open` state applies to the document root and body, preserves
+  the current page offset, compensates for the removed scrollbar to prevent
+  layout shift, and restores prior inline styles and scroll position on native
+  close or opening failure. The dialog retains its own vertical scrolling.
 
 ### Import control
 

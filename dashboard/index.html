@@ -323,7 +323,7 @@
       </div>
       <dialog id="mediaDialog" class="media-dialog" aria-labelledby="mediaDialogTitle">
         <div class="media-dialog-header"><h2 id="mediaDialogTitle">Content preview</h2><button id="mediaDialogClose" class="icon-button" type="button" aria-label="Close preview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg></button></div>
-        <div id="mediaDialogFrame" class="media-dialog-frame"><video id="mediaDialogVideo" controls playsinline preload="metadata" hidden></video><img id="mediaDialogImage" alt="" hidden /><p id="mediaDialogUnavailable" class="media-unavailable" hidden>Preview unavailable</p></div>
+        <div id="mediaDialogFrame" class="media-dialog-frame"><video id="mediaDialogVideo" controls playsinline preload="metadata" hidden></video><img id="mediaDialogImage" alt="" hidden /><p id="mediaDialogUnavailable" class="media-unavailable" role="status" aria-live="polite" aria-atomic="true" hidden></p></div>
         <div class="media-dialog-copy"><p id="mediaDialogCaption"></p><div class="media-dialog-metrics"><span id="mediaDialogImpressions"></span><span id="mediaDialogEngagements"></span></div></div>
       </dialog>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

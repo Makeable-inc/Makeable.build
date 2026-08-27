@@ -163,6 +163,145 @@ test("dashboard component colors come from the documented token palette", async 
   });
 });
 
+test("media viewer opening locks page scrolling at the current offset", async () => {
+  // Given: a page scrolled beneath a playable media dialog.
+  const { createMediaViewer } = await import(socialScriptPath);
+  assert.equal(typeof createMediaViewer, "function");
+  const harness = mediaViewerHarness();
+  const viewer = createMediaViewer(harness.els, harness.options);
+
+  // When: the dialog opens.
+  await viewer.open(mediaRecord());
+
+  // Then: the page is fixed at its current offset without removing the scrollbar gap.
+  assert.equal(harness.root.classList.contains("is-media-viewer-open"), true);
+  assert.equal(harness.body.classList.contains("is-media-viewer-open"), true);
+  assert.equal(harness.root.style.overflow, "hidden");
+  assert.equal(harness.body.style.position, "fixed");
+  assert.equal(harness.body.style.top, "-480px");
+  assert.equal(harness.body.style.paddingRight, "26px");
+  assert.deepEqual(harness.scrollCalls, []);
+});
+
+test("native dialog close restores page scroll ownership and prior styles", async () => {
+  // Given: an open media viewer over a scrolled page.
+  const { createMediaViewer } = await import(socialScriptPath);
+  assert.equal(typeof createMediaViewer, "function");
+  const harness = mediaViewerHarness();
+  const viewer = createMediaViewer(harness.els, harness.options);
+  await viewer.open(mediaRecord());
+
+  // When: Escape/native cancel closes the dialog.
+  harness.els.dialog.cancel();
+
+  // Then: the exact prior page styles and offsets are restored.
+  assert.equal(harness.root.classList.contains("is-media-viewer-open"), false);
+  assert.equal(harness.body.classList.contains("is-media-viewer-open"), false);
+  assert.equal(harness.root.style.overflow, "clip");
+  assert.equal(harness.body.style.position, "relative");
+  assert.equal(harness.body.style.top, "3px");
+  assert.equal(harness.body.style.left, "1px");
+  assert.equal(harness.body.style.right, "2px");
+  assert.equal(harness.body.style.width, "auto");
+  assert.equal(harness.body.style.overflow, "visible");
+  assert.equal(harness.body.style.paddingRight, "6px");
+  assert.deepEqual(harness.scrollCalls, [[12, 480]]);
+});
+
+test("media viewer close control routes through native cleanup", async () => {
+  // Given: an open viewer with the page lock active.
+  const { createMediaViewer } = await import(socialScriptPath);
+  assert.equal(typeof createMediaViewer, "function");
+  const harness = mediaViewerHarness();
+  const viewer = createMediaViewer(harness.els, harness.options);
+  await viewer.open(mediaRecord());
+
+  // When: the visible close control is activated.
+  harness.els.dialogClose.emit("click");
+
+  // Then: native close cleanup releases scroll ownership.
+  assert.equal(harness.els.dialog.open, false);
+  assert.equal(harness.body.classList.contains("is-media-viewer-open"), false);
+  assert.deepEqual(harness.scrollCalls, [[12, 480]]);
+});
+
+test("media viewer restores page scrolling when native dialog opening fails", async () => {
+  // Given: a browser that rejects showModal before the dialog opens.
+  const { createMediaViewer } = await import(socialScriptPath);
+  assert.equal(typeof createMediaViewer, "function");
+  const harness = mediaViewerHarness({ openError: new Error("dialog blocked") });
+  const viewer = createMediaViewer(harness.els, harness.options);
+
+  // When: media opening fails.
+  const opened = await viewer.open(mediaRecord());
+
+  // Then: the page lock is released and the existing status surface reports the failure.
+  assert.equal(opened, false);
+  assert.equal(harness.root.classList.contains("is-media-viewer-open"), false);
+  assert.equal(harness.body.style.position, "relative");
+  assert.deepEqual(harness.scrollCalls, [[12, 480]]);
+  assert.deepEqual(harness.toasts, ["Media preview could not be opened."]);
+});
+
+test("rejected video playback reveals an announced unavailable state", async () => {
+  // Given: a video whose play attempt rejects.
+  const { createMediaViewer } = await import(socialScriptPath);
+  assert.equal(typeof createMediaViewer, "function");
+  const harness = mediaViewerHarness({ playError: new Error("play blocked") });
+  const viewer = createMediaViewer(harness.els, harness.options);
+
+  // When: playback rejects.
+  const firstOpened = await viewer.open(mediaRecord());
+
+  // Then: the open viewer stops and hides video, exposing a polite status message.
+  assert.equal(firstOpened, true);
+  assert.equal(harness.els.dialog.open, true);
+  assert.equal(harness.els.dialogVideo.hidden, true);
+  assert.equal(harness.els.dialogUnavailable.hidden, false);
+  assert.equal(harness.els.dialogUnavailable.textContent, "Video preview unavailable.");
+  assert.equal(harness.els.dialogUnavailable.getAttribute("role"), "status");
+  assert.equal(harness.els.dialogUnavailable.getAttribute("aria-live"), "polite");
+  assert.equal(harness.els.dialogUnavailable.getAttribute("aria-atomic"), "true");
+  assert.ok(harness.els.dialogVideo.pauseCalls > 0);
+});
+
+test("media viewer clears a prior playback failure before the next open", async () => {
+  // Given: a viewer that previously entered its playback-unavailable state.
+  const { createMediaViewer } = await import(socialScriptPath);
+  assert.equal(typeof createMediaViewer, "function");
+  const harness = mediaViewerHarness({ playError: new Error("play blocked") });
+  const viewer = createMediaViewer(harness.els, harness.options);
+  await viewer.open(mediaRecord());
+  harness.els.dialog.close();
+  harness.els.dialogVideo.playError = null;
+
+  // When: the next valid video opens.
+  await viewer.open(mediaRecord({ contentId: "second-video" }));
+
+  // Then: stale failure state is cleared for the valid media.
+  assert.equal(harness.els.dialogVideo.hidden, false);
+  assert.equal(harness.els.dialogUnavailable.hidden, true);
+  assert.equal(harness.els.dialogUnavailable.textContent, "");
+});
+
+test("video error events transition the open viewer to unavailable", async () => {
+  // Given: an open video viewer with successful initial playback.
+  const { createMediaViewer } = await import(socialScriptPath);
+  assert.equal(typeof createMediaViewer, "function");
+  const harness = mediaViewerHarness();
+  const viewer = createMediaViewer(harness.els, harness.options);
+  await viewer.open(mediaRecord());
+
+  // When: the media element reports a runtime error.
+  harness.els.dialogVideo.emit("error");
+
+  // Then: the failed video is stopped and the visible status explains the state.
+  assert.equal(harness.els.dialog.open, true);
+  assert.equal(harness.els.dialogVideo.hidden, true);
+  assert.equal(harness.els.dialogUnavailable.hidden, false);
+  assert.equal(harness.els.dialogUnavailable.textContent, "Video preview unavailable.");
+});
+
 class TestSvgNode {
   constructor(name) {
     this.name = name;
@@ -186,6 +325,145 @@ class TestSvgNode {
   replaceChildren(...children) {
     this.children = children;
   }
+}
+
+class TestClassList {
+  constructor() {
+    this.values = new Set();
+  }
+
+  add(value) {
+    this.values.add(value);
+  }
+
+  remove(value) {
+    this.values.delete(value);
+  }
+
+  contains(value) {
+    return this.values.has(value);
+  }
+}
+
+class TestElement {
+  constructor() {
+    this.attributes = new Map();
+    this.classList = new TestClassList();
+    this.hidden = true;
+    this.listeners = new Map();
+    this.style = {};
+    this.textContent = "";
+  }
+
+  addEventListener(name, listener) {
+    const listeners = this.listeners.get(name) || [];
+    listeners.push(listener);
+    this.listeners.set(name, listeners);
+  }
+
+  emit(name, properties = {}) {
+    const event = { target: this, ...properties };
+    (this.listeners.get(name) || []).forEach((listener) => listener(event));
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) || null;
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
+    if (name === "src" || name === "poster") this[name] = "";
+  }
+}
+
+function mediaViewerHarness({ openError = null, playError = null } = {}) {
+  const dialog = new TestElement();
+  dialog.open = false;
+  dialog.hidden = false;
+  dialog.showModal = () => {
+    if (openError) throw openError;
+    dialog.open = true;
+  };
+  dialog.close = () => {
+    if (!dialog.open) return;
+    dialog.open = false;
+    dialog.emit("close");
+  };
+  dialog.cancel = () => {
+    dialog.emit("cancel");
+    dialog.close();
+  };
+  const dialogVideo = new TestElement();
+  dialogVideo.pauseCalls = 0;
+  dialogVideo.playError = playError;
+  dialogVideo.pause = () => { dialogVideo.pauseCalls += 1; };
+  dialogVideo.load = () => {};
+  dialogVideo.play = async () => {
+    if (dialogVideo.playError) throw dialogVideo.playError;
+  };
+  const root = new TestElement();
+  root.clientWidth = 1180;
+  root.style.overflow = "clip";
+  const body = new TestElement();
+  Object.assign(body.style, {
+    left: "1px",
+    overflow: "visible",
+    paddingRight: "6px",
+    position: "relative",
+    right: "2px",
+    top: "3px",
+    width: "auto",
+  });
+  const scrollCalls = [];
+  const toasts = [];
+  const els = {
+    dialog,
+    dialogCaption: new TestElement(),
+    dialogClose: new TestElement(),
+    dialogEngagements: new TestElement(),
+    dialogImage: new TestElement(),
+    dialogImpressions: new TestElement(),
+    dialogTitle: new TestElement(),
+    dialogUnavailable: new TestElement(),
+    dialogVideo,
+  };
+  return {
+    body,
+    els,
+    root,
+    scrollCalls,
+    toasts,
+    options: {
+      documentRef: { body, documentElement: root },
+      showToast(message) { toasts.push(message); },
+      windowRef: {
+        innerWidth: 1200,
+        scrollX: 12,
+        scrollY: 480,
+        getComputedStyle() { return { paddingRight: "6px" }; },
+        scrollTo(x, y) { scrollCalls.push([x, y]); },
+      },
+    },
+  };
+}
+
+function mediaRecord(overrides = {}) {
+  return {
+    account: "@makeable.build",
+    caption: "Building Ember on a real desk",
+    contentId: "video-one",
+    engagements: 60,
+    impressions: 600,
+    platform: "instagram",
+    previewUrl: "https://media.example.com/ember.mp4",
+    publishedAt: "2026-08-25T00:00:00.000Z",
+    thumbnailUrl: "https://media.example.com/ember.jpg",
+    ...overrides,
+  };
 }
 
 function allDescendants(node) {

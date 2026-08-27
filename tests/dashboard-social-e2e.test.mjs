@@ -80,11 +80,21 @@ browserTest("dashboard switches sections and plays a social clip without leaving
   const dialog = page.getByRole("dialog", { name: "Building Ember on a real desk" });
   await dialog.waitFor();
   assert.equal(await dialog.locator("video[controls]").isVisible(), true);
+  assert.deepEqual(await page.evaluate(() => ({
+    bodyLocked: document.body.classList.contains("is-media-viewer-open"),
+    documentLocked: document.documentElement.classList.contains("is-media-viewer-open"),
+    position: document.body.style.position,
+  })), { bodyLocked: true, documentLocked: true, position: "fixed" });
   assert.equal(page.url(), urlBeforePlay);
   assert.match(page.url(), /\/dashboard$/);
 
   // When: the viewer closes and the layout is reflowed to a narrow phone viewport.
   await dialog.getByRole("button", { name: "Close preview" }).click();
+  assert.deepEqual(await page.evaluate(() => ({
+    bodyLocked: document.body.classList.contains("is-media-viewer-open"),
+    documentLocked: document.documentElement.classList.contains("is-media-viewer-open"),
+    position: document.body.style.position,
+  })), { bodyLocked: false, documentLocked: false, position: "" });
   await page.setViewportSize({ width: 375, height: 812 });
 
   // Then: only the table region owns horizontal overflow.

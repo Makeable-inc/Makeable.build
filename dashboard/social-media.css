@@ -124,6 +124,11 @@
 
 .social-empty { min-height: 260px; }
 
+html.is-media-viewer-open,
+body.is-media-viewer-open {
+  overscroll-behavior: none;
+}
+
 .media-dialog {
   width: min(880px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
@@ -179,6 +184,15 @@
   aspect-ratio: 16 / 9;
   place-items: center;
   background: var(--background-deep);
+}
+
+.media-dialog-frame .media-unavailable {
+  max-width: 32rem;
+  padding: var(--space-5);
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: center;
 }
 
 .media-dialog-frame video,

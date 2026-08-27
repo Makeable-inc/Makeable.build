@@ -29,6 +29,8 @@ export function createSocialDashboard(options) {
     loading: false,
   };
   const els = socialElements();
+  const mediaViewer = createMediaViewer(els, { showToast: options.showToast });
+  const renderOptions = { ...options, mediaViewer };
   const resizeObserver = new ResizeObserver(() => renderChart(state, els));
   resizeObserver.observe(els.chartWrap);
 
@@ -41,30 +43,25 @@ export function createSocialDashboard(options) {
         item.classList.toggle("is-selected", item === button);
         item.setAttribute("aria-pressed", String(item === button));
       });
-      render(state, els, options);
+      render(state, els, renderOptions);
     });
   });
   els.rankBy.addEventListener("change", () => {
     state.rankBy = els.rankBy.value;
-    render(state, els, options);
+    render(state, els, renderOptions);
   });
   els.importButton.addEventListener("click", () => els.csvInput.click());
   els.csvInput.addEventListener("change", () => {
     const [file] = els.csvInput.files || [];
-    if (file) void importCsv(file, state, els, options);
+    if (file) void importCsv(file, state, els, renderOptions);
   });
-  els.dialogClose.addEventListener("click", () => els.dialog.close());
-  els.dialog.addEventListener("click", (event) => {
-    if (event.target === els.dialog) els.dialog.close();
-  });
-  els.dialog.addEventListener("close", () => resetDialog(els));
 
   return {
     clear() {
       state.records = [];
       state.generatedAt = "";
       state.attribution = { status: "not_connected", daily: [] };
-      render(state, els, options);
+      render(state, els, renderOptions);
     },
     async load(loadOptions = {}) {
       if (state.loading) return;
@@ -81,7 +78,7 @@ export function createSocialDashboard(options) {
         if (!response.ok) {
           throw new Error(payload.error || "Social data could not be loaded.");
         }
-        applyReport(payload, state, els, options);
+        applyReport(payload, state, els, renderOptions);
         if (loadOptions.announce) options.showToast("Social data refreshed");
       } catch (error) {
         options.showToast(errorMessage(error, "Social refresh failed"));
@@ -153,7 +150,7 @@ function render(state, els, options) {
     : "No social data imported yet";
   renderChart(state, els);
   renderSocialAccounts(view, { rows: els.accountRows, count: els.accountCount });
-  renderContent(view, els);
+  renderContent(view, els, options.mediaViewer);
   options.onReport(view);
 }
 
@@ -161,7 +158,7 @@ function renderChart(state, els) {
   renderSocialChart({ chart: els.chart, chartWrap: els.chartWrap, data: state.view.daily });
 }
 
-function renderContent(view, els) {
+function renderContent(view, els, mediaViewer) {
   els.contentGrid.replaceChildren();
   view.content.slice(0, 12).forEach((record) => {
     const card = document.createElement("article");
@@ -170,7 +167,7 @@ function renderContent(view, els) {
     card.className = "content-card";
     media.className = "content-media";
     body.className = "content-card-body";
-    appendMedia(media, record, els);
+    appendMedia(media, record, mediaViewer);
     body.append(
       metaRow(record),
       paragraph(record.caption || "Untitled social post", "content-card-caption"),
@@ -183,7 +180,7 @@ function renderContent(view, els) {
   els.contentCount.textContent = `${numberFormatter.format(view.content.length)} posts`;
 }
 
-function appendMedia(container, record, els) {
+function appendMedia(container, record, mediaViewer) {
   const kind = mediaKind(record);
   if (record.thumbnailUrl) {
     const image = document.createElement("img");
@@ -214,13 +211,119 @@ function appendMedia(container, record, els) {
         ? `Play ${record.caption || "social preview"}`
         : `View ${record.caption || "social preview"}`,
     );
-    button.addEventListener("click", () => openDialog(record, els));
+    button.addEventListener("click", () => void mediaViewer.open(record));
     if (kind === "image") button.classList.add("image-control");
     container.append(button);
   }
 }
 
-function openDialog(record, els) {
+export function createMediaViewer(els, viewerOptions = {}) {
+  const documentRef = viewerOptions.documentRef || document;
+  const windowRef = viewerOptions.windowRef || window;
+  const showToast = viewerOptions.showToast || (() => {});
+  let releaseScroll = null;
+  let openRequest = 0;
+
+  els.dialogUnavailable.setAttribute("role", "status");
+  els.dialogUnavailable.setAttribute("aria-live", "polite");
+  els.dialogUnavailable.setAttribute("aria-atomic", "true");
+  els.dialogClose.addEventListener("click", () => els.dialog.close());
+  els.dialog.addEventListener("click", (event) => {
+    if (event.target === els.dialog) els.dialog.close();
+  });
+  els.dialog.addEventListener("close", closeViewer);
+  els.dialogVideo.addEventListener("error", () => {
+    if (els.dialog.open && !els.dialogVideo.hidden) showVideoUnavailable(els);
+  });
+
+  function closeViewer() {
+    openRequest += 1;
+    resetDialog(els);
+    releasePageScroll();
+  }
+
+  function releasePageScroll() {
+    const release = releaseScroll;
+    releaseScroll = null;
+    if (release) release();
+  }
+
+  return {
+    async open(record) {
+      const request = ++openRequest;
+      resetDialog(els);
+      prepareDialog(record, els);
+      releaseScroll = lockDocumentScroll(documentRef, windowRef);
+      try {
+        els.dialog.showModal();
+      } catch {
+        resetDialog(els);
+        releasePageScroll();
+        showToast("Media preview could not be opened.");
+        return false;
+      }
+      if (mediaKind(record) === "video") {
+        try {
+          await els.dialogVideo.play();
+        } catch {
+          if (els.dialog.open && request === openRequest) showVideoUnavailable(els);
+        }
+      }
+      return true;
+    },
+  };
+}
+
+export function lockDocumentScroll(documentRef, windowRef) {
+  const root = documentRef.documentElement;
+  const body = documentRef.body;
+  const scrollX = windowRef.scrollX;
+  const scrollY = windowRef.scrollY;
+  const scrollbarWidth = Math.max(0, windowRef.innerWidth - root.clientWidth);
+  const bodyPadding = Number.parseFloat(windowRef.getComputedStyle(body).paddingRight) || 0;
+  const rootHadState = root.classList.contains("is-media-viewer-open");
+  const bodyHadState = body.classList.contains("is-media-viewer-open");
+  const previous = {
+    bodyLeft: body.style.left,
+    bodyOverflow: body.style.overflow,
+    bodyPaddingRight: body.style.paddingRight,
+    bodyPosition: body.style.position,
+    bodyRight: body.style.right,
+    bodyTop: body.style.top,
+    bodyWidth: body.style.width,
+    rootOverflow: root.style.overflow,
+  };
+
+  root.classList.add("is-media-viewer-open");
+  body.classList.add("is-media-viewer-open");
+  root.style.overflow = "hidden";
+  body.style.position = "fixed";
+  body.style.top = `-${scrollY}px`;
+  body.style.left = `-${scrollX}px`;
+  body.style.right = "0";
+  body.style.width = "100%";
+  body.style.overflow = "hidden";
+  body.style.paddingRight = `${bodyPadding + scrollbarWidth}px`;
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (!rootHadState) root.classList.remove("is-media-viewer-open");
+    if (!bodyHadState) body.classList.remove("is-media-viewer-open");
+    root.style.overflow = previous.rootOverflow;
+    body.style.position = previous.bodyPosition;
+    body.style.top = previous.bodyTop;
+    body.style.left = previous.bodyLeft;
+    body.style.right = previous.bodyRight;
+    body.style.width = previous.bodyWidth;
+    body.style.overflow = previous.bodyOverflow;
+    body.style.paddingRight = previous.bodyPaddingRight;
+    windowRef.scrollTo(scrollX, scrollY);
+  };
+}
+
+function prepareDialog(record, els) {
   const kind = mediaKind(record);
   els.dialogTitle.textContent = record.caption || "Content preview";
   els.dialogCaption.textContent = `${capitalize(record.platform)} ${record.account} · ${dateFormatter.format(new Date(record.publishedAt))}`;
@@ -236,21 +339,31 @@ function openDialog(record, els) {
     els.dialogImage.hidden = false;
   } else {
     els.dialogUnavailable.hidden = false;
+    els.dialogUnavailable.textContent = "Preview unavailable.";
   }
-  els.dialog.showModal();
-  if (kind === "video") void els.dialogVideo.play().catch(() => {});
+}
+
+function showVideoUnavailable(els) {
+  els.dialogVideo.pause();
+  els.dialogVideo.hidden = true;
+  els.dialogVideo.removeAttribute("src");
+  els.dialogVideo.removeAttribute("poster");
+  els.dialogVideo.load();
+  els.dialogUnavailable.hidden = false;
+  els.dialogUnavailable.textContent = "Video preview unavailable.";
 }
 
 function resetDialog(els) {
   els.dialogVideo.pause();
+  els.dialogVideo.hidden = true;
   els.dialogVideo.removeAttribute("src");
   els.dialogVideo.removeAttribute("poster");
   els.dialogVideo.load();
-  els.dialogVideo.hidden = true;
   els.dialogImage.removeAttribute("src");
   els.dialogImage.alt = "";
   els.dialogImage.hidden = true;
   els.dialogUnavailable.hidden = true;
+  els.dialogUnavailable.textContent = "";
 }
 
 async function importCsv(file, state, els, options) {
