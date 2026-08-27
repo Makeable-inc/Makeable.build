@@ -21,13 +21,13 @@ test("PostHog attribution stays disconnected without server credentials", async 
   assert.equal(calls, 0);
 });
 
-test("PostHog attribution returns only normalized daily session aggregates", async () => {
+test("PostHog attribution assigns each session to one last-touch social account", async () => {
   // Given: a valid PostHog query response containing one aggregate row.
   let request;
   const fetchImpl = async (url, options) => {
     request = { url, options };
     return Response.json({
-      results: [["2026-08-26", "instagram", "makeable_zak", 3]],
+      results: [["2026-08-26", "instagram", "makeable_zak", 1]],
     });
   };
 
@@ -46,16 +46,57 @@ test("PostHog attribution returns only normalized daily session aggregates", asy
   const body = JSON.parse(request.options.body);
   assert.equal(body.query.kind, "HogQLQuery");
   assert.match(body.query.query, /event = 'social_landing_view'/);
-  assert.match(body.query.query, /uniqExact\(properties\['\$session_id'\]\)/);
+  assert.match(body.query.query, /GROUP BY sessionId/);
+  assert.match(body.query.query, /argMax\(\s*tuple\(/);
+  assert.match(body.query.query, /count\(\) AS websiteSessions/);
+  assert.doesNotMatch(body.query.query, /uniqExact/);
   assert.deepEqual(result, {
     status: "connected",
     daily: [{
       date: "2026-08-26",
       platform: "instagram",
       accountKey: "makeable_zak",
-      websiteSessions: 3,
+      websiteSessions: 1,
     }],
   });
+});
+
+test("PostHog attribution limits the query to the 90-day dashboard horizon", async () => {
+  // Given: a connected PostHog project.
+  let query = "";
+  const fetchImpl = async (_url, options) => {
+    query = JSON.parse(options.body).query.query;
+    return Response.json({ results: [] });
+  };
+
+  // When: the dashboard requests its attribution aggregate.
+  await readSocialWebsiteSessions({
+    personalApiKey: "phx_test_secret",
+    projectId: "12345",
+    fetchImpl,
+  });
+
+  // Then: PostHog receives the dashboard horizon and a finite output limit.
+  assert.match(query, /timestamp >= now\(\) - INTERVAL 90 DAY/);
+  assert.match(query, /LIMIT 1000/);
+});
+
+test("PostHog attribution rejects result sets above its row cap", async () => {
+  // Given: an upstream payload larger than the bounded dashboard contract.
+  const rows = Array.from(
+    { length: 1_001 },
+    (_, index) => ["2026-08-26", "instagram", `account_${index}`, 1],
+  );
+
+  // When: the oversized aggregate crosses the response boundary.
+  const result = await readSocialWebsiteSessions({
+    personalApiKey: "phx_test_secret",
+    projectId: "12345",
+    fetchImpl: async () => Response.json({ results: rows }),
+  });
+
+  // Then: partial or unexpectedly large analytics fail closed.
+  assert.deepEqual(result, { status: "unavailable", daily: [] });
 });
 
 test("PostHog attribution rejects unsafe project identifiers without fetching", async () => {

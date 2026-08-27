@@ -47,6 +47,16 @@ test("landing attribution rejects partial and unsupported identifiers", () => {
   )), null);
 });
 
+test("landing attribution rejects forged account tuples that only look valid", () => {
+  // Given: a syntactically valid attribution tuple that has no implemented redirect.
+  const forgedUrl = new URL(
+    "https://makeable.build/?utm_source=instagram&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_founder_bio&social_account=makeable_founder&social_placement=bio",
+  );
+
+  // When/Then: the landing boundary rejects the unimplemented account.
+  assert.equal(readSocialAttribution(forgedUrl), null);
+});
+
 test("social landing capture emits one conversion when session storage is available", () => {
   const events = [];
   const values = new Map();

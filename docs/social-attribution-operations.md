@@ -40,7 +40,9 @@ replacement for the personal API key and cannot read these aggregates.
   include repeat views and are not a unique-people or cross-platform reach
   total.
 - **Website conversion** means one unique attributed Makeable website session.
-  Repeated page views in that same session do not add conversions.
+  Repeated page views in that same session do not add conversions. If a session
+  arrives through more than one social account, its latest social landing wins,
+  so the cross-account total cannot count that session twice.
 - **Website visit rate** is website conversions divided by content exposures.
   It is an aggregate, directional exposure-to-visit measure—not a
   person-level conversion rate.
@@ -62,6 +64,11 @@ without website attribution; **Public snapshot** is public views and visible
 engagement only; **Attribution only** is website sessions without platform
 insights; and **Unavailable** means neither source is usable. `@makeable.zak`
 currently carries the **Public snapshot** label.
+
+The conversion query covers the most recent 90 days. The content dashboard
+ships with the eight verified Instagram snapshots (three `@makeable.build` and
+five `@makeable.zak`); later authenticated imports update matching posts by
+platform, account, and content ID instead of duplicating them.
 
 ## Instagram rollout
 

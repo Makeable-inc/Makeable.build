@@ -6,6 +6,7 @@ import {
   dashboardSocialResult,
   mergeSocialRecords,
   parseSocialCsv,
+  readSocialRecords,
 } from "../lib/social-dashboard.mjs";
 
 const now = new Date("2026-08-26T18:00:00.000Z");
@@ -237,6 +238,50 @@ test("mergeSocialRecords updates matching posts without duplicating prior import
   assert.equal(merged.find((record) => record.id === existing[0].id).engagements, 24);
 });
 
+test("readSocialRecords seeds the truthful eight-post baseline in a clean store", async () => {
+  // Given: a newly deployed store with no operator import.
+  const store = new MemoryStore();
+
+  // When: the dashboard reads its records.
+  const records = await readSocialRecords(store);
+  const report = buildSocialDashboardReport(records, { now });
+
+  // Then: both Instagram accounts and all measured exposures are immediately present.
+  assert.equal(report.postsTotal, 8);
+  assert.equal(report.accounts.length, 2);
+  assert.equal(report.totalExposures, 7_339);
+  assert.deepEqual(
+    report.accounts.map(({ account, posts }) => ({ account, posts })),
+    [
+      { account: "@makeable.build", posts: 3 },
+      { account: "@makeable.zak", posts: 5 },
+    ],
+  );
+});
+
+test("readSocialRecords lets a stored post update its seeded identity without duplication", async () => {
+  // Given: an import that refreshes one seeded post with a newer measured value.
+  const store = new MemoryStore();
+  await store.setJSON("v1/social-records.json", {
+    records: [socialRecord({
+      id: "ignored-by-normalization",
+      contentId: "DcgtZHVA9Y7",
+      impressions: 2_000,
+      engagements: 75,
+    })],
+  });
+
+  // When: defaults and stored records are merged by stable post identity.
+  const records = await readSocialRecords(store);
+
+  // Then: the refresh replaces the seed instead of creating a ninth post.
+  assert.equal(records.length, 8);
+  assert.equal(
+    records.find((record) => record.contentId === "DcgtZHVA9Y7").impressions,
+    2_000,
+  );
+});
+
 test("dashboardSocialResult imports and persists new social posts", async () => {
   // Given: an empty private store and a one-row normalized CSV import.
   const store = new MemoryStore();
@@ -263,9 +308,9 @@ test("dashboardSocialResult imports and persists new social posts", async () => 
   // Then: the response reports the imported post and the store retains it.
   assert.equal(result.status, 200);
   assert.equal(result.body.imported, 1);
-  assert.equal(result.body.report.totalImpressions, 2200);
+  assert.equal(result.body.report.totalImpressions, 9_539);
   assert.deepEqual(result.body.report.attribution, attribution);
-  assert.equal((await store.get("v1/social-records.json")).records.length, 1);
+  assert.equal((await store.get("v1/social-records.json")).records.length, 9);
 });
 
 test("dashboardSocialResult rejects extra import fields before storage", async () => {

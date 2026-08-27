@@ -1,6 +1,10 @@
 const socialPlatforms = ["instagram", "tiktok", "youtube", "linkedin", "x"] as const;
 const socialPlacements = ["bio", "profile", "description", "post"] as const;
 const keyPattern = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
+const implementedAttributions = new Set([
+  "instagram:makeable_build:bio:makeable_build_bio",
+  "instagram:makeable_zak:bio:makeable_zak_bio",
+]);
 
 type SocialPlatform = (typeof socialPlatforms)[number];
 type SocialPlacement = (typeof socialPlacements)[number];
@@ -42,6 +46,7 @@ export function readSocialAttribution(url: URL): SocialAttribution | null {
   if (!isSocialPlatform(platform) || !isSocialPlacement(placement)) return null;
   if (!keyPattern.test(account) || content !== `${account}_${placement}`) return null;
   if (value("utm_medium") !== "organic_social" || value("utm_campaign") !== "makeable") return null;
+  if (!implementedAttributions.has(`${platform}:${account}:${placement}:${content}`)) return null;
 
   return {
     social_platform: platform,
