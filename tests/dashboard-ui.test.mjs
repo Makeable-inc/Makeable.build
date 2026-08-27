@@ -9,6 +9,7 @@ const socialScriptPath = new URL("../dashboard/social.js", import.meta.url);
 const socialChartScriptPath = new URL("../dashboard/social-chart.js", import.meta.url);
 const accountTableScriptPath = new URL("../dashboard/social-account-table.js", import.meta.url);
 const socialModelScriptPath = new URL("../dashboard/social-model.js", import.meta.url);
+const socialMediaStylePath = new URL("../dashboard/social-media.css", import.meta.url);
 
 test("dashboard keeps private auth and separates contacts, builders, and projects", async () => {
   const [html, script, socialScript, waitlistScript] = await Promise.all([
@@ -161,6 +162,22 @@ test("dashboard component colors come from the documented token palette", async 
     const closingBraces = sources[index].match(/\}/g)?.length || 0;
     assert.equal(openingBraces, closingBraces, `${path} has unbalanced blocks`);
   });
+});
+
+test("media dialog frame contains portrait replaced media", async () => {
+  // Break caught: a portrait video's automatic grid minimum enlarged the bounded 16:9 frame.
+  const css = await readFile(socialMediaStylePath, "utf8");
+  const frame = css.match(/\.media-dialog-frame\s*\{([^}]*)\}/)?.[1] || "";
+  const media = css.match(/\.media-dialog-frame video,\s*\.media-dialog-frame img\s*\{([^}]*)\}/)?.[1] || "";
+
+  assert.match(frame, /grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(frame, /grid-template-rows:\s*minmax\(0,\s*1fr\)/);
+  assert.match(frame, /overflow:\s*hidden/);
+  assert.match(media, /min-width:\s*0/);
+  assert.match(media, /min-height:\s*0/);
+  assert.match(media, /max-width:\s*100%/);
+  assert.match(media, /max-height:\s*100%/);
+  assert.match(media, /object-fit:\s*contain/);
 });
 
 test("media viewer opening locks page scrolling at the current offset", async () => {

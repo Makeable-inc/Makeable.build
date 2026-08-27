@@ -95,6 +95,37 @@ browserTest("dashboard switches sections and plays a social clip without leaving
     documentLocked: document.documentElement.classList.contains("is-media-viewer-open"),
     position: document.body.style.position,
   })), { bodyLocked: false, documentLocked: false, position: "" });
+
+  // When: a portrait Zak brand MP4 opens in the same bounded viewer.
+  await page.locator("#mediaDialogVideo").evaluate((video) => {
+    video.setAttribute("width", "1080");
+    video.setAttribute("height", "1920");
+    video.play = () => new Promise(() => {});
+  });
+  await page.getByRole("button", { name: "Play Portrait Zak brand workshop" }).click();
+  const portraitDialog = page.getByRole("dialog", { name: "Portrait Zak brand workshop" });
+  await portraitDialog.waitFor();
+
+  // Then: the active media stays inside the frame and cannot cover the copy below it.
+  const geometry = await portraitDialog.evaluate((element) => {
+    const frame = element.querySelector(".media-dialog-frame").getBoundingClientRect();
+    const media = element.querySelector("video:not([hidden]), img:not([hidden])").getBoundingClientRect();
+    const copy = element.querySelector(".media-dialog-copy").getBoundingClientRect();
+    return {
+      contained: media.left >= frame.left - 0.5 && media.top >= frame.top - 0.5
+        && media.right <= frame.right + 0.5 && media.bottom <= frame.bottom + 0.5,
+      copyBelowFrame: copy.top >= frame.bottom - 0.5,
+      frameOverflow: getComputedStyle(element.querySelector(".media-dialog-frame")).overflow,
+      unnecessaryScroll: element.scrollHeight > element.clientHeight + 1,
+    };
+  });
+  assert.deepEqual(geometry, {
+    contained: true,
+    copyBelowFrame: true,
+    frameOverflow: "hidden",
+    unnecessaryScroll: false,
+  });
+  await portraitDialog.getByRole("button", { name: "Close preview" }).click();
   await page.setViewportSize({ width: 375, height: 812 });
 
   // Then: only the table region owns horizontal overflow.
@@ -224,12 +255,12 @@ function socialReport(attributionStatus) {
     id: "instagram:@makeable.zak:reel-2",
     account: "@makeable.zak",
     contentId: "reel-2",
-    caption: "Public snapshot post",
+    caption: "Portrait Zak brand workshop",
     impressions: 1300,
     engagements: 15,
     followersGained: null,
     clicks: null,
-    previewUrl: "",
+    previewUrl: "https://media.example.com/zak-portrait.mp4",
     postUrl: "https://instagram.com/p/reel-2",
     coverage: "public-snapshot",
     attributionKey: "makeable_zak",

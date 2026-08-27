@@ -210,11 +210,14 @@ Spacing intent derives from a 4px base.
   polite atomic status announcement. Background scrolling is locked only while
   the dialog is open.
 - **Motion**: 180ms opacity and transform entrance; reduced motion is instant.
-- **Layout**: centered imposter with a bounded 16:9 frame. The explicit
-  `is-media-viewer-open` state applies to the document root and body, preserves
-  the current page offset, compensates for the removed scrollbar to prevent
-  layout shift, and restores prior inline styles and scroll position on native
-  close or opening failure. The dialog retains its own vertical scrolling.
+- **Layout**: centered imposter with a bounded 16:9 frame. The frame uses
+  zero-minimum grid tracks and clips overflow so portrait media cannot enlarge
+  the frame; the video or image remains fully contained with `object-fit:
+  contain`, and the caption/metrics begin below the frame without overlap. The
+  explicit `is-media-viewer-open` state applies to the document root and body,
+  preserves the current page offset, compensates for the removed scrollbar to
+  prevent layout shift, and restores prior inline styles and scroll position on
+  native close or opening failure. The dialog retains its own vertical scrolling.
 
 ### Import control
 
