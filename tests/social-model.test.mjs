@@ -163,6 +163,63 @@ test("buildSocialView joins attribution only on exact keys inside the UTC range"
   assert.equal(view.accounts[0].websiteSessions, 8);
 });
 
+test("buildSocialView assigns one session bucket to renamed display accounts", () => {
+  // Given: two display labels for one normalized platform and attribution identity.
+  const records = [
+    record({ id: "instagram:@old-name:post-1", platform: "Instagram", account: "@old-name", attributionKey: "makeable_build", publishedAt: "2026-08-19T00:00:00.000Z", impressions: 100 }),
+    record({ id: "instagram:@new-name:post-2", account: "@new-name", attributionKey: "makeable_build", publishedAt: "2026-08-22T00:00:00.000Z", impressions: 200 }),
+  ];
+
+  // When: the shared attribution bucket is joined to the account view.
+  const view = buildSocialView(records, {
+    days: 30,
+    now,
+    attribution: connectedAttribution(session("makeable_build", 7)),
+  });
+
+  // Then: the bucket is assigned once and the newest display label represents the identity.
+  assert.equal(view.websiteSessions, 7);
+  assert.equal(view.accounts.length, 1);
+  assert.equal(view.accounts[0].platform, "instagram");
+  assert.equal(view.accounts[0].account, "@new-name");
+  assert.equal(view.accounts[0].attributionKey, "makeable_build");
+  assert.equal(view.accounts[0].impressions, 300);
+  assert.equal(view.accounts[0].websiteSessions, 7);
+});
+
+test("buildSocialView keeps changed attribution keys as distinct account identities", () => {
+  // Given: one display label whose older and newer content use different exact keys.
+  const records = [
+    record({ id: "instagram:@makeable:legacy", attributionKey: "makeable_legacy", publishedAt: "2026-08-19T00:00:00.000Z", impressions: 200 }),
+    record({ id: "instagram:@makeable:current", attributionKey: "makeable_current", publishedAt: "2026-08-22T00:00:00.000Z", impressions: 100 }),
+  ];
+
+  // When: each attribution bucket is joined and ranked by its measured sessions.
+  const view = buildSocialView(records, {
+    days: 30,
+    rankBy: "websiteSessions",
+    now,
+    attribution: connectedAttribution(
+      session("makeable_legacy", 4),
+      session("makeable_current", 6),
+    ),
+  });
+
+  // Then: both identities remain visible and each exact bucket contributes once globally.
+  assert.equal(view.websiteSessions, 10);
+  assert.deepEqual(
+    view.accounts.map(({ account, attributionKey, websiteSessions }) => ({
+      account,
+      attributionKey,
+      websiteSessions,
+    })),
+    [
+      { account: "@makeable", attributionKey: "makeable_current", websiteSessions: 6 },
+      { account: "@makeable", attributionKey: "makeable_legacy", websiteSessions: 4 },
+    ],
+  );
+});
+
 test("buildSocialView ranks measured visit rates above zero and null deterministically", () => {
   // Given: positive, zero, and denominator-less account conversion rates.
   const records = [
@@ -226,4 +283,12 @@ function record(overrides = {}) {
     postUrl: "",
     ...overrides,
   };
+}
+
+function connectedAttribution(...daily) {
+  return { status: "connected", daily };
+}
+
+function session(accountKey, websiteSessions) {
+  return { date: "2026-08-20", platform: "instagram", accountKey, websiteSessions };
 }

@@ -30,7 +30,8 @@ export function buildSocialView(records, options = {}) {
     rankValue(right, rankBy) - rankValue(left, rankBy)
     || right.impressions - left.impressions
     || left.account.localeCompare(right.account)
-    || left.platform.localeCompare(right.platform),
+    || left.platform.localeCompare(right.platform)
+    || left.attributionKey.localeCompare(right.attributionKey),
   );
   accounts.forEach((account, index) => {
     account.rank = index + 1;
@@ -85,13 +86,15 @@ function inRange(value, days, now) {
 function accountRows(records, attributionConnected, sessions) {
   const accounts = new Map();
   records.forEach((record) => {
-    const key = `${record.platform}:${record.account}`;
+    const platform = String(record.platform || "").trim().toLowerCase();
+    const normalizedAttributionKey = attributionKey(record.attributionKey, record.account);
+    const key = `${platform}:${normalizedAttributionKey}`;
     const account = accounts.get(key) || {
       rank: 0,
-      platform: record.platform,
+      platform,
       account: record.account,
       coverage: coverage(record.coverage),
-      attributionKey: attributionKey(record.attributionKey, record.account),
+      attributionKey: normalizedAttributionKey,
       impressions: 0,
       engagements: 0,
       completeExposures: 0,
@@ -116,9 +119,9 @@ function accountRows(records, attributionConnected, sessions) {
     account.posts += 1;
     if (record.publishedAt >= account.latestPublishedAt) {
       account.latestPublishedAt = record.publishedAt;
+      account.account = record.account;
       account.followers = number(record.followers);
       account.coverage = coverage(record.coverage);
-      account.attributionKey = attributionKey(record.attributionKey, record.account);
     }
     accounts.set(key, account);
   });
