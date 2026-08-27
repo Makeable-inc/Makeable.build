@@ -34,10 +34,31 @@ test("parseSocialCsv creates safe normalized post records from a quoted CSV expo
     followers: 842,
     followersGained: 14,
     clicks: 36,
+    coverage: "platform-only",
+    attributionKey: "makeable_build",
+    engagementsComplete: true,
     thumbnailUrl: "https://cdn.example.com/thumb.jpg",
     previewUrl: "https://cdn.example.com/preview.mp4",
     postUrl: "https://instagram.com/p/reel-1",
   }]);
+});
+
+test("parseSocialCsv preserves unknown optional metrics and parses incomplete engagements", () => {
+  // Given: a public snapshot whose private metrics are blank and completeness is CSV text.
+  const csv = [
+    "platform,account,published_at,content_id,content_type,caption,impressions,engagements,followers_current,followers_gained,clicks,thumbnail_url,preview_url,post_url,coverage,attribution_key,engagements_complete",
+    "instagram,@makeable.zak,2026-08-26,reel-1,reel,Public reel,500,15,47,,,,,,public-snapshot,makeable_zak,false",
+  ].join("\n");
+
+  // When: the CSV crosses the import boundary.
+  const [record] = parseSocialCsv(csv);
+
+  // Then: unknown values stay unknown and the literal false controls completeness.
+  assert.equal(record.followersGained, null);
+  assert.equal(record.clicks, null);
+  assert.equal(record.coverage, "public-snapshot");
+  assert.equal(record.attributionKey, "makeable_zak");
+  assert.equal(record.engagementsComplete, false);
 });
 
 test("parseSocialCsv rejects unsafe media URLs before they reach the dashboard", () => {
@@ -169,6 +190,27 @@ test("buildSocialDashboardReport includes normalized website-session attribution
 
   // Then: the report includes only the normalized attribution contract.
   assert.deepEqual(report.attribution, attribution);
+});
+
+test("buildSocialDashboardReport does not invent totals for unknown stored metrics", () => {
+  // Given: one record whose private click and follower-gain metrics are unavailable.
+  const records = [socialRecord({
+    coverage: "public-snapshot",
+    engagementsComplete: false,
+    followersGained: null,
+    clicks: null,
+  })];
+
+  // When: the stored records are normalized and summarized.
+  const report = buildSocialDashboardReport(records, { now });
+
+  // Then: null survives storage normalization, account aggregation, and report totals.
+  assert.equal(report.records[0].followersGained, null);
+  assert.equal(report.records[0].clicks, null);
+  assert.equal(report.accounts[0].followersGained, null);
+  assert.equal(report.accounts[0].clicks, null);
+  assert.equal(report.followersGained, null);
+  assert.equal(report.totalClicks, null);
 });
 
 test("mergeSocialRecords updates matching posts without duplicating prior imports", () => {
