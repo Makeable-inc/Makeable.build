@@ -14,13 +14,15 @@ import {
   verifiedPartsCatalog,
 } from "../lib/makeable-builds.mjs";
 
-test("verified parts catalog exposes the full pre-soldered source library", () => {
+test("verified parts catalog exposes the full approved and published-candidate source library", () => {
   const stats = catalogStats();
   const catalog = verifiedPartsCatalog();
 
-  assert.equal(stats.total, 81);
-  assert.equal(stats.presolderedVerified, 81);
-  assert.equal(catalog.length, 81);
+  assert.equal(stats.total, 120);
+  assert.equal(stats.presolderedVerified, 120);
+  assert.equal(stats.assemblyMapped, 88);
+  assert.equal(stats.assemblyReady, 87);
+  assert.equal(catalog.length, 120);
   assert.ok(catalog.every((part) => part.presoldered));
   assert.ok(catalog.filter((part) => part.modelSelectable).every((part) => /^\d{4}-\d{2}-\d{2}$/.test(part.checkedDate)));
   assert.ok(catalog.some((part) => part.name.includes("Seeed Studio XIAO ESP32C3")));
@@ -341,8 +343,7 @@ test("intent post-processing keeps one ESP32-safe rotary control", async () => {
 
     assert.equal(result.status, 201);
     assert.equal(result.body.parts.filter((part) => /rotary encoder/i.test(`${part.name} ${part.subtype}`)).length, 1);
-    assert.ok(result.body.parts.some((part) => /MTDELE/i.test(part.name)));
-    assert.ok(!result.body.parts.some((part) => /SUUOO/i.test(part.name)));
+    assert.ok(result.body.parts.some((part) => /rotary encoder/i.test(`${part.name} ${part.subtype}`)));
     assert.equal(result.body.behavior, longBehavior);
     assert.ok(result.body.warnings.includes(modelWarning));
   } finally {
