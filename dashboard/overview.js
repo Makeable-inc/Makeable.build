@@ -9,39 +9,44 @@ export function createOverview({ state, els }) {
     render() {
       const report = state.report || {};
       const social = state.socialView;
-      els.overviewExposures.textContent = social ? compactFormatter.format(social.totalExposures) : "—";
-      els.overviewEngagements.textContent = social ? compactFormatter.format(social.totalEngagements) : "—";
-      els.overviewEngagementRate.textContent = social ? optionalPercent(social.engagementRate) : "—";
-      els.overviewFollowers.textContent = social ? optionalSigned(social.followersGained) : "—";
+      const display = photoDemo() ? photoDemoSocial() : social;
+      if (els.overviewDemoNote) {
+        els.overviewDemoNote.hidden = !photoDemo();
+        els.overviewDemoNote.className = "import-status is-warning";
+      }
+      els.overviewExposures.textContent = display ? compactFormatter.format(display.totalExposures) : "—";
+      els.overviewEngagements.textContent = display ? compactFormatter.format(display.totalEngagements) : "—";
+      els.overviewEngagementRate.textContent = display ? optionalPercent(display.engagementRate) : "—";
+      els.overviewFollowers.textContent = display ? optionalSigned(display.followersGained) : "—";
       els.overviewContacts.textContent = numberFormatter.format(Number(report.total) || 0);
       els.overviewBuilders.textContent = numberFormatter.format(Number(report.builderAccountsTotal) || 0);
       els.overviewSocialRows.replaceChildren();
       appendPulseRow(
         els.overviewSocialRows,
         "Content exposures",
-        social ? compactFormatter.format(social.totalExposures) : "Loading…",
+        display ? compactFormatter.format(display.totalExposures) : "Loading…",
       );
       appendPulseRow(
         els.overviewSocialRows,
         "Engagement rate",
-        social ? optionalPercent(social.engagementRate) : "—",
+        display ? optionalPercent(display.engagementRate) : "—",
       );
-      if (social?.attributionStatus === "connected") {
+      if (display?.attributionStatus === "connected") {
         appendPulseRow(
           els.overviewSocialRows,
           "Website conversions",
-          numberFormatter.format(social.websiteSessions),
+          numberFormatter.format(display.websiteSessions),
         );
         appendPulseRow(
           els.overviewSocialRows,
           "Website visit rate",
-          optionalPercent(social.websiteVisitRate),
+          optionalPercent(display.websiteVisitRate),
         );
       } else {
         appendPulseRow(
           els.overviewSocialRows,
           "Website attribution",
-          social ? (social.attributionStatus === "unavailable" ? "Unavailable" : "Not connected") : "Loading…",
+          display ? (display.attributionStatus === "unavailable" ? "Unavailable" : "Not connected") : "Loading…",
         );
       }
       els.overviewWaitlistRows.replaceChildren();
@@ -62,6 +67,15 @@ export function createOverview({ state, els }) {
       );
     },
   };
+}
+
+function photoDemo() {
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "photo";
+}
+
+function photoDemoSocial() {
+  return { totalExposures: 36_700, totalEngagements: 1_321, engagementRate: 0.036, followersGained: 82,
+    attributionStatus: "connected", websiteSessions: 125, websiteVisitRate: 0.0034 };
 }
 
 function appendPulseRow(container, label, value) {

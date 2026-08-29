@@ -50,6 +50,7 @@ const els = {
   overviewFollowers: document.querySelector("#overviewFollowers"),
   overviewContacts: document.querySelector("#overviewContacts"),
   overviewBuilders: document.querySelector("#overviewBuilders"),
+  overviewDemoNote: document.querySelector("#overviewDemoNote"),
   overviewSocialRows: document.querySelector("#overviewSocialRows"),
   overviewWaitlistRows: document.querySelector("#overviewWaitlistRows"),
   toast: document.querySelector("#toast"),
