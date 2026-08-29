@@ -42,6 +42,7 @@ const env = {
   MAKEABLE_BACKGROUND_SECRET: "background-secret-with-at-least-32-chars",
   NODE_ENV: "test",
 };
+const BUILD_FIXTURE_NOW = new Date("2026-08-21T19:05:00.000Z");
 
 test("anonymous build starts use a signed draft cookie and enforce active/daily limits", async () => {
   const stateStore = createMemoryBlobStore();
@@ -101,6 +102,7 @@ test("anonymous build starts use a signed draft cookie and enforce active/daily 
       stateStore,
       env,
       jobId: next.job.id,
+      now: new Date(`2026-08-21T18:0${5 + index}:00.000Z`),
     });
   }
 
@@ -161,6 +163,7 @@ test("signed-in accounts use the ten-start account window instead of the anonymo
       stateStore,
       env,
       jobId: started.job.id,
+      now: new Date(`2026-08-23T12:${String(index).padStart(2, "0")}:30.000Z`),
     });
   }
 
@@ -211,6 +214,7 @@ test("successful draft jobs keep binary image bytes separate from metadata", asy
     imageStore,
     env,
     jobId,
+    now: BUILD_FIXTURE_NOW,
   });
   assert.equal(image.ok, true);
   assert.equal(Buffer.from(image.image.bytes).toString("utf8"), "hello");
@@ -243,6 +247,7 @@ test("claimed fallback-image jobs keep their static preview URL", async () => {
     jobId: draft.jobId,
     user: { sub: "google-subject-fallback", email: "maker@example.com", name: "Mo" },
     galleryName: "Mo",
+    now: BUILD_FIXTURE_NOW,
   });
 
   assert.equal(claim.ok, true);
@@ -346,6 +351,7 @@ test("eleven simultaneous successful claims reserve only ten account slots", asy
         jobId: draft.jobId,
         user: { sub: "google-subject-1", email: "maker@example.com", name: "Mo" },
         galleryName: `Mo ${index}`,
+        now: BUILD_FIXTURE_NOW,
       }),
     ),
   );
@@ -420,6 +426,7 @@ test("moderation rejects disallowed concepts before quota or public publish", as
     jobId: draft.jobId,
     user: { sub: "google-subject-moderation", email: "maker@example.com", name: "Mo" },
     galleryName: "Mo",
+    now: BUILD_FIXTURE_NOW,
   });
 
   assert.equal(result.ok, false);
@@ -464,6 +471,7 @@ test("owner unpublish hides gallery record without releasing used quota", async 
     jobId: draft.jobId,
     user,
     galleryName: "Mo",
+    now: BUILD_FIXTURE_NOW,
   });
   assert.equal(claim.ok, true);
   assert.equal((await accountBuildQuota(stateStore, user.sub)).used, 1);
@@ -526,6 +534,7 @@ test("failed publish releases claim marker and quota reservation cleanly", async
       jobId: draft.jobId,
       user: { sub: "google-subject-release", email: "maker@example.com", name: "Mo" },
       galleryName: "Mo",
+      now: BUILD_FIXTURE_NOW,
     }),
     /simulated gallery write failure/,
   );
@@ -541,6 +550,7 @@ test("failed publish releases claim marker and quota reservation cleanly", async
     jobId: draft.jobId,
     user: { sub: "google-subject-release", email: "maker@example.com", name: "Mo" },
     galleryName: "Mo",
+    now: BUILD_FIXTURE_NOW,
   });
   assert.equal(retry.ok, true);
   assert.equal((await accountBuildQuota(stateStore, "google-subject-release")).used, 1);
@@ -565,6 +575,7 @@ test("nightly cleanup removes old unclaimed outputs and stale reservations", asy
     jobId: draft.jobId,
     user: { sub: "google-subject-cleanup", email: "maker@example.com", name: "Mo" },
     galleryName: "Mo",
+    now: BUILD_FIXTURE_NOW,
   });
   assert.equal(reservation.ok, true);
 
