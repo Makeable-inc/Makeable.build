@@ -50,7 +50,7 @@ test("Apify Facebook refresh uses the visible public video count for the linked 
     engagements: record?.engagements,
   }, { account: "Makeable Facebook", attributionKey: "makeable_facebook", impressions: 4_200, engagements: 133 });
   assert.deepEqual(facebookInput, {
-    startUrls: [{ url: "https://www.facebook.com/profile.php?id=61593471075023" }],
+    startUrls: [{ url: "https://www.facebook.com/61593471075023" }],
     maxItems: 12,
   });
 });
