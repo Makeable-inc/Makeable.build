@@ -178,6 +178,7 @@ type HeroBuild = {
   title: string;
   description: string;
   image: string;
+  mobileImage?: string;
   cardImage: string;
   cta: string;
   action: "preorder" | "soon";
@@ -209,6 +210,7 @@ const heroBuilds: HeroBuild[] = [
     title: "Feed Ember Tokens.",
     description: "A desk pet that grows with every Claude and Codex token you burn.",
     image: "/concepts/homepage-v2/ember-flagship-hero-v2.webp",
+    mobileImage: "/concepts/homepage-v2/ember-flagship-hero-physical-geometry-v9.png",
     cardImage: "/concepts/homepage-v2/ember-flagship-hero-v2.webp",
     cta: "Pre-order Ember",
     action: "preorder",
@@ -237,6 +239,33 @@ const heroBuilds: HeroBuild[] = [
     description: "A small printed light with a translucent FDM diffuser that wakes up gently when you walk by.",
     image: "/concepts/homepage-v2/motion-light-v2.webp",
     cardImage: "/concepts/homepage-v2/motion-light-v2.webp",
+    cta: "Coming soon",
+    action: "soon",
+  },
+  {
+    id: "window-air-monitor",
+    title: "Window Air Monitor",
+    description: "A simple screen that helps you know when to open the window.",
+    image: "/assets/landing/gallery-v2/window-air.webp",
+    cardImage: "/assets/landing/gallery-v2/window-air.webp",
+    cta: "Coming soon",
+    action: "soon",
+  },
+  {
+    id: "pet-water-reminder",
+    title: "Pet Water Reminder",
+    description: "A gentle desk reminder for keeping your pet's water fresh.",
+    image: "/assets/landing/gallery-v2/pet-water.webp",
+    cardImage: "/assets/landing/gallery-v2/pet-water.webp",
+    cta: "Coming soon",
+    action: "soon",
+  },
+  {
+    id: "quiet-door-chime",
+    title: "Quiet Door Chime",
+    description: "A calm way to know when someone arrives.",
+    image: "/assets/landing/gallery-v2/quiet-chime.webp",
+    cardImage: "/assets/landing/gallery-v2/quiet-chime.webp",
     cta: "Coming soon",
     action: "soon",
   },
@@ -459,6 +488,8 @@ function catalogPart(
 export default function Home() {
   const router = useRouter();
   const [activeHeroId, setActiveHeroId] = useState("ember");
+  const [featuredBuildsExpanded, setFeaturedBuildsExpanded] = useState(false);
+  const [featuredRailState, setFeaturedRailState] = useState({ canGoBack: false, canGoForward: false });
   const [idea, setIdea] = useState("");
   const [generationBusy, setGenerationBusy] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -486,6 +517,7 @@ export default function Home() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const communityGridRef = useRef<HTMLDivElement>(null);
+  const featuredBuildsRailRef = useRef<HTMLDivElement>(null);
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const loginDialogRef = useRef<HTMLElement>(null);
   const preorderDialogRef = useRef<HTMLFormElement>(null);
@@ -547,6 +579,44 @@ export default function Home() {
     url.searchParams.set("build", selectedBuild.id);
     window.history.pushState({ makeableBuild: selectedBuild.id }, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
+
+  const syncFeaturedBuildsRail = useCallback(() => {
+    const rail = featuredBuildsRailRef.current;
+    if (!rail || featuredBuildsExpanded) {
+      setFeaturedRailState({ canGoBack: false, canGoForward: false });
+      return;
+    }
+    const maxScrollLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    setFeaturedRailState({
+      canGoBack: rail.scrollLeft > 2,
+      canGoForward: rail.scrollLeft < maxScrollLeft - 2,
+    });
+  }, [featuredBuildsExpanded]);
+
+  const moveFeaturedBuildsRail = useCallback((direction: "back" | "forward") => {
+    const rail = featuredBuildsRailRef.current;
+    if (!rail) return;
+    const firstCard = rail.querySelector<HTMLElement>(".mk-hero-build-card");
+    const distance = (firstCard?.offsetWidth || rail.clientWidth * 0.92) + 16;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    rail.scrollBy({
+      left: direction === "forward" ? distance : -distance,
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, []);
+
+  useEffect(() => {
+    const rail = featuredBuildsRailRef.current;
+    if (!rail) return;
+    const resizeObserver = new ResizeObserver(syncFeaturedBuildsRail);
+    rail.addEventListener("scroll", syncFeaturedBuildsRail, { passive: true });
+    resizeObserver.observe(rail);
+    syncFeaturedBuildsRail();
+    return () => {
+      rail.removeEventListener("scroll", syncFeaturedBuildsRail);
+      resizeObserver.disconnect();
+    };
+  }, [syncFeaturedBuildsRail]);
 
   useDialogFocusTrap(loginOpen, loginDialogRef, closeLogin, authBusy);
   useDialogFocusTrap(preorderOpen, preorderDialogRef, () => setPreorderOpen(false), preorderBusy);
@@ -1161,7 +1231,7 @@ export default function Home() {
         <div
           className="mk-mobile-hero-media"
           aria-hidden="true"
-          style={{ backgroundImage: `url(${activeHero.image})` }}
+          style={{ backgroundImage: `url(${activeHero.mobileImage ?? activeHero.image})` }}
         />
 
         <div className="mk-hero-copy">
@@ -1177,24 +1247,45 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mk-hero-builds" id="builds">
+        <div className="mk-hero-builds" id="builds" data-builds-expanded={featuredBuildsExpanded || undefined}>
           <div className="mk-hero-builds-copy">
             <h2>Builds to get you started</h2>
+            <button
+              className="mk-featured-view-all"
+              type="button"
+              aria-pressed={featuredBuildsExpanded}
+              onClick={() => setFeaturedBuildsExpanded((expanded) => !expanded)}
+            >
+              {featuredBuildsExpanded ? "Show carousel" : "View all builds"}
+              <ArrowIcon />
+            </button>
           </div>
-          <div className="mk-hero-build-grid">
-            {starterBuilds.map((build) => (
-              <button
-                className="mk-hero-build-card"
-                type="button"
-                key={build.id}
-                aria-current={activeHeroId === build.id ? "true" : undefined}
-                onClick={() => selectHeroBuild(build.id)}
-              >
-                <img src={build.cardImage} alt={`${build.title} product render`} />
-                <span>{build.title}</span>
-                <small>{build.cta}</small>
+          <div className="mk-featured-rail-shell">
+            {featuredRailState.canGoBack ? (
+              <button className="mk-featured-rail-control mk-featured-rail-control-back" type="button" aria-label="Show previous builds" onClick={() => moveFeaturedBuildsRail("back")}>
+                <ArrowIcon direction="left" />
               </button>
-            ))}
+            ) : null}
+            <div ref={featuredBuildsRailRef} className="mk-hero-build-grid" aria-label="Featured builds" onScroll={syncFeaturedBuildsRail}>
+              {starterBuilds.map((build) => (
+                <button
+                  className="mk-hero-build-card"
+                  type="button"
+                  key={build.id}
+                  aria-current={activeHeroId === build.id ? "true" : undefined}
+                  onClick={() => selectHeroBuild(build.id)}
+                >
+                  <img src={build.cardImage} alt={`${build.title} product render`} />
+                  <span>{build.title}</span>
+                  <small>{build.cta}</small>
+                </button>
+              ))}
+            </div>
+            {featuredRailState.canGoForward ? (
+              <button className="mk-featured-rail-control mk-featured-rail-control-forward" type="button" aria-label="Show more builds" onClick={() => moveFeaturedBuildsRail("forward")}>
+                <ArrowIcon />
+              </button>
+            ) : null}
           </div>
         </div>
       </section>
@@ -1202,7 +1293,7 @@ export default function Home() {
       <section className="mk-builder" id="make" aria-labelledby="make-title">
         <div className="mk-builder-inner">
           <h2 id="make-title">Create your own build.</h2>
-          <p>Tell us what you want to make. We&apos;ll turn it into a render, a parts list, and a project folder.</p>
+          <p>Bring any idea to life.</p>
           <form className="mk-composer" onSubmit={submitBuild}>
             <label className="mk-sr-only" htmlFor="build-idea">Describe what you want to build</label>
             <textarea
