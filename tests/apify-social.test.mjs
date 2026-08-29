@@ -20,7 +20,7 @@ test("Apify refresh keeps successful platform data when another platform is temp
         videoPlayCount: 12_000,
       }]));
     }
-    if (url.includes("facebook-profile-posts-scraper") || url.includes("youtube-scraper")) return new Response(JSON.stringify([]));
+    if (url.includes("facebook-posts-scraper") || url.includes("youtube-scraper")) return new Response(JSON.stringify([]));
     return new Response(JSON.stringify({ error: "rate limited" }), { status: 429 });
   };
 
@@ -33,10 +33,10 @@ test("Apify refresh keeps successful platform data when another platform is temp
   ]);
 });
 
-test("Apify Facebook refresh uses public-profile rows for the linked Makeable profile", async () => {
+test("Apify Facebook refresh uses official post rows for the linked Makeable profile", async () => {
   let facebookInput;
   const fetchImpl = async (url, options) => {
-    if (!url.includes("facebook-profile-posts-scraper")) return new Response(JSON.stringify([]));
+    if (!url.includes("facebook-posts-scraper")) return new Response(JSON.stringify([]));
     facebookInput = JSON.parse(options.body);
     return new Response(JSON.stringify([{
       profile_id: "61593471075023", post_id: "fb-reel-1", created_time: "2026-08-29T00:00:00.000Z",
@@ -54,7 +54,8 @@ test("Apify Facebook refresh uses public-profile rows for the linked Makeable pr
     engagements: record?.engagements,
   }, { account: "Makeable Facebook", attributionKey: "makeable_facebook", impressions: 4_200, engagements: 133 });
   assert.deepEqual(facebookInput, {
-    endpoint: "profile_posts_by_id",
-    profile_id: "61593471075023",
+    startUrls: [{ url: "https://www.facebook.com/profile.php?id=61593471075023" }],
+    resultsLimit: 12,
+    captionText: false,
   });
 });
