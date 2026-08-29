@@ -2379,16 +2379,15 @@ button:active,
     linear-gradient(
       135deg,
       color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-light), white),
-      color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-mid), transparent),
-      color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-dark), var(--ink))
+      color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-mid), white) 48%,
+      color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-dark), white)
     ) border-box;
   background-clip: padding-box, border-box;
   background-origin: border-box;
   color: var(--ink);
   box-shadow: var(--featured-card-shadow);
   scroll-snap-align: start;
-  backdrop-filter: blur(var(--featured-card-blur)) saturate(130%);
-  -webkit-backdrop-filter: blur(var(--featured-card-blur)) saturate(130%);
+  transition: transform var(--featured-interaction-duration) var(--featured-interaction-easing);
 }
 
 .mk-hero-build-card:nth-child(2) {
@@ -2409,7 +2408,14 @@ button:active,
 
 .mk-hero-build-card[aria-current="true"] {
   border-color: transparent;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--featured-card-edge) 28%, transparent), var(--featured-card-selected-shadow);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--featured-card-edge) 24%, white);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mk-hero-build-card:hover {
+    filter: none;
+    transform: translateY(var(--featured-card-hover-lift));
+  }
 }
 
 .mk-hero-build-card small {
