@@ -61,9 +61,14 @@ import {
   readJsonBlobRecords,
 } from "../../lib/dashboard-report.mjs";
 import {
+  buildSocialDashboardReport,
   dashboardSocialResult,
+  mergeSocialRecords,
+  persistSocialRecords,
+  readSocialRecords,
   socialStoreNameForFunctionContext,
 } from "../../lib/social-dashboard.mjs";
+import { refreshApifySocialRecords } from "../../lib/apify-social.mjs";
 import { readSocialWebsiteSessions } from "../../lib/posthog-social.mjs";
 import {
   clearWaitlistSessionCookie,
@@ -180,6 +185,10 @@ export default async function handler(req, context = {}) {
       return await dashboardSocial(req, env, context);
     }
 
+    if (localApiPath === "/api/dashboard/social/refresh-public") {
+      return await dashboardSocialPublicRefresh(req, env, context);
+    }
+
     if (localApiPath === "/api/dashboard") {
       return await dashboardData(req, env, context);
     }
@@ -273,6 +282,7 @@ function getEnv() {
     "DASHBOARD_SESSION_SECRET",
     "POSTHOG_PERSONAL_API_KEY",
     "POSTHOG_PROJECT_ID",
+    "APIFY_TOKEN",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "OPENAI_BUILD_MODEL",
@@ -1397,6 +1407,35 @@ async function dashboardSocial(req, env, context) {
     "Cache-Control": "no-store",
     Vary: "Cookie",
   });
+}
+
+async function dashboardSocialPublicRefresh(req, env, context) {
+  const authFailure = dashboardAuthorizationFailure(req, env, "POST");
+  if (authFailure) return authFailure;
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+  try {
+    const store = getStore({
+      name: socialStoreNameForFunctionContext(context),
+      consistency: "strong",
+    });
+    const incoming = await refreshApifySocialRecords({ token: env.APIFY_TOKEN });
+    const records = mergeSocialRecords(await readSocialRecords(store), incoming);
+    await persistSocialRecords(store, records);
+    const attribution = await readSocialWebsiteSessions({
+      personalApiKey: env.POSTHOG_PERSONAL_API_KEY,
+      projectId: env.POSTHOG_PROJECT_ID,
+      fetchImpl: fetch,
+    });
+    return jsonResponse({
+      imported: incoming.length,
+      report: buildSocialDashboardReport(records, { attribution }),
+    }, 200, { "Cache-Control": "no-store", Vary: "Cookie" });
+  } catch (error) {
+    return jsonResponse({
+      error: error instanceof Error ? error.message : "Public social refresh failed.",
+    }, 502, { "Cache-Control": "no-store", Vary: "Cookie" });
+  }
 }
 
 function dashboardAuthorizationFailure(req, env, allowedMethod) {

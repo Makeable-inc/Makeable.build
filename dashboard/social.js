@@ -51,6 +51,7 @@ export function createSocialDashboard(options) {
     render(state, els, renderOptions);
   });
   els.importButton.addEventListener("click", () => els.csvInput.click());
+  els.refreshButton.addEventListener("click", () => void refreshPublicData(state, els, renderOptions));
   els.csvInput.addEventListener("change", () => {
     const [file] = els.csvInput.files || [];
     if (file) void importCsv(file, state, els, renderOptions);
@@ -95,7 +96,7 @@ export function createSocialDashboard(options) {
 function socialElements() {
   return {
     ...elementMap("social", [
-      "importButton", "csvInput", "importStatus", "rankBy", "exposures",
+      "importButton", "refreshButton", "csvInput", "importStatus", "rankBy", "exposures",
       "engagementRate", "websiteSessions", "websiteVisitRate", "followers",
       "posts", "updated", "chartWrap", "chart",
       "accountRows", "accountCount", "contentGrid", "contentCount", "emptyState",
@@ -400,6 +401,31 @@ async function importCsv(file, state, els, options) {
 function setImportState(els, busy, message, tone = "") {
   els.importButton.disabled = busy;
   els.importButton.setAttribute("aria-busy", String(busy));
+  els.importStatus.textContent = message;
+  els.importStatus.className = `import-status${tone ? ` is-${tone}` : ""}`;
+}
+
+async function refreshPublicData(state, els, options) {
+  setRefreshState(els, true, "Refreshing public social data…");
+  try {
+    const response = await fetch("/api/dashboard/social/refresh-public", {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
+    if (response.status === 401) return options.onUnauthorized();
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || "Public social refresh failed.");
+    applyReport(payload.report, state, els, options);
+    setRefreshState(els, false, `Refreshed ${numberFormatter.format(payload.imported)} public posts.`, "success");
+    options.showToast("Public social data refreshed");
+  } catch (error) {
+    setRefreshState(els, false, errorMessage(error, "Public social refresh failed"), "error");
+  }
+}
+
+function setRefreshState(els, busy, message, tone = "") {
+  els.refreshButton.disabled = busy;
+  els.refreshButton.setAttribute("aria-busy", String(busy));
   els.importStatus.textContent = message;
   els.importStatus.className = `import-status${tone ? ` is-${tone}` : ""}`;
 }
