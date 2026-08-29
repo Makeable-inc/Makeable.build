@@ -210,7 +210,7 @@ const heroBuilds: HeroBuild[] = [
     title: "Feed Ember Tokens.",
     description: "A desk pet that grows with every Claude and Codex token you burn.",
     image: "/concepts/homepage-v2/ember-flagship-hero-v2.webp",
-    mobileImage: "/concepts/homepage-v2/ember-flagship-hero-physical-geometry-v9.png",
+    mobileImage: "/concepts/homepage-v2/ember-flagship-hero-physical-geometry-v10.png",
     cardImage: "/concepts/homepage-v2/ember-flagship-hero-v2.webp",
     cta: "Pre-order Ember",
     action: "preorder",
