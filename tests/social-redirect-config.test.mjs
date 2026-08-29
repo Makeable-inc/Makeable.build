@@ -22,6 +22,8 @@ test("Netlify social redirects are explicitly no-store in production", async () 
       { path: "/r/ig/makeable-build", cacheControl: "no-store" },
       { path: "/r/ig/makeable-zak", cacheControl: "no-store" },
       { path: "/r/fb/makeable", cacheControl: "no-store" },
+      { path: "/r/tiktok/makeable", cacheControl: "no-store" },
+      { path: "/r/youtube/makeable", cacheControl: "no-store" },
     ],
   );
 });
