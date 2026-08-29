@@ -26,7 +26,7 @@ test("Apify refresh keeps successful platform data when another platform is temp
 
   const result = await refreshApifySocialRecords({ token: "test", fetchImpl });
   assert.equal(result.records.length, 1);
-  assert.deepEqual(result.failures, [{ platform: "tiktok", status: 429 }]);
+  assert.deepEqual(result.failures, [{ platform: "tiktok", status: 429, detail: '{"error":"rate limited"}' }]);
 });
 
 test("Apify Facebook refresh uses the visible public video count for the linked Makeable Page", async () => {
