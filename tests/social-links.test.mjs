@@ -29,6 +29,18 @@ test("social links redirect only the allowlisted social accounts", () => {
     location:
       "/?utm_source=facebook&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_facebook_page&social_account=makeable_facebook&social_placement=page",
   });
+  assert.deepEqual(socialLinkRedirect("/r/tiktok/makeable"), {
+    platform: "tiktok",
+    accountKey: "trymakeable_build",
+    location:
+      "/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=makeable&utm_content=trymakeable_build_bio&social_account=trymakeable_build&social_placement=bio",
+  });
+  assert.deepEqual(socialLinkRedirect("/r/youtube/makeable"), {
+    platform: "youtube",
+    accountKey: "makeable_youtube",
+    location:
+      "/?utm_source=youtube&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_youtube_description&social_account=makeable_youtube&social_placement=description",
+  });
   assert.equal(socialLinkRedirect("/r/ig/not-allowlisted"), null);
   assert.equal(socialLinkRedirect("/r/ig/makeable-zak?next=https://evil.example"), null);
   assert.equal(socialLinkRedirect("/r/ig/makeable-zak#next"), null);

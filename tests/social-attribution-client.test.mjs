@@ -40,6 +40,23 @@ test("landing attribution accepts a valid account-specific social URL", () => {
   );
 });
 
+test("landing attribution accepts every shipped social redirect", () => {
+  for (const [url, platform, account, placement] of [
+    ["https://makeable.build/?utm_source=facebook&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_facebook_page&social_account=makeable_facebook&social_placement=page", "facebook", "makeable_facebook", "page"],
+    ["https://makeable.build/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=makeable&utm_content=trymakeable_build_bio&social_account=trymakeable_build&social_placement=bio", "tiktok", "trymakeable_build", "bio"],
+    ["https://makeable.build/?utm_source=youtube&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_youtube_description&social_account=makeable_youtube&social_placement=description", "youtube", "makeable_youtube", "description"],
+  ]) {
+    assert.deepEqual(readSocialAttribution(new URL(url)), {
+      social_platform: platform,
+      social_account: account,
+      social_placement: placement,
+      utm_medium: "organic_social",
+      utm_campaign: "makeable",
+      utm_content: `${account}_${placement}`,
+    });
+  }
+});
+
 test("landing attribution rejects partial and unsupported identifiers", () => {
   assert.equal(readSocialAttribution(new URL("https://makeable.build/?social_account=makeable_zak")), null);
   assert.equal(readSocialAttribution(new URL(

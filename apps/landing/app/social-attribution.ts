@@ -1,9 +1,12 @@
-const socialPlatforms = ["instagram", "tiktok", "youtube", "linkedin", "x"] as const;
-const socialPlacements = ["bio", "profile", "description", "post"] as const;
+const socialPlatforms = ["facebook", "instagram", "tiktok", "youtube", "linkedin", "x"] as const;
+const socialPlacements = ["bio", "page", "profile", "description", "post"] as const;
 const keyPattern = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 const implementedAttributions = new Set([
   "instagram:makeable_build:bio:makeable_build_bio",
   "instagram:makeable_zak:bio:makeable_zak_bio",
+  "facebook:makeable_facebook:page:makeable_facebook_page",
+  "tiktok:trymakeable_build:bio:trymakeable_build_bio",
+  "youtube:makeable_youtube:description:makeable_youtube_description",
 ]);
 
 type SocialPlatform = (typeof socialPlatforms)[number];
