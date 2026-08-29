@@ -20,7 +20,7 @@ test("Apify refresh keeps successful platform data when another platform is temp
         videoPlayCount: 12_000,
       }]));
     }
-    if (url.includes("facebook-metrics-scraper")) return new Response(JSON.stringify([]));
+    if (url.includes("facebook-metrics-scraper") || url.includes("youtube-scraper")) return new Response(JSON.stringify([]));
     return new Response(JSON.stringify({ error: "rate limited" }), { status: 429 });
   };
 
