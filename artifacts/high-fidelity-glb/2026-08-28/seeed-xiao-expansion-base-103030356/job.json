@@ -1,0 +1,20 @@
+{
+  "candidateGlb": {
+    "byteSize": 1071408,
+    "materialCount": 0,
+    "nodeCount": 189,
+    "path": "models/seeed-xiao-expansion-base-103030356.glb",
+    "sha256": "6eb3cc6be0872f3c79af55b8d004dfd2d9481fe24a646c59cbf9924a29916a9d",
+    "triangleCount": 49080
+  },
+  "createdAt": "2026-08-28T10:38:49.671781Z",
+  "nextEvidence": [],
+  "partId": "seeed-xiao-expansion-base-103030356",
+  "requestedIdentity": {
+    "manufacturer": "Seeed Studio",
+    "manufacturerSku": "103030356",
+    "productName": "Seeed Studio Expansion Board Base for XIAO"
+  },
+  "schemaVersion": "makeable-part-job/v1",
+  "state": "candidate_review"
+}

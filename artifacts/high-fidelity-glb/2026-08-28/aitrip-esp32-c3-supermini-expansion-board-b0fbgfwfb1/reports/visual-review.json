@@ -1,0 +1,19 @@
+{
+  "criteria": {
+    "connectors": "pass",
+    "frontPopulation": "pass",
+    "identity": "pass",
+    "markings": "pass",
+    "materials": "pass",
+    "outline": "pass",
+    "pins": "pass",
+    "scale": "pass",
+    "undersidePopulation": "pass"
+  },
+  "glbSha256": "af48aac2094ae56e3350417f477b0068f1308e2523486c6d0d55f10eead4fe1d",
+  "notes": [],
+  "partId": "aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1",
+  "reviewedAt": "2026-08-28T04:07:44-07:00",
+  "reviewer": "Codex source-to-render visual review",
+  "schemaVersion": "makeable-visual-review/v1"
+}

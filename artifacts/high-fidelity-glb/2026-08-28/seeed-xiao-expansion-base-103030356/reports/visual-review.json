@@ -1,0 +1,19 @@
+{
+  "criteria": {
+    "connectors": "pass",
+    "frontPopulation": "pass",
+    "identity": "pass",
+    "markings": "pass",
+    "materials": "pass",
+    "outline": "pass",
+    "pins": "pass",
+    "scale": "pass",
+    "undersidePopulation": "pass"
+  },
+  "glbSha256": "6eb3cc6be0872f3c79af55b8d004dfd2d9481fe24a646c59cbf9924a29916a9d",
+  "notes": [],
+  "partId": "seeed-xiao-expansion-base-103030356",
+  "reviewedAt": "2026-08-28T04:07:44-07:00",
+  "reviewer": "Codex source-to-render visual review",
+  "schemaVersion": "makeable-visual-review/v1"
+}

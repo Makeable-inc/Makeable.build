@@ -1,0 +1,11 @@
+{
+  "errors": [],
+  "manifest": "/Users/mohammedkhambhati/Documents/Makeable/artifacts/high-fidelity-glb/2026-08-28/aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx/manifest.json",
+  "metrics": {
+    "glbChunkCount": 2,
+    "jsonTriangleCount": 86592,
+    "sceneTriangleCount": 86592
+  },
+  "valid": true,
+  "warnings": []
+}

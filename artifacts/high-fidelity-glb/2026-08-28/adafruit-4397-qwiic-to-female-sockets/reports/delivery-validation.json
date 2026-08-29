@@ -1,0 +1,7 @@
+{
+  "state": "pass",
+  "glbSha256": "6428dfc118538bb9d634889a7754668f421f6f4389fe681c88fc8a0b6cfbcf99",
+  "requiredNodesPresent": true,
+  "nominalLengthMm": 150.0,
+  "runtimeVisualPasses": 0
+}

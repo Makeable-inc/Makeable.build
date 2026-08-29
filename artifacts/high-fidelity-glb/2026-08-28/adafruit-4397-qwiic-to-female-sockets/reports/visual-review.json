@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "MakeableCableInterfaceReviewV1",
+  "partId": "adafruit-4397-qwiic-to-female-sockets",
+  "revision": "adafruit-4397-interface-v1.1.0",
+  "reviewedSha256": "6428dfc118538bb9d634889a7754668f421f6f4389fe681c88fc8a0b6cfbcf99",
+  "state": "visual_ready",
+  "interfaceEligibility": "ready",
+  "visualEligibility": "ready",
+  "selectionStatus": "ready",
+  "officialEvidence": {
+    "manufacturerUrl": "https://www.adafruit.com/product/4397",
+    "productId": "4397",
+    "nominalLengthMm": 150,
+    "connector": "JST-SH 1.0 mm four-pin to four premium female sockets",
+    "colorOrder": [
+      "gnd",
+      "3v3",
+      "sda",
+      "scl"
+    ]
+  },
+  "deterministicChecks": {
+    "glb2Container": true,
+    "uniqueRequiredNodes": true,
+    "allRequiredNodesReachableFromActiveScene": true,
+    "requiredNodeCount": 19,
+    "nominalLengthLocked": true
+  },
+  "offlineCatalogVisualPasses": 1,
+  "productionRuntimeVisualPasses": 0,
+  "render": {
+    "path": "renders/adafruit-4397-qwiic-to-female-sockets-four-angle.png",
+    "sha256": "a36d981c80165dc089a780c3227f2b5c2c60fa18e4040aa81b07998df40599b4",
+    "bytes": 46494
+  }
+}

@@ -1,0 +1,535 @@
+{
+  "absenceJustifications": {
+    "keepouts": "Candidate GLB is not yet cleared for enclosure collision planning; use the full measured envelope.",
+    "landmarks": "Connector, anchor, and mount nodes provide the required stable assembly semantics for this candidate."
+  },
+  "anchors": [
+    {
+      "anchorId": "xiao-3v3",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "XIAO socket",
+      "connectorId": "xiao-controller-socket",
+      "contactIndex": 0,
+      "electricalRole": "power",
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "nodeName": "anchor:xiao-3v3",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "3V3",
+      "pitchMm": 2.54,
+      "positionMm": [
+        -20.999,
+        10.55,
+        4.18
+      ],
+      "voltageDomain": "3.3V"
+    },
+    {
+      "anchorId": "xiao-gnd",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "XIAO socket",
+      "connectorId": "xiao-controller-socket",
+      "contactIndex": 1,
+      "electricalRole": "ground",
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "nodeName": "anchor:xiao-gnd",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "GND",
+      "pitchMm": 2.54,
+      "positionMm": [
+        -23.539,
+        10.55,
+        4.18
+      ],
+      "voltageDomain": "0V"
+    },
+    {
+      "anchorId": "xiao-d0",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "XIAO socket",
+      "connectorId": "xiao-controller-socket",
+      "contactIndex": 2,
+      "electricalRole": "GPIO/ADC",
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "nodeName": "anchor:xiao-d0",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "D0",
+      "pitchMm": 2.54,
+      "positionMm": [
+        -26.079,
+        -10.45,
+        4.18
+      ],
+      "voltageDomain": "3.3V logic"
+    },
+    {
+      "anchorId": "xiao-grove-a0-gnd",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "Grove 4-pin analog/digital",
+      "connectorId": "grove-a0-d0",
+      "contactIndex": 0,
+      "electricalRole": "ground",
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "nodeName": "anchor:xiao-grove-a0-gnd",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "GND",
+      "pitchMm": 2.54,
+      "positionMm": [
+        -3.0,
+        -12.45,
+        3.4
+      ],
+      "voltageDomain": "0V"
+    },
+    {
+      "anchorId": "xiao-grove-a0-3v3",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "Grove 4-pin analog/digital",
+      "connectorId": "grove-a0-d0",
+      "contactIndex": 1,
+      "electricalRole": "power",
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "nodeName": "anchor:xiao-grove-a0-3v3",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "3V3",
+      "pitchMm": 2.54,
+      "positionMm": [
+        -1.0,
+        -12.45,
+        3.4
+      ],
+      "voltageDomain": "3.3V"
+    },
+    {
+      "anchorId": "xiao-grove-a0-d0",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "Grove 4-pin analog/digital",
+      "connectorId": "grove-a0-d0",
+      "contactIndex": 3,
+      "electricalRole": "GPIO/ADC",
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "nodeName": "anchor:xiao-grove-a0-d0",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "D0",
+      "pitchMm": 2.54,
+      "positionMm": [
+        3.0,
+        -12.45,
+        3.4
+      ],
+      "voltageDomain": "3.3V logic"
+    }
+  ],
+  "assemblyEligibility": {
+    "reasons": [],
+    "state": "ready"
+  },
+  "connectors": [
+    {
+      "compatibleWith": [
+        "pre-soldered Seeed Studio XIAO ESP32-C3",
+        "pre-soldered Seeed Studio XIAO ESP32-S3"
+      ],
+      "connectorId": "xiao-controller-socket",
+      "contactCount": 14,
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "facePositionMm": [
+        -18.459,
+        0.05,
+        4.18
+      ],
+      "factoryInstalled": true,
+      "family": "Seeed XIAO 2x7 2.54mm socket footprint",
+      "gender": "female",
+      "nodeName": "connector:xiao-controller-socket",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "Grove 4-pin cable"
+      ],
+      "connectorId": "grove-i2c-a",
+      "contactCount": 4,
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "facePositionMm": [
+        11.6,
+        12.55,
+        3.4
+      ],
+      "factoryInstalled": true,
+      "family": "Grove 4-pin I2C",
+      "gender": "female",
+      "nodeName": "connector:grove-i2c-a",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "Grove 4-pin cable"
+      ],
+      "connectorId": "grove-i2c-b",
+      "contactCount": 4,
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "facePositionMm": [
+        0,
+        12.55,
+        3.4
+      ],
+      "factoryInstalled": true,
+      "family": "Grove 4-pin I2C",
+      "gender": "female",
+      "nodeName": "connector:grove-i2c-b",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "Grove 4-pin cable"
+      ],
+      "connectorId": "grove-a0-d0",
+      "contactCount": 4,
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "facePositionMm": [
+        0,
+        -12.45,
+        3.4
+      ],
+      "factoryInstalled": true,
+      "family": "Grove 4-pin analog/digital",
+      "gender": "female",
+      "nodeName": "connector:grove-a0-d0",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "Grove 4-pin cable"
+      ],
+      "connectorId": "grove-uart",
+      "contactCount": 4,
+      "evidenceIds": [
+        "seeed-xiao-brd",
+        "seeed-xiao-schematic"
+      ],
+      "facePositionMm": [
+        11.6,
+        -12.45,
+        3.4
+      ],
+      "factoryInstalled": true,
+      "family": "Grove 4-pin UART",
+      "gender": "female",
+      "nodeName": "connector:grove-uart",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    }
+  ],
+  "coordinateSystem": {
+    "axes": "+X right, +Y up, +Z toward viewer",
+    "glbScaleFromMm": 0.001,
+    "glbUnits": "m",
+    "handedness": "right",
+    "origin": "centre of component-side PCB mid-plane",
+    "sourceUnits": "mm"
+  },
+  "evidence": [
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_revision",
+      "localPath": "reference/Seeeduino-XIAO-Expansion-board-v1.0-200824.brd",
+      "sha256": "fa43130d0c58a59023a810174e4fb292ba2bf427ae24feb0da012a544de13e3f",
+      "sourceId": "seeed-xiao-brd",
+      "supports": [
+        "58 x 42.5 mm outline",
+        "mount centres",
+        "connector and component XY placements"
+      ],
+      "url": "https://files.seeedstudio.com/wiki/Seeeduino-XIAO-Expansion-Board/document/Seeeduino%20XIAO%20Expansion%20board_v1.0_200824.brd"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_revision",
+      "localPath": "reference/Seeeduino-XIAO-Expansion-board-v1.0-200824.pdf",
+      "sha256": "70a40e3b476af288802bbe3ebe8024e1124efd72519acd5f02b0c03632c40d20",
+      "sourceId": "seeed-xiao-schematic",
+      "supports": [
+        "XIAO 14-pin mapping",
+        "Grove contacts",
+        "JST and servo/SWD interfaces"
+      ],
+      "url": "https://files.seeedstudio.com/wiki/Seeeduino-XIAO-Expansion-Board/document/Seeeduino%20XIAO%20Expansion%20board_v1.0_SCH_200824.pdf"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_revision",
+      "localPath": "reference/PCN-103030356.pdf",
+      "sha256": "e157c0328fb7db69e59efa15692c9a396568a4f8286aa52b72eeb326bea27dc2",
+      "sourceId": "seeed-xiao-pcn",
+      "supports": [
+        "SKU identity",
+        "ETA6003A to SY6974B PMIC change",
+        "no mechanical change"
+      ],
+      "url": "https://files.seeedstudio.com/wiki/Seeeduino-XIAO-Expansion-Board/document/PCN-103030356.pdf"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_component",
+      "localPath": "reference/official-top-layout.jpg",
+      "sha256": "2fb2b2c6ce7f51f89104f30d2a5ff849c139443c3fd16d93413cd6e57165a1fd",
+      "sourceId": "seeed-xiao-top",
+      "supports": [
+        "front population",
+        "factory connector population",
+        "pin labels"
+      ],
+      "url": "https://files.seeedstudio.com/wiki/Seeeduino-XIAO-Expansion-Board/2222222222222222222222222222221.jpg"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_component",
+      "localPath": "reference/official-bottom-layout.jpg",
+      "sha256": "1f8adb0a0a6027fecc22ce9be46ca2661848d805b95ab96dcef206c4d29ef67d",
+      "sourceId": "seeed-xiao-bottom",
+      "supports": [
+        "microSD slot",
+        "CR1220 holder",
+        "underside population"
+      ],
+      "url": "https://files.seeedstudio.com/wiki/Seeeduino-XIAO-Expansion-Board/1111111111111111111111110.jpg"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_sold_variant",
+      "localPath": "reference/amazon-1.jpg",
+      "sha256": "ed35039dfc7cd88edea871da1170b0cbef7874da9ce17f51eac5bb8ed46a86a7",
+      "sourceId": "amazon-xiao-sold",
+      "supports": [
+        "retail sold form",
+        "installed sockets and peripherals"
+      ],
+      "url": "https://m.media-amazon.com/images/I/71CbcImq+aL._AC_SL1500_.jpg"
+    }
+  ],
+  "geometry": {
+    "envelopeMm": {
+      "depth": 10.65,
+      "height": 43.003,
+      "width": 58.0
+    },
+    "glbBoundsM": [
+      0.058,
+      0.043003,
+      0.01065
+    ],
+    "sourceBoundsMm": [
+      58.0,
+      43.003,
+      10.65
+    ],
+    "strategy": "manufacturer_ecad_derived",
+    "uncertaintyMm": {
+      "interfaces": 0.05,
+      "nonInterfaceHeight": 0.75,
+      "outline": 0.05
+    }
+  },
+  "glb": {
+    "byteSize": 1071408,
+    "materialCount": 0,
+    "nodeCount": 189,
+    "path": "models/seeed-xiao-expansion-base-103030356.glb",
+    "sha256": "6eb3cc6be0872f3c79af55b8d004dfd2d9481fe24a646c59cbf9924a29916a9d",
+    "triangleCount": 49080
+  },
+  "identity": {
+    "acceptedAliases": [
+      "Expansion Board Base for XIAO",
+      "Seeeduino XIAO Expansion Board"
+    ],
+    "hardwareRevision": "post-PCN20251119-010 SY6974B PMIC revision",
+    "manufacturer": "Seeed Studio",
+    "manufacturerSku": "103030356",
+    "marketplaceIds": [
+      {
+        "id": "B08P4GPR6M",
+        "marketplace": "Amazon US",
+        "url": "https://www.amazon.com/dp/B08P4GPR6M"
+      }
+    ],
+    "productName": "Seeed Studio Expansion Board Base for XIAO",
+    "rejectedAliases": [
+      "Grove Shield for XIAO",
+      "XIAO controller included"
+    ],
+    "soldConnectorForm": "fully assembled base with XIAO sockets, Grove connectors, OLED, RTC, microSD, JST2.0 and 2x4 header"
+  },
+  "interfaceEligibility": {
+    "reasons": [],
+    "state": "ready"
+  },
+  "keepouts": [],
+  "landmarks": [],
+  "mounts": [
+    {
+      "diameterMm": 3.0,
+      "mountId": "m1",
+      "nodeName": "mount:m1",
+      "positionMm": [
+        -25.0101,
+        17.4987,
+        0.91
+      ]
+    },
+    {
+      "diameterMm": 3.0,
+      "mountId": "m2",
+      "nodeName": "mount:m2",
+      "positionMm": [
+        24.9899,
+        17.4987,
+        0.91
+      ]
+    },
+    {
+      "diameterMm": 3.0,
+      "mountId": "m3",
+      "nodeName": "mount:m3",
+      "positionMm": [
+        24.9899,
+        -17.5013,
+        0.91
+      ]
+    },
+    {
+      "diameterMm": 3.0,
+      "mountId": "m4",
+      "nodeName": "mount:m4",
+      "positionMm": [
+        -25.0101,
+        -17.5013,
+        0.91
+      ]
+    }
+  ],
+  "partId": "seeed-xiao-expansion-base-103030356",
+  "revision": "candidate-v1.1.0-silkscreen",
+  "schemaVersion": "makeable-part-3d/v1",
+  "state": "candidate_review",
+  "toolchain": {
+    "aiGeometryAuthority": false,
+    "determinism": "two consecutive generation runs produced the same SHA-256",
+    "generator": "scripts/assembly3d/generate_esp32_expansion_glbs.py",
+    "khronosGltfValidator": {
+      "report": "reports/khronos-gltf-validator.json",
+      "reportSha256": "226c90b5b4e30d2d754917040e49816eeedab0ce7a77c01cfbf5fedc690b13a3",
+      "version": "2.0.0-dev.3.10"
+    },
+    "python": "3.9.6",
+    "trimesh": "4.12.2"
+  },
+  "visualEligibility": {
+    "reasons": [],
+    "state": "ready"
+  },
+  "visualReview": {
+    "criteria": {
+      "connectors": "pass",
+      "frontPopulation": "pass",
+      "identity": "pass",
+      "markings": "pass",
+      "materials": "pass",
+      "outline": "pass",
+      "pins": "pass",
+      "scale": "pass",
+      "undersidePopulation": "pass"
+    },
+    "multiAngleRender": {
+      "path": "renders/seeed-xiao-expansion-base-103030356-four-angle.png",
+      "sha256": "a39efdea21af605813c7dd3b6f7d661bf30a1886500f6bd3a95c788975b0d0bc"
+    },
+    "referenceComparison": {
+      "path": "renders/seeed-xiao-expansion-base-103030356-reference-comparison.png",
+      "sha256": "44eee09adf86a179205f4b35b80cb5e9eb01869c08780022a8e477b7cba66678"
+    },
+    "reviewFile": "reports/visual-review.json",
+    "reviewFileSha256": "5c8f4cab2c6be4d072e59b9247b189a6c59d611b57fbe6789e2a181e6b43b11a",
+    "reviewedAt": "2026-08-28T04:07:44-07:00",
+    "reviewedGlbSha256": "6eb3cc6be0872f3c79af55b8d004dfd2d9481fe24a646c59cbf9924a29916a9d",
+    "reviewer": "Codex source-to-render visual review"
+  }
+}

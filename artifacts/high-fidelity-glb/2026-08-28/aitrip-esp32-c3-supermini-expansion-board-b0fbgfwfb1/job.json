@@ -1,0 +1,22 @@
+{
+  "candidateGlb": {
+    "byteSize": 393876,
+    "materialCount": 0,
+    "nodeCount": 230,
+    "path": "models/aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1.glb",
+    "sha256": "af48aac2094ae56e3350417f477b0068f1308e2523486c6d0d55f10eead4fe1d",
+    "triangleCount": 20352
+  },
+  "createdAt": "2026-08-28T10:38:49.608737Z",
+  "nextEvidence": [
+    "clone schematic and current limits are not published"
+  ],
+  "partId": "aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1",
+  "requestedIdentity": {
+    "manufacturer": "AITRIP",
+    "manufacturerSku": "B0FBGFWFB1",
+    "productName": "AITRIP ESP32-C3 SuperMini Expansion Board (Only Expansion Board, 2PCS)"
+  },
+  "schemaVersion": "makeable-part-job/v1",
+  "state": "candidate_review"
+}

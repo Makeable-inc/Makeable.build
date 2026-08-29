@@ -1,0 +1,11 @@
+{
+  "errors": [],
+  "manifest": "/Users/mohammedkhambhati/Documents/Makeable/artifacts/high-fidelity-glb/2026-08-28/seeed-xiao-expansion-base-103030356/manifest.json",
+  "metrics": {
+    "glbChunkCount": 2,
+    "jsonTriangleCount": 49080,
+    "sceneTriangleCount": 49080
+  },
+  "valid": true,
+  "warnings": []
+}

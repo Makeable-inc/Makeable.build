@@ -1,0 +1,19 @@
+{
+  "criteria": {
+    "connectors": "pass",
+    "frontPopulation": "pass",
+    "identity": "pass",
+    "markings": "pass",
+    "materials": "pass",
+    "outline": "pass",
+    "pins": "pass",
+    "scale": "pass",
+    "undersidePopulation": "not_applicable"
+  },
+  "glbSha256": "aec8e5e6e81deb28f3a1da8ab56a76aba0429501964e7c86227cef0e4006a9da",
+  "notes": [],
+  "partId": "aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx",
+  "reviewedAt": "2026-08-28T04:07:44-07:00",
+  "reviewer": "Codex source-to-render visual review",
+  "schemaVersion": "makeable-visual-review/v1"
+}

@@ -1,0 +1,11 @@
+{
+  "errors": [],
+  "manifest": "/Users/mohammedkhambhati/Documents/Makeable/artifacts/high-fidelity-glb/2026-08-28/aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1/manifest.json",
+  "metrics": {
+    "glbChunkCount": 2,
+    "jsonTriangleCount": 20352,
+    "sceneTriangleCount": 20352
+  },
+  "valid": true,
+  "warnings": []
+}

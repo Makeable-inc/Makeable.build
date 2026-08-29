@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "MakeableCableInterfaceAssetV1",
+  "partId": "adafruit-4397-qwiic-to-female-sockets",
+  "name": "Adafruit STEMMA QT / Qwiic cable to premium female sockets #4397",
+  "revision": "adafruit-4397-interface-v1.1.0",
+  "catalogKey": "B09WLRBKWT",
+  "manufacturerSku": "4397",
+  "manufacturerUrl": "https://www.adafruit.com/product/4397",
+  "nominalLengthMm": 150,
+  "connectorFamily": "jst_sh_1.0mm_4p_qwiic",
+  "controllerTermination": "four_individual_factory_housed_female_sockets",
+  "colorOrder": [
+    "gnd",
+    "3v3",
+    "sda",
+    "scl"
+  ],
+  "flexGeometryMode": "deterministic_runtime_harness_from_locked_anchors",
+  "glb": {
+    "path": "models/adafruit-4397-qwiic-to-female-sockets.glb",
+    "sha256": "6428dfc118538bb9d634889a7754668f421f6f4389fe681c88fc8a0b6cfbcf99",
+    "bytes": 26664,
+    "boundsMm": [
+      0,
+      -8.85,
+      -1.6,
+      150.125,
+      8.85,
+      1.95
+    ]
+  },
+  "requiredNodes": [
+    "connector:qwiic-jst-sh-1.0mm-4p:plug-body",
+    "connector:qwiic-jst-sh-1.0mm-4p:rear-boot",
+    "anchor:cable:split",
+    "connector:qwiic:contact:0:gnd",
+    "connector:qwiic:contact:1:3v3",
+    "connector:qwiic:contact:2:sda",
+    "connector:qwiic:contact:3:scl",
+    "connector:socket:gnd:housing",
+    "connector:socket:3v3:housing",
+    "connector:socket:sda:housing",
+    "connector:socket:scl:housing",
+    "anchor:socket:gnd:pin-entry",
+    "anchor:socket:3v3:pin-entry",
+    "anchor:socket:sda:pin-entry",
+    "anchor:socket:scl:pin-entry",
+    "anchor:socket:gnd:wire-exit",
+    "anchor:socket:3v3:wire-exit",
+    "anchor:socket:sda:wire-exit",
+    "anchor:socket:scl:wire-exit"
+  ],
+  "nodeCount": 41,
+  "sceneRoot": "root:adafruit-4397-cable",
+  "sceneReachabilityRequired": true,
+  "visualEligibility": "ready",
+  "interfaceEligibility": "ready",
+  "selectionStatus": "ready",
+  "runtimeVisualPasses": 0,
+  "approvalSource": "official-spec-plus-deterministic-interface-and-offline-four-angle-review-2026-08-28",
+  "reviewEvidence": {
+    "path": "renders/adafruit-4397-qwiic-to-female-sockets-four-angle.png",
+    "sha256": "a36d981c80165dc089a780c3227f2b5c2c60fa18e4040aa81b07998df40599b4",
+    "bytes": 46494
+  }
+}

@@ -1,0 +1,351 @@
+{
+  "absenceJustifications": {
+    "keepouts": "Candidate GLB is not yet cleared for enclosure collision planning; use the full measured envelope.",
+    "landmarks": "Connector, anchor, and mount nodes provide the required stable assembly semantics for this candidate."
+  },
+  "anchors": [
+    {
+      "anchorId": "c3-3v3",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "2.54mm male header",
+      "connectorId": "gpio-breakout",
+      "contactIndex": 0,
+      "electricalRole": "power",
+      "evidenceIds": [
+        "amazon-c3-front"
+      ],
+      "nodeName": "anchor:c3-3v3",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "3V3",
+      "pitchMm": 2.54,
+      "positionMm": [
+        16.0,
+        -3.81,
+        8.0
+      ],
+      "voltageDomain": "3.3V"
+    },
+    {
+      "anchorId": "c3-gnd",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "2.54mm male header",
+      "connectorId": "gpio-breakout",
+      "contactIndex": 1,
+      "electricalRole": "ground",
+      "evidenceIds": [
+        "amazon-c3-front"
+      ],
+      "nodeName": "anchor:c3-gnd",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "GND",
+      "pitchMm": 2.54,
+      "positionMm": [
+        13.45,
+        -6.35,
+        8.0
+      ],
+      "voltageDomain": "0V"
+    },
+    {
+      "anchorId": "c3-gpio0",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "2.54mm male header",
+      "connectorId": "gpio-breakout",
+      "contactIndex": 2,
+      "electricalRole": "GPIO0",
+      "evidenceIds": [
+        "amazon-c3-front"
+      ],
+      "nodeName": "anchor:c3-gpio0",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "0",
+      "pitchMm": 2.54,
+      "positionMm": [
+        16.0,
+        8.89,
+        8.0
+      ],
+      "voltageDomain": "3.3V logic"
+    }
+  ],
+  "assemblyEligibility": {
+    "reasons": [
+      "clone schematic and current limits are not published"
+    ],
+    "state": "candidate_review"
+  },
+  "connectors": [
+    {
+      "compatibleWith": [
+        "ESP32-C3 SuperMini 16-pin installed headers"
+      ],
+      "connectorId": "controller-left-1x8",
+      "contactCount": 8,
+      "evidenceIds": [
+        "amazon-c3-front"
+      ],
+      "facePositionMm": [
+        -5.3,
+        0,
+        7.24
+      ],
+      "factoryInstalled": true,
+      "family": "2.54mm SuperMini socket row",
+      "gender": "female",
+      "nodeName": "connector:controller-left-1x8",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "ESP32-C3 SuperMini 16-pin installed headers"
+      ],
+      "connectorId": "controller-right-1x8",
+      "contactCount": 8,
+      "evidenceIds": [
+        "amazon-c3-front"
+      ],
+      "facePositionMm": [
+        5.3,
+        0,
+        7.24
+      ],
+      "factoryInstalled": true,
+      "family": "2.54mm SuperMini socket row",
+      "gender": "female",
+      "nodeName": "connector:controller-right-1x8",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "female Dupont lead",
+        "screw-terminal field wire"
+      ],
+      "connectorId": "gpio-breakout",
+      "contactCount": 48,
+      "evidenceIds": [
+        "amazon-c3-front",
+        "amazon-c3-details"
+      ],
+      "facePositionMm": [
+        10.9,
+        0,
+        8.0
+      ],
+      "factoryInstalled": true,
+      "family": "2.54mm 3-lane GPIO breakout",
+      "gender": "male",
+      "nodeName": "connector:gpio-breakout",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    }
+  ],
+  "coordinateSystem": {
+    "axes": "+X right, +Y up, +Z toward viewer",
+    "glbScaleFromMm": 0.001,
+    "glbUnits": "m",
+    "handedness": "right",
+    "origin": "centre of component-side PCB mid-plane",
+    "sourceUnits": "mm"
+  },
+  "evidence": [
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_sold_variant",
+      "localPath": "reference/amazon-2.jpg",
+      "sha256": "2d9e1e8ae858876576512886864d54d91c571b07df9166b837c7daecfac398b4",
+      "sourceId": "amazon-c3-front",
+      "supports": [
+        "37 x 23 mm outline",
+        "connector population",
+        "pin labels",
+        "factory-installed pins"
+      ],
+      "url": "https://m.media-amazon.com/images/I/71BkPITTVSL._AC_SL1500_.jpg"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_sold_variant",
+      "localPath": "reference/amazon-3.jpg",
+      "sha256": "3cae54d1fe92436e1d388b35e8526286ab2cf1b95e5174fc9fd155aed9844f5c",
+      "sourceId": "amazon-c3-details",
+      "supports": [
+        "terminal blocks",
+        "JST battery connector",
+        "underside",
+        "mounted SuperMini orientation"
+      ],
+      "url": "https://m.media-amazon.com/images/I/81nHQDFEDIL._AC_SL1500_.jpg"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "family_context",
+      "localPath": "reference/aliexpress-dimension-drawing.pdf",
+      "sha256": "db73b580b42c1a1c670900177877271701a97e363486fd7a931cfbc81078a4f5",
+      "sourceId": "aliexpress-c3-drawing",
+      "supports": [
+        "SuperMini compatibility",
+        "battery support",
+        "all IO ports led out"
+      ],
+      "url": "https://ae-pic-a1.aliexpress-media.com/kf/S93170361c9804a08bbdac6eea096f4c8d.pdf"
+    }
+  ],
+  "geometry": {
+    "envelopeMm": {
+      "depth": 8.915,
+      "height": 23.0,
+      "width": 37.0
+    },
+    "glbBoundsM": [
+      0.037,
+      0.023,
+      0.008915
+    ],
+    "sourceBoundsMm": [
+      37.0,
+      23.0,
+      8.915
+    ],
+    "strategy": "photo_calibrated",
+    "uncertaintyMm": {
+      "interfaces": 0.15,
+      "nonInterfaceHeight": 1.0,
+      "outline": 0.25
+    }
+  },
+  "glb": {
+    "byteSize": 393876,
+    "materialCount": 0,
+    "nodeCount": 230,
+    "path": "models/aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1.glb",
+    "sha256": "af48aac2094ae56e3350417f477b0068f1308e2523486c6d0d55f10eead4fe1d",
+    "triangleCount": 20352
+  },
+  "identity": {
+    "acceptedAliases": [
+      "ESP32-C3 SuperMini IO Breakout Expansion Board"
+    ],
+    "hardwareRevision": "marketplace-listing-revision-checked-2026-08-28",
+    "manufacturer": "AITRIP",
+    "manufacturerSku": "B0FBGFWFB1",
+    "marketplaceIds": [
+      {
+        "id": "B0FBGFWFB1",
+        "marketplace": "Amazon US",
+        "url": "https://www.amazon.com/dp/B0FBGFWFB1"
+      },
+      {
+        "id": "1005008585341920",
+        "marketplace": "AliExpress",
+        "url": "https://www.aliexpress.com/item/1005008585341920.html"
+      }
+    ],
+    "productName": "AITRIP ESP32-C3 SuperMini Expansion Board (Only Expansion Board, 2PCS)",
+    "rejectedAliases": [
+      "ESP32-C3 SuperMini controller included"
+    ],
+    "soldConnectorForm": "factory-installed 2x8 controller sockets, screw terminals, and 3-lane male breakout pins"
+  },
+  "interfaceEligibility": {
+    "reasons": [
+      "clone schematic and current limits are not published"
+    ],
+    "state": "candidate_review"
+  },
+  "keepouts": [],
+  "landmarks": [],
+  "mounts": [
+    {
+      "diameterMm": 2.6,
+      "mountId": "m1",
+      "nodeName": "mount:m1",
+      "positionMm": [
+        -4.75,
+        -8.6,
+        0.91
+      ]
+    },
+    {
+      "diameterMm": 2.6,
+      "mountId": "m2",
+      "nodeName": "mount:m2",
+      "positionMm": [
+        4.75,
+        -8.6,
+        0.91
+      ]
+    }
+  ],
+  "partId": "aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1",
+  "revision": "candidate-v1.1.0-silkscreen",
+  "schemaVersion": "makeable-part-3d/v1",
+  "state": "candidate_review",
+  "toolchain": {
+    "aiGeometryAuthority": false,
+    "determinism": "two consecutive generation runs produced the same SHA-256",
+    "generator": "scripts/assembly3d/generate_esp32_expansion_glbs.py",
+    "khronosGltfValidator": {
+      "report": "reports/khronos-gltf-validator.json",
+      "reportSha256": "dc4458addd75833329893bd78c6260a343c89c13c7491998b105b13ec6e2eccf",
+      "version": "2.0.0-dev.3.10"
+    },
+    "python": "3.9.6",
+    "trimesh": "4.12.2"
+  },
+  "visualEligibility": {
+    "reasons": [],
+    "state": "ready"
+  },
+  "visualReview": {
+    "criteria": {
+      "connectors": "pass",
+      "frontPopulation": "pass",
+      "identity": "pass",
+      "markings": "pass",
+      "materials": "pass",
+      "outline": "pass",
+      "pins": "pass",
+      "scale": "pass",
+      "undersidePopulation": "pass"
+    },
+    "multiAngleRender": {
+      "path": "renders/aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1-four-angle.png",
+      "sha256": "841214eda073319262c2abaf35b19c4b348ba0864dd391b101971d8feb815831"
+    },
+    "referenceComparison": {
+      "path": "renders/aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1-reference-comparison.png",
+      "sha256": "1fc2e8e41b8e1c58509a1e2bcea3de8b4fda0631b8edf1edba1a8b43e7ad77b5"
+    },
+    "reviewFile": "reports/visual-review.json",
+    "reviewFileSha256": "dd2f7af94a05f43b3f2cd53bb4e5901ff22affd16b8a49d189e9f45a08045452",
+    "reviewedAt": "2026-08-28T04:07:44-07:00",
+    "reviewedGlbSha256": "af48aac2094ae56e3350417f477b0068f1308e2523486c6d0d55f10eead4fe1d",
+    "reviewer": "Codex source-to-render visual review"
+  }
+}

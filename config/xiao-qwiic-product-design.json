@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "makeable-xiao-qwiic-product-design/v2",
+  "units": "mm",
+  "coordinateSystem": "right-handed-z-up",
+  "outerEnvelopeMm": [67.0, 55.0, 34.2],
+  "baseHeightMm": 32.0,
+  "wallMm": 2.2,
+  "floorMm": 2.2,
+  "lidTopMm": 2.2,
+  "movingClearanceMm": 0.5,
+  "placements": {
+    "controller": [-18.0, 13.0, 28.0],
+    "sensor": [16.0, -5.0, 10.0]
+  },
+  "usbServiceOpening": {
+    "face": "rear",
+    "centerMm": [-18.0, 27.5, 28.0],
+    "sizeMm": [10.0, 7.0]
+  },
+  "airflowOpening": {
+    "face": "top",
+    "centerMm": [16.0, -4.2, 34.2],
+    "regionMm": [20.0, 14.0],
+    "slotWidthMm": 2.2,
+    "barWidthMm": 1.5
+  },
+  "serviceLoop": {
+    "centerMm": [-1.0, -10.0, 10.0],
+    "channelRadiusMm": 14.0,
+    "minimumBendRadiusMm": 8.0,
+    "channelWallMm": 1.4,
+    "channelHeightMm": 2.6
+  },
+  "snapFit": {
+    "hookCount": 4,
+    "hookDepthMm": 0.8,
+    "hookHeightMm": 1.2,
+    "engagementMm": 0.6
+  },
+  "runtimeVisualPasses": 0
+}

@@ -1,0 +1,384 @@
+{
+  "absenceJustifications": {
+    "keepouts": "Candidate GLB is not yet cleared for enclosure collision planning; use the full measured envelope.",
+    "landmarks": "Connector, anchor, and mount nodes provide the required stable assembly semantics for this candidate."
+  },
+  "anchors": [
+    {
+      "anchorId": "s3-3v3",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "2.54mm male header",
+      "connectorId": "gpio-breakout",
+      "contactIndex": 0,
+      "electricalRole": "power",
+      "evidenceIds": [
+        "amazon-s3-interface",
+        "espressif-s3-pin-table"
+      ],
+      "nodeName": "anchor:s3-3v3",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "3V3",
+      "pitchMm": 2.54,
+      "positionMm": [
+        -20.3,
+        34.67,
+        8.0
+      ],
+      "voltageDomain": "3.3V"
+    },
+    {
+      "anchorId": "s3-gnd",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "2.54mm male header",
+      "connectorId": "gpio-breakout",
+      "contactIndex": 1,
+      "electricalRole": "ground",
+      "evidenceIds": [
+        "amazon-s3-interface",
+        "espressif-s3-pin-table"
+      ],
+      "nodeName": "anchor:s3-gnd",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "GND",
+      "pitchMm": 2.54,
+      "positionMm": [
+        20.3,
+        34.67,
+        8.0
+      ],
+      "voltageDomain": "0V"
+    },
+    {
+      "anchorId": "s3-gpio1",
+      "confidence": "source-backed-candidate",
+      "connectorFamily": "2.54mm male header",
+      "connectorId": "gpio-breakout",
+      "contactIndex": 2,
+      "electricalRole": "GPIO1",
+      "evidenceIds": [
+        "amazon-s3-interface",
+        "espressif-s3-pin-table"
+      ],
+      "nodeName": "anchor:s3-gpio1",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "physicalLabel": "IO1",
+      "pitchMm": 2.54,
+      "positionMm": [
+        20.3,
+        27.05,
+        8.0
+      ],
+      "voltageDomain": "3.3V logic"
+    }
+  ],
+  "assemblyEligibility": {
+    "reasons": [
+      "marketplace clone has no manufacturer ECAD or exact electrical schematic"
+    ],
+    "state": "candidate_review"
+  },
+  "connectors": [
+    {
+      "compatibleWith": [
+        "ESP32-S3 DevKitC-1 44-pin installed headers"
+      ],
+      "connectorId": "controller-j1-1x22",
+      "contactCount": 22,
+      "evidenceIds": [
+        "amazon-s3-dimensions",
+        "espressif-s3-pin-table"
+      ],
+      "facePositionMm": [
+        -12.7,
+        8.0,
+        7.24
+      ],
+      "factoryInstalled": true,
+      "family": "ESP32-S3 DevKitC-1 J1 2.54mm socket",
+      "gender": "female",
+      "nodeName": "connector:controller-j1-1x22",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "ESP32-S3 DevKitC-1 44-pin installed headers"
+      ],
+      "connectorId": "controller-j3-1x22",
+      "contactCount": 22,
+      "evidenceIds": [
+        "amazon-s3-dimensions",
+        "espressif-s3-pin-table"
+      ],
+      "facePositionMm": [
+        12.7,
+        8.0,
+        7.24
+      ],
+      "factoryInstalled": true,
+      "family": "ESP32-S3 DevKitC-1 J3 2.54mm socket",
+      "gender": "female",
+      "nodeName": "connector:controller-j3-1x22",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    },
+    {
+      "compatibleWith": [
+        "female Dupont lead"
+      ],
+      "connectorId": "gpio-breakout",
+      "contactCount": 132,
+      "evidenceIds": [
+        "amazon-s3-interface"
+      ],
+      "facePositionMm": [
+        20.3,
+        8.0,
+        8.0
+      ],
+      "factoryInstalled": true,
+      "family": "2.54mm replicated GPIO breakout",
+      "gender": "male",
+      "nodeName": "connector:gpio-breakout",
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "requiresSoldering": false
+    }
+  ],
+  "coordinateSystem": {
+    "axes": "+X right, +Y up, +Z toward viewer",
+    "glbScaleFromMm": 0.001,
+    "glbUnits": "m",
+    "handedness": "right",
+    "origin": "centre of component-side PCB mid-plane",
+    "sourceUnits": "mm"
+  },
+  "evidence": [
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_sold_variant",
+      "localPath": "reference/amazon-4.jpg",
+      "sha256": "f39899e88aebe61c4201156ce7da72fb572ac8debe922a5ee420626b753e0461",
+      "sourceId": "amazon-s3-dimensions",
+      "supports": [
+        "82 x 82 mm outline",
+        "44-pin socket population",
+        "pin labels",
+        "two-USB-C controller orientation"
+      ],
+      "url": "https://m.media-amazon.com/images/I/71QK47rF0zL._AC_SL1500_.jpg"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "exact_sold_variant",
+      "localPath": "reference/amazon-5.jpg",
+      "sha256": "14ebfa6b5c215c223147d7ae3604efbb3544e5e3f3603274b88290ec54b307bc",
+      "sourceId": "amazon-s3-interface",
+      "supports": [
+        "GPIO breakout mapping",
+        "3V3 bank",
+        "5V bank",
+        "DC 6.5-9V input"
+      ],
+      "url": "https://m.media-amazon.com/images/I/71jw9MQ6kFL._AC_SL1500_.jpg"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "family_context",
+      "sourceId": "espressif-s3-pin-table",
+      "supports": [
+        "official DevKitC-1 J1/J3 44-pin order",
+        "power and ground pins"
+      ],
+      "url": "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide.html"
+    },
+    {
+      "checkedAt": "2026-08-28T04:07:44-07:00",
+      "exactness": "family_context",
+      "localPath": "reference/aliexpress-dimension-drawing.pdf",
+      "sha256": "28765d6afee3ef7fd10c00f0224a7c79aef27844aae73a83af1865ff2cee599f",
+      "sourceId": "aliexpress-s3-drawing",
+      "supports": [
+        "44-pin expansion-board category",
+        "DC barrel interface"
+      ],
+      "url": "https://ae-pic-a1.aliexpress-media.com/kf/Sedf9498530844dac85f78184d1d31a3aN.pdf"
+    }
+  ],
+  "geometry": {
+    "envelopeMm": {
+      "depth": 12.71,
+      "height": 85.1,
+      "width": 82.0
+    },
+    "glbBoundsM": [
+      0.082,
+      0.0851,
+      0.01271
+    ],
+    "sourceBoundsMm": [
+      82.0,
+      85.1,
+      12.71
+    ],
+    "strategy": "photo_calibrated",
+    "uncertaintyMm": {
+      "interfaces": 0.15,
+      "nonInterfaceHeight": 1.5,
+      "outline": 0.25
+    }
+  },
+  "glb": {
+    "byteSize": 1203604,
+    "materialCount": 0,
+    "nodeCount": 640,
+    "path": "models/aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx.glb",
+    "sha256": "aec8e5e6e81deb28f3a1da8ab56a76aba0429501964e7c86227cef0e4006a9da",
+    "triangleCount": 86592
+  },
+  "identity": {
+    "acceptedAliases": [
+      "ESP32-S3 GPIO Extension Board V2775"
+    ],
+    "hardwareRevision": "V2775 marketplace-listing-revision-checked-2026-08-28",
+    "manufacturer": "AITRIP",
+    "manufacturerSku": "B0H336QRXX",
+    "marketplaceIds": [
+      {
+        "id": "B0H336QRXX",
+        "marketplace": "Amazon US",
+        "url": "https://www.amazon.com/dp/B0H336QRXX"
+      },
+      {
+        "id": "1005009901996625",
+        "marketplace": "AliExpress",
+        "url": "https://www.aliexpress.com/item/1005009901996625.html"
+      }
+    ],
+    "productName": "AITRIP ESP32-S3 44-pin GPIO 1-to-2 Expansion Board",
+    "rejectedAliases": [
+      "30-pin ESP32 expansion board",
+      "38-pin ESP32 expansion board"
+    ],
+    "soldConnectorForm": "factory-installed dual 1x22 sockets, replicated male pin banks, DC barrel input, 3V3 and 5V banks"
+  },
+  "interfaceEligibility": {
+    "reasons": [
+      "marketplace clone has no manufacturer ECAD or exact electrical schematic"
+    ],
+    "state": "candidate_review"
+  },
+  "keepouts": [],
+  "landmarks": [],
+  "mounts": [
+    {
+      "diameterMm": 3.2,
+      "mountId": "m1",
+      "nodeName": "mount:m1",
+      "positionMm": [
+        -37,
+        -37,
+        0.91
+      ]
+    },
+    {
+      "diameterMm": 3.2,
+      "mountId": "m2",
+      "nodeName": "mount:m2",
+      "positionMm": [
+        37,
+        -37,
+        0.91
+      ]
+    },
+    {
+      "diameterMm": 3.2,
+      "mountId": "m3",
+      "nodeName": "mount:m3",
+      "positionMm": [
+        -37,
+        37,
+        0.91
+      ]
+    },
+    {
+      "diameterMm": 3.2,
+      "mountId": "m4",
+      "nodeName": "mount:m4",
+      "positionMm": [
+        37,
+        37,
+        0.91
+      ]
+    }
+  ],
+  "partId": "aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx",
+  "revision": "candidate-v1.1.0-silkscreen",
+  "schemaVersion": "makeable-part-3d/v1",
+  "state": "candidate_review",
+  "toolchain": {
+    "aiGeometryAuthority": false,
+    "determinism": "two consecutive generation runs produced the same SHA-256",
+    "generator": "scripts/assembly3d/generate_esp32_expansion_glbs.py",
+    "khronosGltfValidator": {
+      "report": "reports/khronos-gltf-validator.json",
+      "reportSha256": "7d1c607b9e6c37bfe8aba872841fd59efb6f0615a5fd051cf58e030ac9d6cc90",
+      "version": "2.0.0-dev.3.10"
+    },
+    "python": "3.9.6",
+    "trimesh": "4.12.2"
+  },
+  "visualEligibility": {
+    "reasons": [],
+    "state": "ready"
+  },
+  "visualReview": {
+    "criteria": {
+      "connectors": "pass",
+      "frontPopulation": "pass",
+      "identity": "pass",
+      "markings": "pass",
+      "materials": "pass",
+      "outline": "pass",
+      "pins": "pass",
+      "scale": "pass",
+      "undersidePopulation": "not_applicable"
+    },
+    "multiAngleRender": {
+      "path": "renders/aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx-four-angle.png",
+      "sha256": "cf9c674b70c493865311d2ecc185dcfa2fd2fddc501c427dd9e58136f70ae579"
+    },
+    "referenceComparison": {
+      "path": "renders/aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx-reference-comparison.png",
+      "sha256": "87a2cd2a14e14d92673ab9e4381e93bad0eb019b8ed0a16a364d236fccb03812"
+    },
+    "reviewFile": "reports/visual-review.json",
+    "reviewFileSha256": "92522cdebe7a0d74fb7784b472856abaf00374ec4c2779b38e8ea41875829c5f",
+    "reviewedAt": "2026-08-28T04:07:44-07:00",
+    "reviewedGlbSha256": "aec8e5e6e81deb28f3a1da8ab56a76aba0429501964e7c86227cef0e4006a9da",
+    "reviewer": "Codex source-to-render visual review"
+  }
+}

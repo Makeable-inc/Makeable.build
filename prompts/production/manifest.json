@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "makeable-production-prompt-package/v1",
+  "packageVersion": "2026-08-29.1",
+  "stages": [
+    {
+      "id": "parts_plan",
+      "owner": "gpt-5.6-terra",
+      "executor": "openai_responses",
+      "promptPath": "parts-planner.md",
+      "purpose": "Select or normalize an exact catalog-constrained build plan from approved candidates.",
+      "outputContract": "code_owned_json_schema"
+    },
+    {
+      "id": "asset_resolution",
+      "owner": "registry_service",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Resolve approved immutable AWS assets and verify their manifests, hashes, interfaces, and required nodes.",
+      "outputContract": "code_owned_validator"
+    },
+    {
+      "id": "assembly_routing",
+      "owner": "gpt-5.6-sol",
+      "executor": "openai_responses",
+      "promptPath": "assembly-routing.md",
+      "purpose": "Choose bounded presentation metadata for immutable, prevalidated wire endpoints.",
+      "outputContract": "code_owned_json_schema"
+    },
+    {
+      "id": "route_geometry",
+      "owner": "assembly_geometry",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Construct connector-normal wire geometry and reject loops, self-intersections, keepouts, and invalid endpoints.",
+      "outputContract": "code_owned_validator"
+    },
+    {
+      "id": "hero_art_direction",
+      "owner": "gpt-5.6-sol",
+      "executor": "openai_responses",
+      "promptPath": "hero-art-director.md",
+      "purpose": "Write one exact, non-exploded industrial product-image prompt from the locked build plan.",
+      "outputContract": "code_owned_json_schema"
+    },
+    {
+      "id": "hero_image",
+      "owner": "gpt-image-2",
+      "executor": "openai_images",
+      "promptPath": null,
+      "promptFromStage": "hero_art_direction",
+      "purpose": "Render one illustrative hero image with no visual review or correction pass.",
+      "outputContract": "code_owned_binary_validator"
+    },
+    {
+      "id": "housing_generation",
+      "owner": "deterministic_cad",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Generate housing geometry from the locked dimensional contract after the hero response exists.",
+      "outputContract": "code_owned_mesh_validator"
+    },
+    {
+      "id": "firmware_generation",
+      "owner": "firmware_template",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Generate firmware from the locked electrical contract and compile it for the exact board target.",
+      "outputContract": "compiler_gate"
+    },
+    {
+      "id": "browser_delivery",
+      "owner": "threejs_renderer",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Fetch, hash-verify, and render approved CloudFront GLBs and accepted route geometry.",
+      "outputContract": "machine_state_gate"
+    }
+  ]
+}

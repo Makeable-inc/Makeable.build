@@ -1,0 +1,22 @@
+{
+  "candidateGlb": {
+    "byteSize": 1203604,
+    "materialCount": 0,
+    "nodeCount": 640,
+    "path": "models/aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx.glb",
+    "sha256": "aec8e5e6e81deb28f3a1da8ab56a76aba0429501964e7c86227cef0e4006a9da",
+    "triangleCount": 86592
+  },
+  "createdAt": "2026-08-28T10:38:49.640422Z",
+  "nextEvidence": [
+    "marketplace clone has no manufacturer ECAD or exact electrical schematic"
+  ],
+  "partId": "aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx",
+  "requestedIdentity": {
+    "manufacturer": "AITRIP",
+    "manufacturerSku": "B0H336QRXX",
+    "productName": "AITRIP ESP32-S3 44-pin GPIO 1-to-2 Expansion Board"
+  },
+  "schemaVersion": "makeable-part-job/v1",
+  "state": "candidate_review"
+}
