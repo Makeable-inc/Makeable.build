@@ -10,7 +10,7 @@ import { socialLinkRedirect } from "../lib/social-links.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("social links redirect only the allowlisted Instagram accounts", () => {
+test("social links redirect only the allowlisted social accounts", () => {
   assert.deepEqual(socialLinkRedirect("/r/ig/makeable-build"), {
     platform: "instagram",
     accountKey: "makeable_build",
@@ -22,6 +22,12 @@ test("social links redirect only the allowlisted Instagram accounts", () => {
     accountKey: "makeable_zak",
     location:
       "/?utm_source=instagram&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_zak_bio&social_account=makeable_zak&social_placement=bio",
+  });
+  assert.deepEqual(socialLinkRedirect("/r/fb/makeable"), {
+    platform: "facebook",
+    accountKey: "makeable_facebook",
+    location:
+      "/?utm_source=facebook&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_facebook_page&social_account=makeable_facebook&social_placement=page",
   });
   assert.equal(socialLinkRedirect("/r/ig/not-allowlisted"), null);
   assert.equal(socialLinkRedirect("/r/ig/makeable-zak?next=https://evil.example"), null);

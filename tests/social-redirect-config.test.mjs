@@ -15,12 +15,13 @@ test("Netlify social redirects are explicitly no-store in production", async () 
     /\[\[headers\]\]\s+for = "([^"]+)"\s+\[headers\.values\]\s+Cache-Control = "([^"]+)"/g,
   )].map((match) => ({ path: match[1], cacheControl: match[2] }));
 
-  // Then: both public social links prohibit cached attribution redirects.
+  // Then: every public social link prohibits cached attribution redirects.
   assert.deepEqual(
-    headerBlocks.filter(({ path: pathname }) => pathname.startsWith("/r/ig/")),
+    headerBlocks.filter(({ path: pathname }) => pathname.startsWith("/r/")),
     [
       { path: "/r/ig/makeable-build", cacheControl: "no-store" },
       { path: "/r/ig/makeable-zak", cacheControl: "no-store" },
+      { path: "/r/fb/makeable", cacheControl: "no-store" },
     ],
   );
 });
