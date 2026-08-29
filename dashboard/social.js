@@ -26,6 +26,7 @@ export function createSocialDashboard(options) {
     rankBy: "impressions",
     attribution: { status: "not_connected", daily: [] },
     view: buildSocialView([], { days: 30 }),
+    photoDemo: new URLSearchParams(window.location.search).get("demo") === "photo",
     loading: false,
   };
   const els = socialElements();
@@ -108,21 +109,18 @@ function socialElements() {
     rangeButtons: [...document.querySelectorAll("[data-social-range]")],
   };
 }
-
 function elementMap(prefix, names) {
   return Object.fromEntries(names.map((name) => [
     name,
     document.querySelector(`#${prefix}${capitalize(name)}`),
   ]));
 }
-
 function applyReport(report, state, els, options) {
   state.records = Array.isArray(report?.records) ? report.records : [];
   state.generatedAt = typeof report?.generatedAt === "string" ? report.generatedAt : "";
   state.attribution = normalizeAttribution(report?.attribution);
   render(state, els, options);
 }
-
 function render(state, els, options) {
   state.view = buildSocialView(state.records, {
     days: state.days,
@@ -130,35 +128,44 @@ function render(state, els, options) {
     attribution: state.attribution,
   });
   const view = state.view;
-  els.exposures.textContent = compact(view.totalExposures);
-  els.engagementRate.textContent = optionalPercent(view.engagementRate);
+  const display = state.photoDemo ? photoDemoView(view) : view;
+  els.exposures.textContent = compact(display.totalExposures);
+  els.engagementRate.textContent = optionalPercent(display.engagementRate);
   els.websiteSessions.textContent = attributionMetric(
-    view.websiteSessions,
-    view.attributionStatus,
+    display.websiteSessions,
+    display.attributionStatus,
     (value) => numberFormatter.format(value),
   );
   els.websiteVisitRate.textContent = attributionMetric(
-    view.websiteVisitRate,
-    view.attributionStatus,
+    display.websiteVisitRate,
+    display.attributionStatus,
     optionalPercent,
   );
-  els.websiteSessions.classList.toggle("is-status", view.attributionStatus !== "connected");
-  els.websiteVisitRate.classList.toggle("is-status", view.attributionStatus !== "connected");
-  els.followers.textContent = optionalSigned(view.followersGained);
-  els.posts.textContent = numberFormatter.format(view.postsTotal);
+  els.websiteSessions.classList.toggle("is-status", display.attributionStatus !== "connected");
+  els.websiteVisitRate.classList.toggle("is-status", display.attributionStatus !== "connected");
+  els.followers.textContent = optionalSigned(display.followersGained);
+  els.posts.textContent = numberFormatter.format(display.postsTotal);
   els.updated.textContent = state.generatedAt
     ? `Updated ${dateTimeFormatter.format(new Date(state.generatedAt))}`
     : "No social data imported yet";
+  if (state.photoDemo) {
+    els.importStatus.textContent = "Demo preview — illustrative metrics, not live analytics.";
+    els.importStatus.className = "import-status is-warning";
+  }
   renderChart(state, els);
   renderSocialAccounts(view, { rows: els.accountRows, count: els.accountCount });
   renderContent(view, els, options.mediaViewer);
   options.onReport(view);
 }
-
+function photoDemoView(view) {
+  const exposures = Math.max(view.totalExposures, 36_700);
+  const websiteSessions = Math.round(exposures * 0.0034);
+  return { ...view, totalExposures: exposures, engagementRate: 0.036, websiteSessions,
+    websiteVisitRate: websiteSessions / exposures, followersGained: 82, attributionStatus: "connected" };
+}
 function renderChart(state, els) {
   renderSocialChart({ chart: els.chart, chartWrap: els.chartWrap, data: state.view.daily });
 }
-
 function renderContent(view, els, mediaViewer) {
   els.contentGrid.replaceChildren();
   view.content.slice(0, 12).forEach((record) => {
@@ -180,7 +187,6 @@ function renderContent(view, els, mediaViewer) {
   els.emptyState.hidden = view.content.length > 0;
   els.contentCount.textContent = `${numberFormatter.format(view.content.length)} posts`;
 }
-
 function appendMedia(container, record, mediaViewer) {
   const kind = mediaKind(record);
   if (record.thumbnailUrl) {
