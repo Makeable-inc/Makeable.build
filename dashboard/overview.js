@@ -8,33 +8,25 @@ export function createOverview({ state, els }) {
   return {
     render() {
       const report = state.report || {};
-      const social = state.socialView || {
-        totalExposures: 0,
-        totalEngagements: 0,
-        engagementRate: null,
-        attributionStatus: "not_connected",
-        websiteSessions: null,
-        websiteVisitRate: null,
-        followersGained: 0,
-      };
-      els.overviewExposures.textContent = compactFormatter.format(social.totalExposures || 0);
-      els.overviewEngagements.textContent = compactFormatter.format(social.totalEngagements || 0);
-      els.overviewEngagementRate.textContent = optionalPercent(social.engagementRate);
-      els.overviewFollowers.textContent = optionalSigned(social.followersGained);
+      const social = state.socialView;
+      els.overviewExposures.textContent = social ? compactFormatter.format(social.totalExposures) : "—";
+      els.overviewEngagements.textContent = social ? compactFormatter.format(social.totalEngagements) : "—";
+      els.overviewEngagementRate.textContent = social ? optionalPercent(social.engagementRate) : "—";
+      els.overviewFollowers.textContent = social ? optionalSigned(social.followersGained) : "—";
       els.overviewContacts.textContent = numberFormatter.format(Number(report.total) || 0);
       els.overviewBuilders.textContent = numberFormatter.format(Number(report.builderAccountsTotal) || 0);
       els.overviewSocialRows.replaceChildren();
       appendPulseRow(
         els.overviewSocialRows,
         "Content exposures",
-        compactFormatter.format(social.totalExposures || 0),
+        social ? compactFormatter.format(social.totalExposures) : "Loading…",
       );
       appendPulseRow(
         els.overviewSocialRows,
         "Engagement rate",
-        optionalPercent(social.engagementRate),
+        social ? optionalPercent(social.engagementRate) : "—",
       );
-      if (social.attributionStatus === "connected") {
+      if (social?.attributionStatus === "connected") {
         appendPulseRow(
           els.overviewSocialRows,
           "Website conversions",
@@ -49,7 +41,7 @@ export function createOverview({ state, els }) {
         appendPulseRow(
           els.overviewSocialRows,
           "Website attribution",
-          social.attributionStatus === "unavailable" ? "Unavailable" : "Not connected",
+          social ? (social.attributionStatus === "unavailable" ? "Unavailable" : "Not connected") : "Loading…",
         );
       }
       els.overviewWaitlistRows.replaceChildren();
