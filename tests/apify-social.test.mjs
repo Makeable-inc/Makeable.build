@@ -30,11 +30,16 @@ test("Apify refresh keeps successful platform data when another platform is temp
 });
 
 test("Apify Facebook refresh uses the visible public video count for the linked Makeable Page", async () => {
-  const fetchImpl = async (url) => new Response(JSON.stringify(url.includes("facebook-pages-posts-scraper") ? [{
-    pageId: "61593471075023", postId: "fb-reel-1", timestampMs: 1_788_000_000_000,
-    viewsCount: 4_200, likesCount: 120, commentsCount: 8, sharesCount: 5,
-    isVideo: true, text: "A Makeable reel", postUrl: "https://www.facebook.com/reel/1",
-  }] : []));
+  let facebookInput;
+  const fetchImpl = async (url, options) => {
+    if (!url.includes("facebook-pages-posts-scraper")) return new Response(JSON.stringify([]));
+    facebookInput = JSON.parse(options.body);
+    return new Response(JSON.stringify([{
+      pageId: "61593471075023", postId: "fb-reel-1", timestampMs: 1_788_000_000_000,
+      viewsCount: 4_200, likesCount: 120, commentsCount: 8, sharesCount: 5,
+      isVideo: true, text: "A Makeable reel", postUrl: "https://www.facebook.com/reel/1",
+    }]));
+  };
 
   const { records } = await refreshApifySocialRecords({ token: "test", fetchImpl });
   const record = records.find((candidate) => candidate.platform === "facebook");
@@ -44,4 +49,8 @@ test("Apify Facebook refresh uses the visible public video count for the linked 
     impressions: record?.impressions,
     engagements: record?.engagements,
   }, { account: "Makeable Facebook", attributionKey: "makeable_facebook", impressions: 4_200, engagements: 133 });
+  assert.deepEqual(facebookInput, {
+    startUrls: [{ url: "https://www.facebook.com/profile.php?id=61593471075023" }],
+    maxItems: 12,
+  });
 });
