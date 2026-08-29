@@ -7,17 +7,13 @@ const compactFormatter = new Intl.NumberFormat(undefined, {
   notation: "compact",
   maximumFractionDigits: 1,
 });
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
-const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
+const dateFormatter = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const CONFIGURED_ACCOUNTS = [
+  ["instagram", "@makeable.build", "makeable_build"], ["instagram", "@makeable.zak", "makeable_zak"],
+  ["tiktok", "@trymakeable.build", "trymakeable_build"], ["facebook", "Makeable Facebook", "makeable_facebook"],
+  ["youtube", "@makeablebuild", "makeable_youtube"],
+];
 export function createSocialDashboard(options) {
   const state = {
     records: [],
@@ -126,6 +122,7 @@ function render(state, els, options) {
     days: state.days,
     rankBy: state.rankBy,
     attribution: state.attribution,
+    configuredAccounts: CONFIGURED_ACCOUNTS,
   });
   const view = state.view;
   const display = state.photoDemo ? photoDemoView(view) : view;

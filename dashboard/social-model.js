@@ -15,6 +15,13 @@ const COVERAGE_STATES = new Set([
   "unavailable",
 ]);
 const ATTRIBUTION_KEY_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
+const CONFIGURED_ACCOUNTS = [
+  ["instagram", "@makeable.build", "makeable_build"],
+  ["instagram", "@makeable.zak", "makeable_zak"],
+  ["tiktok", "@trymakeable.build", "trymakeable_build"],
+  ["facebook", "Makeable Facebook", "makeable_facebook"],
+  ["youtube", "@makeablebuild", "makeable_youtube"],
+];
 
 export function buildSocialView(records, options = {}) {
   const now = options.now instanceof Date ? options.now : new Date();
@@ -27,7 +34,7 @@ export function buildSocialView(records, options = {}) {
   const completeExposures = sum(complete, "impressions");
   const attributionConnected = options.attribution?.status === "connected";
   const sessions = attributionSessions(options.attribution, days, now);
-  const accounts = accountRows(filtered, attributionConnected, sessions).sort((left, right) =>
+  const accounts = configuredAccountRows(accountRows(filtered, attributionConnected, sessions), attributionConnected, options.configuredAccounts).sort((left, right) =>
     rankValue(right, rankBy) - rankValue(left, rankBy)
     || right.impressions - left.impressions
     || left.account.localeCompare(right.account)
@@ -68,6 +75,19 @@ export function buildSocialView(records, options = {}) {
       || right.publishedAt.localeCompare(left.publishedAt),
     ),
   };
+}
+
+function configuredAccountRows(accounts, attributionConnected, configuredAccounts = []) {
+  const existing = new Set(accounts.map((account) => `${account.platform}:${account.attributionKey}`));
+  const unavailable = configuredAccounts
+    .filter(([platform, , key]) => !existing.has(`${platform}:${key}`))
+    .map(([platform, account, attributionKey]) => ({
+      rank: 0, platform, account, attributionKey, coverage: "unavailable", impressions: 0,
+      engagements: 0, followers: 0, followersGained: null, clicks: null, posts: 0,
+      latestPublishedAt: "", engagementRate: null,
+      websiteSessions: attributionConnected ? 0 : null, websiteVisitRate: null,
+    }));
+  return [...accounts, ...unavailable];
 }
 
 export function mediaKind(record) {

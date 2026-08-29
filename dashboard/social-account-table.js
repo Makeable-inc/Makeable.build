@@ -15,7 +15,7 @@ export function renderSocialAccounts(view, { rows, count }) {
       cell(`#${account.rank}`, "rank-cell"),
       accountCell(account),
       cell(account.platform, "platform-name"),
-      cell(numberFormatter.format(account.impressions)),
+      cell(account.coverage === "unavailable" ? "—" : numberFormatter.format(account.impressions)),
       cell(optionalPercent(account.engagementRate)),
       cell(formatOptionalNumber(account.clicks)),
       cell(formatOptionalNumber(account.websiteSessions)),
@@ -24,7 +24,7 @@ export function renderSocialAccounts(view, { rows, count }) {
         formatOptionalSigned(account.followersGained),
         account.followersGained > 0 ? "positive-value" : "",
       ),
-      cell(numberFormatter.format(account.posts)),
+      cell(account.coverage === "unavailable" ? "—" : numberFormatter.format(account.posts)),
     );
     rows.append(row);
   });
