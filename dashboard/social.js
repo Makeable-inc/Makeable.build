@@ -416,8 +416,13 @@ async function refreshPublicData(state, els, options) {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || "Public social refresh failed.");
     applyReport(payload.report, state, els, options);
-    setRefreshState(els, false, `Refreshed ${numberFormatter.format(payload.imported)} public posts.`, "success");
-    options.showToast("Public social data refreshed");
+    const unavailable = Array.isArray(payload.partialFailures)
+      ? payload.partialFailures.map((failure) => failure.platform).filter(Boolean) : [];
+    const message = unavailable.length
+      ? `Refreshed ${numberFormatter.format(payload.imported)} public posts. ${unavailable.join(", ")} will retry automatically.`
+      : `Refreshed ${numberFormatter.format(payload.imported)} public posts.`;
+    setRefreshState(els, false, message, "success");
+    options.showToast(unavailable.length ? "Public social data partially refreshed" : "Public social data refreshed");
   } catch (error) {
     setRefreshState(els, false, errorMessage(error, "Public social refresh failed"), "error");
   }

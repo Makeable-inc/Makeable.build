@@ -1419,7 +1419,7 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       name: socialStoreNameForFunctionContext(context),
       consistency: "strong",
     });
-    const incoming = await refreshApifySocialRecords({ token: env.APIFY_TOKEN });
+    const { records: incoming, failures } = await refreshApifySocialRecords({ token: env.APIFY_TOKEN });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);
     await persistSocialRecords(store, records);
     const attribution = await readSocialWebsiteSessions({
@@ -1429,6 +1429,7 @@ async function dashboardSocialPublicRefresh(req, env, context) {
     });
     return jsonResponse({
       imported: incoming.length,
+      partialFailures: failures,
       report: buildSocialDashboardReport(records, { attribution }),
     }, 200, { "Cache-Control": "no-store", Vary: "Cookie" });
   } catch (error) {

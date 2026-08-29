@@ -8,10 +8,10 @@ export default async function handler(_req, context = {}) {
   try {
     const token = globalThis.Netlify?.env?.get("APIFY_TOKEN") || process.env.APIFY_TOKEN || "";
     const store = getStore({ name: socialStoreNameForFunctionContext(context), consistency: "strong" });
-    const incoming = await refreshApifySocialRecords({ token });
+    const { records: incoming, failures } = await refreshApifySocialRecords({ token });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);
     await persistSocialRecords(store, records);
-    return jsonResponse({ imported: incoming.length, total: records.length });
+    return jsonResponse({ imported: incoming.length, total: records.length, partialFailures: failures });
   } catch (error) {
     console.error("Scheduled social refresh failed", error);
     return jsonResponse({ error: "Scheduled social refresh failed." }, 500);
