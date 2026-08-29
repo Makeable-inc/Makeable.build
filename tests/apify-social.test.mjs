@@ -20,7 +20,7 @@ test("Apify refresh keeps successful platform data when another platform is temp
         videoPlayCount: 12_000,
       }]));
     }
-    if (url.includes("facebook-metrics-scraper") || url.includes("youtube-scraper")) return new Response(JSON.stringify([]));
+    if (url.includes("facebook-page-posts-scraper") || url.includes("youtube-scraper")) return new Response(JSON.stringify([]));
     return new Response(JSON.stringify({ error: "rate limited" }), { status: 429 });
   };
 
@@ -29,15 +29,15 @@ test("Apify refresh keeps successful platform data when another platform is temp
   assert.deepEqual(result.failures, [{ platform: "tiktok", status: 429, detail: '{"error":"rate limited"}' }]);
 });
 
-test("Apify Facebook refresh uses the visible public video count for the linked Makeable Page", async () => {
+test("Apify Facebook refresh uses public Page-post rows for the linked Makeable Page", async () => {
   let facebookInput;
   const fetchImpl = async (url, options) => {
-    if (!url.includes("facebook-metrics-scraper")) return new Response(JSON.stringify([]));
+    if (!url.includes("facebook-page-posts-scraper")) return new Response(JSON.stringify([]));
     facebookInput = JSON.parse(options.body);
     return new Response(JSON.stringify([{
-      profileId: "61593471075023", contentId: "fb-reel-1", publishedAt: "2026-08-29T00:00:00.000Z",
-      plays: 4_200, likes: 120, comments: 8, shares: 5,
-      contentType: "reel", text: "A Makeable reel", contentUrl: "https://www.facebook.com/reel/1",
+      page_id: "61593471075023", post_id: "fb-reel-1", created_time: "2026-08-29T00:00:00.000Z",
+      video_views: 4_200, reactions_count: 120, comments_count: 8, shares_count: 5,
+      type: "reel", message: "A Makeable reel", permalink_url: "https://www.facebook.com/reel/1",
     }]));
   };
 
@@ -50,15 +50,7 @@ test("Apify Facebook refresh uses the visible public video count for the linked 
     engagements: record?.engagements,
   }, { account: "Makeable Facebook", attributionKey: "makeable_facebook", impressions: 4_200, engagements: 133 });
   assert.deepEqual(facebookInput, {
-    mode: "profileUrls",
     startUrls: ["https://www.facebook.com/profile.php?id=61593471075023"],
-    maxItemsPerProfile: 12,
-    includePosts: true,
-    includeReels: true,
-    includeVideos: true,
-    includePhotos: false,
-    includeAuthorProfileMetrics: true,
-    maxConcurrency: 2,
-    requestTimeoutSecs: 15,
+    maxPostsPerProfile: 12,
   });
 });
