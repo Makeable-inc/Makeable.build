@@ -6,9 +6,19 @@ export const config = { schedule: "0 * * * *" };
 
 export default async function handler(_req, context = {}) {
   try {
+    const metaAccessToken = value("META_ACCESS_TOKEN");
     const youtubeApiKey = globalThis.Netlify?.env?.get("YOUTUBE_API_KEY") || process.env.YOUTUBE_API_KEY || "";
     const store = getStore({ name: socialStoreNameForFunctionContext(context), consistency: "strong" });
-    const { records: incoming, failures } = await refreshSocialRecords({ youtubeApiKey });
+    const { records: incoming, failures } = await refreshSocialRecords({
+      youtubeApiKey,
+      metaAccessToken,
+      instagramAccounts: [
+        { id: value("INSTAGRAM_MAKEABLE_BUILD_ID"), account: "@makeable.build", attributionKey: "makeable_build" },
+        { id: value("INSTAGRAM_MAKEABLE_ZAK_ID"), account: "@makeable.zak", attributionKey: "makeable_zak" },
+      ].filter((account) => account.id),
+      tiktokAccessToken: value("TIKTOK_ACCESS_TOKEN"),
+      facebookPageId: value("FACEBOOK_PAGE_ID"),
+    });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);
     await persistSocialRecords(store, records);
     return jsonResponse({ imported: incoming.length, total: records.length, partialFailures: failures });
@@ -16,6 +26,10 @@ export default async function handler(_req, context = {}) {
     console.error("Scheduled social refresh failed", error);
     return jsonResponse({ error: "Scheduled social refresh failed." }, 500);
   }
+}
+
+function value(key) {
+  return globalThis.Netlify?.env?.get(key) || process.env[key] || "";
 }
 
 function jsonResponse(body, status = 200) {

@@ -282,6 +282,11 @@ function getEnv() {
     "DASHBOARD_SESSION_SECRET",
     "POSTHOG_PERSONAL_API_KEY",
     "POSTHOG_PROJECT_ID",
+    "META_ACCESS_TOKEN",
+    "INSTAGRAM_MAKEABLE_BUILD_ID",
+    "INSTAGRAM_MAKEABLE_ZAK_ID",
+    "TIKTOK_ACCESS_TOKEN",
+    "FACEBOOK_PAGE_ID",
     "YOUTUBE_API_KEY",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
@@ -1421,6 +1426,10 @@ async function dashboardSocialPublicRefresh(req, env, context) {
     });
     const { records: incoming, failures } = await refreshSocialRecords({
       youtubeApiKey: env.YOUTUBE_API_KEY,
+      metaAccessToken: env.META_ACCESS_TOKEN,
+      instagramAccounts: instagramAccountsFromEnv(env),
+      tiktokAccessToken: env.TIKTOK_ACCESS_TOKEN,
+      facebookPageId: env.FACEBOOK_PAGE_ID,
     });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);
     await persistSocialRecords(store, records);
@@ -1439,6 +1448,13 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       error: error instanceof Error ? error.message : "Public social refresh failed.",
     }, 502, { "Cache-Control": "no-store", Vary: "Cookie" });
   }
+}
+
+function instagramAccountsFromEnv(env) {
+  return [
+    { id: env.INSTAGRAM_MAKEABLE_BUILD_ID, account: "@makeable.build", attributionKey: "makeable_build" },
+    { id: env.INSTAGRAM_MAKEABLE_ZAK_ID, account: "@makeable.zak", attributionKey: "makeable_zak" },
+  ].filter((account) => account.id);
 }
 
 function dashboardAuthorizationFailure(req, env, allowedMethod) {
