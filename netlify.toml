@@ -71,36 +71,6 @@ status = 302
 force = true
 
 [[redirects]]
-from = "/r/ig/makeable-build/:post"
-to = "/?utm_source=instagram&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_build_post_:post&social_account=makeable_build&social_placement=post"
-status = 302
-force = true
-
-[[redirects]]
-from = "/r/ig/makeable-zak/:post"
-to = "/?utm_source=instagram&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_zak_post_:post&social_account=makeable_zak&social_placement=post"
-status = 302
-force = true
-
-[[redirects]]
-from = "/r/fb/makeable/:post"
-to = "/?utm_source=facebook&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_facebook_post_:post&social_account=makeable_facebook&social_placement=post"
-status = 302
-force = true
-
-[[redirects]]
-from = "/r/tiktok/makeable/:post"
-to = "/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=makeable&utm_content=trymakeable_build_post_:post&social_account=trymakeable_build&social_placement=post"
-status = 302
-force = true
-
-[[redirects]]
-from = "/r/youtube/makeable/:post"
-to = "/?utm_source=youtube&utm_medium=organic_social&utm_campaign=makeable&utm_content=makeable_youtube_post_:post&social_account=makeable_youtube&social_placement=post"
-status = 302
-force = true
-
-[[redirects]]
   from = "/ember/download"
   to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg"
   status = 302
@@ -128,11 +98,6 @@ for = "/r/tiktok/makeable"
 
 [[headers]]
 for = "/r/youtube/makeable"
-[headers.values]
-  Cache-Control = "no-store"
-
-[[headers]]
-for = "/r/*"
 [headers.values]
   Cache-Control = "no-store"
 
