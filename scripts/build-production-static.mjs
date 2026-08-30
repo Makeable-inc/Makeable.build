@@ -13,8 +13,6 @@ await cp(nextExport, output, { recursive: true });
 for (const directory of [
   "assets",
   "styles",
-  "privacy",
-  "terms",
   "ember",
   "pilot",
   "dashboard",
