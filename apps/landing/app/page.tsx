@@ -179,6 +179,7 @@ type HeroBuild = {
   description: string;
   image: string;
   mobileImage?: string;
+  heroBackgroundPosition?: string;
   cardImage: string;
   cta: string;
   action: "preorder" | "soon";
@@ -209,9 +210,9 @@ const heroBuilds: HeroBuild[] = [
     id: "ember",
     title: "Feed Ember Tokens.",
     description: "A desk pet that grows with every Claude and Codex token you burn.",
-    image: "/concepts/homepage-v2/ember-flagship-hero-v2.webp",
-    mobileImage: "/concepts/homepage-v2/ember-flagship-hero-physical-geometry-v9.png",
-    cardImage: "/concepts/homepage-v2/ember-flagship-hero-v2.webp",
+    image: "/concepts/homepage-v2/ember-flagship-hero-adult-neutral-v15.png",
+    mobileImage: "/concepts/homepage-v2/ember-flagship-hero-adult-neutral-v15.png",
+    cardImage: "/concepts/homepage-v2/ember-flagship-hero-adult-neutral-v15.png",
     cta: "Pre-order Ember",
     action: "preorder",
   },
@@ -219,7 +220,8 @@ const heroBuilds: HeroBuild[] = [
     id: "study-desk-companion",
     title: "Study Desk Companion",
     description: "A compact focus buddy with a real screen and a tactile desk control.",
-    image: "/concepts/homepage-v2/study-desk-companion-v2.webp",
+    image: "/assets/landing/heroes-v3/study-desk-companion-hero-v6.png",
+    heroBackgroundPosition: "40% 20%",
     cardImage: "/concepts/homepage-v2/study-desk-companion-v2.webp",
     cta: "Coming soon",
     action: "soon",
@@ -228,7 +230,8 @@ const heroBuilds: HeroBuild[] = [
     id: "plant-companion",
     title: "Plant Companion",
     description: "Give your plant a simple way to show when it needs attention.",
-    image: "/concepts/homepage-v2/plant-companion-v2.webp",
+    image: "/assets/landing/heroes-v3/plant-companion-hero-v5.png",
+    heroBackgroundPosition: "40% 20%",
     cardImage: "/concepts/homepage-v2/plant-companion-v2.webp",
     cta: "Coming soon",
     action: "soon",
@@ -237,7 +240,8 @@ const heroBuilds: HeroBuild[] = [
     id: "motion-light",
     title: "Motion Light",
     description: "A small printed light with a translucent FDM diffuser that wakes up gently when you walk by.",
-    image: "/concepts/homepage-v2/motion-light-v2.webp",
+    image: "/assets/landing/heroes-v3/motion-light-hero-v6.png",
+    heroBackgroundPosition: "40% 20%",
     cardImage: "/concepts/homepage-v2/motion-light-v2.webp",
     cta: "Coming soon",
     action: "soon",
@@ -246,7 +250,8 @@ const heroBuilds: HeroBuild[] = [
     id: "window-air-monitor",
     title: "Window Air Monitor",
     description: "A simple screen that helps you know when to open the window.",
-    image: "/assets/landing/gallery-v2/window-air-final-v2.webp",
+    image: "/assets/landing/heroes-v3/window-air-monitor-hero-v6.png",
+    heroBackgroundPosition: "40% 20%",
     cardImage: "/assets/landing/gallery-v2/window-air-final-v2.webp",
     cta: "Coming soon",
     action: "soon",
@@ -255,7 +260,8 @@ const heroBuilds: HeroBuild[] = [
     id: "pet-water-reminder",
     title: "Pet Water Reminder",
     description: "A gentle desk reminder for keeping your pet's water fresh.",
-    image: "/assets/landing/gallery-v2/pet-water-final-v2.webp",
+    image: "/assets/landing/heroes-v3/pet-water-reminder-hero-v5.png",
+    heroBackgroundPosition: "40% 20%",
     cardImage: "/assets/landing/gallery-v2/pet-water-final-v2.webp",
     cta: "Coming soon",
     action: "soon",
@@ -264,7 +270,8 @@ const heroBuilds: HeroBuild[] = [
     id: "quiet-door-chime",
     title: "Quiet Door Chime",
     description: "A calm way to know when someone arrives.",
-    image: "/assets/landing/gallery-v2/quiet-chime-final-v3.webp",
+    image: "/assets/landing/heroes-v3/quiet-door-chime-hero-v5.png",
+    heroBackgroundPosition: "40% 20%",
     cardImage: "/assets/landing/gallery-v2/quiet-chime-final-v3.webp",
     cta: "Coming soon",
     action: "soon",
@@ -1213,7 +1220,10 @@ export default function Home() {
         className="mk-hero"
         id="top"
         aria-label="Makeable flagship build"
-        style={{ "--mk-hero-image": `url(${activeHero.image})` } as CSSProperties}
+        style={{
+          "--mk-hero-image": `url(${activeHero.image})`,
+          "--hero-background-position": activeHero.heroBackgroundPosition ?? "0 20%",
+        } as CSSProperties}
       >
         <nav className="mk-nav" aria-label="Primary navigation">
           <a className="mk-logo-link" href="#top" aria-label="Makeable home">
@@ -1363,15 +1373,34 @@ export default function Home() {
       </section>
 
       <footer className="mk-footer">
-        <div>
+        <div className="mk-footer-brand">
           <img src="/makeable-logo-tight.webp" alt="Makeable" />
           <p>Anything is Makeable</p>
         </div>
-        <nav aria-label="Footer navigation">
-          <a href="https://www.instagram.com/makeable.build/" target="_blank" rel="noreferrer">Instagram</a>
-          <a href="https://www.tiktok.com/" target="_blank" rel="noreferrer">TikTok</a>
-          <a href="/terms/">Terms</a>
+        <nav className="mk-footer-social" aria-label="Follow Makeable">
+          <a href="mailto:makeable.build@gmail.com" aria-label="Email Makeable">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h12a2.5 2.5 0 0 1 2.5 2.5v11A2.5 2.5 0 0 1 18 20H6a2.5 2.5 0 0 1-2.5-2.5v-11Z" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="m4.5 6 7.5 5.6L19.5 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
+          </a>
+          <a href="https://www.instagram.com/makeable.build/" target="_blank" rel="noreferrer" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" /></svg>
+          </a>
+          <a href="https://www.tiktok.com/@trymakeable.build?lang=en" target="_blank" rel="noreferrer" aria-label="TikTok">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3c.7 2.4 2.1 3.9 4.5 4.5v3.1c-1.6-.1-3.1-.6-4.5-1.5v6.2a5.3 5.3 0 1 1-4.6-5.2v3.2a2.1 2.1 0 1 0 1.4 2V3h3.2Z" /></svg>
+          </a>
+          <a href="https://www.youtube.com/@makeablebuild" target="_blank" rel="noreferrer" aria-label="YouTube">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c0 3.2-.4 5.2-1.1 6-.7.7-2.5 1-7.9 1s-7.2-.3-7.9-1C3.4 17.2 3 15.2 3 12s.4-5.2 1.1-6C4.8 5.3 6.6 5 12 5s7.2.3 7.9 1c.7.8 1.1 2.8 1.1 6Z" /><path className="mk-footer-social-play" d="m10 8.8 5 3.2-5 3.2V8.8Z" /></svg>
+          </a>
+          <a href="https://www.facebook.com/profile.php?id=61593471075023" target="_blank" rel="noreferrer" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 21v-7.7h2.6l.4-3h-3V8.4c0-.9.3-1.5 1.6-1.5h1.7V4.2c-.3 0-1.3-.2-2.4-.2-2.4 0-4.1 1.5-4.1 4.2v2.1H8v3h2.5V21h3.2Z" /></svg>
+          </a>
         </nav>
+        <div className="mk-footer-legal">
+          <span>© Makeable 2026</span>
+          <span aria-hidden="true">·</span>
+          <a href="/terms/">Terms</a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy/">Privacy</a>
+        </div>
       </footer>
 
       {loginModal}

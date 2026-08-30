@@ -2369,25 +2369,41 @@ button:active,
 
 .mk-hero-build-card {
   --featured-card-edge: var(--pink);
+  --featured-card-ring: color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-mid), white);
+  position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: var(--starter-card-min-height);
   overflow: hidden;
-  border: var(--featured-card-border-width) solid transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
   border-radius: var(--featured-card-radius);
-  background:
-    linear-gradient(var(--featured-card-surface), var(--featured-card-surface)) padding-box,
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-light), white),
-      color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-mid), white) 48%,
-      color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-dark), white)
-    ) border-box;
-  background-clip: padding-box, border-box;
-  background-origin: border-box;
+  background: var(--featured-card-surface);
   color: var(--ink);
-  box-shadow: var(--featured-card-shadow);
   scroll-snap-align: start;
   transition: transform var(--featured-interaction-duration) var(--featured-interaction-easing);
+}
+
+.mk-hero-build-card::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: var(--featured-card-border-width) solid var(--featured-card-ring);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+.mk-hero-build-card > img {
+  position: relative;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .mk-hero-build-card:nth-child(2) {
@@ -2407,8 +2423,7 @@ button:active,
 }
 
 .mk-hero-build-card[aria-current="true"] {
-  border-color: transparent;
-  box-shadow: none;
+  --featured-card-ring: color-mix(in srgb, var(--featured-card-edge) var(--featured-card-edge-dark), white);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -2516,5 +2531,106 @@ button:active,
   .mk-featured-view-all,
   .mk-featured-rail-control {
     transition: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .mk-hero {
+    display: grid;
+    min-height: 100svh;
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(27rem, 1fr) auto;
+    overflow: hidden;
+    background: var(--navy);
+  }
+
+  .mk-hero::before,
+  .mk-hero::after {
+    display: none;
+  }
+
+  .mk-mobile-hero-media {
+    grid-column: 1;
+    grid-row: 2;
+    display: block;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    align-self: stretch;
+    background-position: 50% center;
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
+
+  .mk-hero-copy {
+    grid-column: 1;
+    grid-row: 2;
+    z-index: 2;
+    align-self: center;
+    width: min(48%, 14rem);
+    max-width: calc(100% - 2rem);
+    margin: 0 0 0 1rem;
+    padding: 0;
+    background: transparent;
+    text-align: left;
+  }
+
+  .mk-hero-copy h1 {
+    max-width: none;
+    margin: 0;
+    font-size: clamp(2.2rem, 10.5vw, 3.2rem);
+  }
+
+  .mk-hero-copy p {
+    width: 100%;
+    max-width: none;
+    margin-top: 0.7rem;
+    font-size: 0.88rem;
+    line-height: 1.34;
+  }
+
+  .mk-hero-actions {
+    gap: 0.55rem;
+    margin-top: 1rem;
+  }
+
+  .mk-hero-actions .mk-button,
+  .mk-hero-actions .mk-link-action {
+    min-height: 2.75rem;
+    font-size: 0.84rem;
+  }
+
+  .mk-hero-builds {
+    position: relative;
+    z-index: 3;
+    grid-column: 1;
+    grid-row: 3;
+    width: 100%;
+    padding: 3rem 1rem 2rem;
+    border-radius: 0;
+    background:
+      radial-gradient(circle at 5% 66%, var(--featured-wash-blue), transparent 42%),
+      radial-gradient(circle at 94% 30%, var(--featured-wash-pink), transparent 40%),
+      var(--paper);
+    color: var(--ink);
+  }
+
+  .mk-hero-builds::before {
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    left: -6%;
+    width: 112%;
+    height: 2.25rem;
+    border-radius: 0 0 50% 50% / 0 0 100% 100%;
+    background: var(--navy);
+    content: "";
+    pointer-events: none;
+  }
+
+  .mk-hero-builds > * {
+    position: relative;
+    z-index: 1;
   }
 }
