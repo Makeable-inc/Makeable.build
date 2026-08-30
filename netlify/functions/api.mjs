@@ -68,7 +68,7 @@ import {
   readSocialRecords,
   socialStoreNameForFunctionContext,
 } from "../../lib/social-dashboard.mjs";
-import { refreshApifySocialRecords } from "../../lib/apify-social.mjs";
+import { refreshSocialRecords } from "../../lib/social-refresh.mjs";
 import { readSocialWebsiteSessions } from "../../lib/posthog-social.mjs";
 import {
   clearWaitlistSessionCookie,
@@ -283,6 +283,7 @@ function getEnv() {
     "POSTHOG_PERSONAL_API_KEY",
     "POSTHOG_PROJECT_ID",
     "APIFY_TOKEN",
+    "YOUTUBE_API_KEY",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "OPENAI_BUILD_MODEL",
@@ -1419,7 +1420,10 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       name: socialStoreNameForFunctionContext(context),
       consistency: "strong",
     });
-    const { records: incoming, failures } = await refreshApifySocialRecords({ token: env.APIFY_TOKEN });
+    const { records: incoming, failures } = await refreshSocialRecords({
+      apifyToken: env.APIFY_TOKEN,
+      youtubeApiKey: env.YOUTUBE_API_KEY,
+    });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);
     await persistSocialRecords(store, records);
     const attribution = await readSocialWebsiteSessions({
