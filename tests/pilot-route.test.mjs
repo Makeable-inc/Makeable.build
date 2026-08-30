@@ -54,7 +54,8 @@ test("the current production app stays packaged as a self-contained pilot", asyn
   assert.match(privacyHtml, /one-way pseudonymous Makeable account identifier/);
   assert.match(privacyHtml, /not a\s+Google credential/);
   assert.match(privacyHtml, /Netlify Blobs/);
-  assert.match(privacyHtml, /mohammedkhambhati2020@gmail\.com/);
+  assert.match(privacyHtml, /makeable\.build@gmail\.com/);
+  assert.doesNotMatch(privacyHtml, /mohammedkhambhati2020@gmail\.com/);
   assert.match(termsHtml, /Early access, not a finished product/);
   assert.match(termsHtml, /acceptable-use rules/);
   assert.match(landingHtml, /href="\/terms\/"/);
