@@ -71,6 +71,14 @@ import {
 import { refreshSocialRecords } from "../../lib/social-refresh.mjs";
 import { readSocialWebsiteSessions } from "../../lib/posthog-social.mjs";
 import {
+  createTikTokAuthorization,
+  createTikTokState,
+  exchangeTikTokCode,
+  loadTikTokAccessToken,
+  saveTikTokToken,
+  verifyTikTokState,
+} from "../../lib/tiktok-oauth.mjs";
+import {
   clearWaitlistSessionCookie,
   createWaitlistSession,
   forgetWaitlistSession,
@@ -189,6 +197,14 @@ export default async function handler(req, context = {}) {
       return await dashboardSocialPublicRefresh(req, env, context);
     }
 
+    if (localApiPath === "/api/dashboard/social/tiktok/connect") {
+      return dashboardTikTokConnect(req, env);
+    }
+
+    if (localApiPath === "/api/dashboard/tiktok/callback") {
+      return await dashboardTikTokCallback(req, env, context);
+    }
+
     if (localApiPath === "/api/dashboard") {
       return await dashboardData(req, env, context);
     }
@@ -286,6 +302,9 @@ function getEnv() {
     "INSTAGRAM_MAKEABLE_BUILD_ID",
     "INSTAGRAM_MAKEABLE_ZAK_ID",
     "TIKTOK_ACCESS_TOKEN",
+    "TIKTOK_CLIENT_KEY",
+    "TIKTOK_CLIENT_SECRET",
+    "TIKTOK_REDIRECT_URI",
     "FACEBOOK_PAGE_ID",
     "YOUTUBE_API_KEY",
     "STRIPE_SECRET_KEY",
@@ -1424,11 +1443,12 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       name: socialStoreNameForFunctionContext(context),
       consistency: "strong",
     });
+    const tiktokAccessToken = await resolvedTikTokAccessToken(store, env);
     const { records: incoming, failures } = await refreshSocialRecords({
       youtubeApiKey: env.YOUTUBE_API_KEY,
       metaAccessToken: env.META_ACCESS_TOKEN,
       instagramAccounts: instagramAccountsFromEnv(env),
-      tiktokAccessToken: env.TIKTOK_ACCESS_TOKEN,
+      tiktokAccessToken,
       facebookPageId: env.FACEBOOK_PAGE_ID,
     });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);
@@ -1448,6 +1468,73 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       error: error instanceof Error ? error.message : "Public social refresh failed.",
     }, 502, { "Cache-Control": "no-store", Vary: "Cookie" });
   }
+}
+
+function dashboardTikTokConnect(req, env) {
+  const authFailure = dashboardAuthorizationFailure(req, env, "POST");
+  if (authFailure) return authFailure;
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+  if (!env.TIKTOK_CLIENT_KEY || !env.TIKTOK_CLIENT_SECRET) {
+    return jsonResponse({ error: "TikTok owner access is not configured." }, 503, { "Cache-Control": "no-store" });
+  }
+  const state = createTikTokState(env.DASHBOARD_SESSION_SECRET);
+  const authorization = createTikTokAuthorization({
+    clientKey: env.TIKTOK_CLIENT_KEY,
+    redirectUri: tiktokRedirectUri(env),
+    state,
+  });
+  return jsonResponse({ authorizationUrl: authorization.href }, 200, { "Cache-Control": "no-store" });
+}
+
+async function dashboardTikTokCallback(req, env, context) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, { Allow: "GET", "Cache-Control": "no-store" });
+  }
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code") || "";
+  const state = url.searchParams.get("state") || "";
+  if (!code || !verifyTikTokState(state, env.DASHBOARD_SESSION_SECRET)) {
+    return jsonResponse({ error: "TikTok authorization could not be verified." }, 400, { "Cache-Control": "no-store" });
+  }
+  const token = await exchangeTikTokCode({
+    code,
+    clientKey: env.TIKTOK_CLIENT_KEY,
+    clientSecret: env.TIKTOK_CLIENT_SECRET,
+    redirectUri: tiktokRedirectUri(env),
+    fetchImpl: fetch,
+  });
+  const store = getStore({
+    name: socialStoreNameForFunctionContext(context),
+    consistency: "strong",
+  });
+  await saveTikTokToken(store, token);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: "/dashboard/?tiktok=connected",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function resolvedTikTokAccessToken(store, env) {
+  try {
+    return await loadTikTokAccessToken({
+      store,
+      clientKey: env.TIKTOK_CLIENT_KEY,
+      clientSecret: env.TIKTOK_CLIENT_SECRET,
+      fallbackToken: env.TIKTOK_ACCESS_TOKEN,
+      fetchImpl: fetch,
+    });
+  } catch (error) {
+    console.warn("TikTok owner token refresh failed", error instanceof Error ? error.message : "Unknown error");
+    return env.TIKTOK_ACCESS_TOKEN;
+  }
+}
+
+function tiktokRedirectUri(env) {
+  return env.TIKTOK_REDIRECT_URI || "https://makeable.build/api/dashboard/tiktok/callback";
 }
 
 function instagramAccountsFromEnv(env) {

@@ -397,6 +397,8 @@ test("dashboard routes stay private and issue signed owner sessions", async (t) 
       "dashboard-session-secret-with-at-least-32-characters",
     POSTHOG_PERSONAL_API_KEY: "phx_private_value",
     POSTHOG_PROJECT_ID: "12345",
+    TIKTOK_CLIENT_KEY: "tiktok-client-key",
+    TIKTOK_CLIENT_SECRET: "tiktok-client-secret",
   });
   let fetchCalls = 0;
   globalThis.fetch = async () => {
@@ -450,6 +452,23 @@ test("dashboard routes stay private and issue signed owner sessions", async (t) 
     }),
   );
   assert.deepEqual(await status.json(), { authenticated: true });
+
+  const tiktokConnect = await handler(
+    new Request(`${productionOrigin}/api/dashboard/social/tiktok/connect`, {
+      method: "POST",
+      headers: { Cookie: cookie.split(";")[0], Origin: productionOrigin },
+    }),
+  );
+  assert.equal(tiktokConnect.status, 200);
+  const tiktokAuthorization = new URL((await tiktokConnect.json()).authorizationUrl);
+  assert.equal(tiktokAuthorization.origin, "https://www.tiktok.com");
+  assert.equal(tiktokAuthorization.searchParams.get("client_key"), "tiktok-client-key");
+  assert.equal(tiktokAuthorization.searchParams.get("scope"), "user.info.basic,user.info.stats,video.list");
+
+  const invalidTikTokCallback = await handler(
+    new Request(`${productionOrigin}/api/dashboard/tiktok/callback?code=untrusted&state=invalid`),
+  );
+  assert.equal(invalidTikTokCallback.status, 400);
 
   const exportWithoutSession = await handler(
     new Request(`${productionOrigin}/api/dashboard/export`),
