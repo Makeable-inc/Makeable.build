@@ -52,5 +52,8 @@ test("official YouTube refresh uses public video counters without calling paid c
     previewUrl: "",
     postUrl: "https://www.youtube.com/watch?v=latest-short",
   });
-  assert.equal(requests.some((url) => url.includes("apify")), false);
+  assert.deepEqual(requests.map((url) => new URL(url).host), [
+    "www.googleapis.com",
+    "www.googleapis.com",
+  ]);
 });
