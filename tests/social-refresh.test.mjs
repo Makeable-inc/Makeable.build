@@ -59,7 +59,7 @@ test("official YouTube refresh uses public video counters without calling paid c
 });
 
 test("official refresh reports successful Meta and TikTok sources separately", async () => {
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, options = {}) => {
     if (url.includes("graph.facebook.com") && url.includes("ig-build")) {
       return new Response(JSON.stringify({ data: [{
         id: "ig-post", caption: "Makeable reel", media_type: "REELS", timestamp: "2026-08-30T02:00:00+0000",
@@ -67,7 +67,13 @@ test("official refresh reports successful Meta and TikTok sources separately", a
         like_count: 10, comments_count: 2, insights: { data: [{ name: "views", values: [{ value: 500 }] }] },
       }] }));
     }
-    if (url.includes("open.tiktokapis.com")) {
+    if (url.includes("open.tiktokapis.com") && url.includes("/user/info/")) {
+      assert.equal(options.method, undefined);
+      return Response.json({ data: { user: { follower_count: 42 } } });
+    }
+    if (url.includes("open.tiktokapis.com") && url.includes("/video/list/")) {
+      assert.equal(options.method, "POST");
+      assert.deepEqual(JSON.parse(options.body), { max_count: 20 });
       return new Response(JSON.stringify({ data: { videos: [{
         id: "tt-post", title: "Makeable TikTok", create_time: 1_788_131_600,
         cover_image_url: "https://cdn.example/tt.jpg", share_url: "https://www.tiktok.com/@trymakeable.build/video/tt-post",
@@ -99,4 +105,5 @@ test("official refresh reports successful Meta and TikTok sources separately", a
     ["instagram", 500],
     ["tiktok", 700],
   ]);
+  assert.equal(result.records.find((record) => record.platform === "tiktok").followers, 42);
 });
