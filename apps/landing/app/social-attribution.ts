@@ -8,6 +8,14 @@ const implementedAttributions = new Set([
   "tiktok:trymakeable_build:bio:trymakeable_build_bio",
   "youtube:makeable_youtube:description:makeable_youtube_description",
 ]);
+const implementedPostAccounts = new Set([
+  "instagram:makeable_build",
+  "instagram:makeable_zak",
+  "facebook:makeable_facebook",
+  "tiktok:trymakeable_build",
+  "youtube:makeable_youtube",
+]);
+const postIdentifierPattern = /^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$/;
 
 type SocialPlatform = (typeof socialPlatforms)[number];
 type SocialPlacement = (typeof socialPlacements)[number];
@@ -47,9 +55,9 @@ export function readSocialAttribution(url: URL): SocialAttribution | null {
   const content = value("utm_content");
 
   if (!isSocialPlatform(platform) || !isSocialPlacement(placement)) return null;
-  if (!keyPattern.test(account) || content !== `${account}_${placement}`) return null;
+  if (!keyPattern.test(account)) return null;
   if (value("utm_medium") !== "organic_social" || value("utm_campaign") !== "makeable") return null;
-  if (!implementedAttributions.has(`${platform}:${account}:${placement}:${content}`)) return null;
+  if (!implementedAttribution(platform, account, placement, content)) return null;
 
   return {
     social_platform: platform,
@@ -59,6 +67,21 @@ export function readSocialAttribution(url: URL): SocialAttribution | null {
     utm_campaign: "makeable",
     utm_content: content,
   };
+}
+
+function implementedAttribution(
+  platform: SocialPlatform,
+  account: string,
+  placement: SocialPlacement,
+  content: string,
+): boolean {
+  if (placement !== "post") {
+    return implementedAttributions.has(`${platform}:${account}:${placement}:${content}`);
+  }
+  const prefix = `${account}_post_`;
+  return implementedPostAccounts.has(`${platform}:${account}`)
+    && content.startsWith(prefix)
+    && postIdentifierPattern.test(content.slice(prefix.length));
 }
 
 export function landingEventKey(sessionId: string, attribution: SocialAttribution): string {

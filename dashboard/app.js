@@ -163,6 +163,7 @@ function showDashboard() {
   els.authView.hidden = true;
   els.dashboardView.hidden = false;
   setDashboardSection("overview");
+  overview.render();
   window.clearInterval(state.refreshTimer);
   state.refreshTimer = window.setInterval(() => {
     if (document.visibilityState === "visible") void refreshActiveSection();
@@ -275,8 +276,8 @@ async function signOut() {
     state.records = [];
     state.activity = [];
     state.report = null;
-    state.socialView = null;
     socialDashboard.clear();
+    state.socialView = null;
     showAuth();
     els.authError.textContent = "";
     els.signOutButton.disabled = false;

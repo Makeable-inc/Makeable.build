@@ -7,29 +7,31 @@ const compactFormatter = new Intl.NumberFormat(undefined, {
 export function createOverview({ state, els }) {
   return {
     render() {
-      const report = state.report || {};
+      const report = state.report;
       const social = state.socialView;
       const display = photoDemo() ? photoDemoSocial() : social;
       if (els.overviewDemoNote) {
         els.overviewDemoNote.hidden = !photoDemo();
         els.overviewDemoNote.className = "import-status is-warning";
       }
-      els.overviewExposures.textContent = display ? compactFormatter.format(display.totalExposures) : "—";
-      els.overviewEngagements.textContent = display ? compactFormatter.format(display.totalEngagements) : "—";
-      els.overviewEngagementRate.textContent = display ? optionalPercent(display.engagementRate) : "—";
-      els.overviewFollowers.textContent = display ? optionalSigned(display.followersGained) : "—";
-      els.overviewContacts.textContent = numberFormatter.format(Number(report.total) || 0);
-      els.overviewBuilders.textContent = numberFormatter.format(Number(report.builderAccountsTotal) || 0);
+      const socialMetric = (format) => display ? format() : "Loading…";
+      const customerMetric = (value) => report ? numberFormatter.format(Number(value) || 0) : "Loading…";
+      els.overviewExposures.textContent = socialMetric(() => compactFormatter.format(display.totalExposures));
+      els.overviewEngagements.textContent = socialMetric(() => compactFormatter.format(display.totalEngagements));
+      els.overviewEngagementRate.textContent = socialMetric(() => optionalPercent(display.engagementRate));
+      els.overviewFollowers.textContent = socialMetric(() => optionalSigned(display.followersGained));
+      els.overviewContacts.textContent = customerMetric(report?.total);
+      els.overviewBuilders.textContent = customerMetric(report?.builderAccountsTotal);
       els.overviewSocialRows.replaceChildren();
       appendPulseRow(
         els.overviewSocialRows,
         "Content exposures",
-        display ? compactFormatter.format(display.totalExposures) : "Loading…",
+        socialMetric(() => compactFormatter.format(display.totalExposures)),
       );
       appendPulseRow(
         els.overviewSocialRows,
         "Engagement rate",
-        display ? optionalPercent(display.engagementRate) : "—",
+        socialMetric(() => optionalPercent(display.engagementRate)),
       );
       if (display?.attributionStatus === "connected") {
         appendPulseRow(
@@ -53,17 +55,17 @@ export function createOverview({ state, els }) {
       appendPulseRow(
         els.overviewWaitlistRows,
         "New contacts today",
-        numberFormatter.format(Number(report.todayTotal) || 0),
+        customerMetric(report?.todayTotal),
       );
       appendPulseRow(
         els.overviewWaitlistRows,
         "Active today",
-        numberFormatter.format(Number(report.activeTodayTotal) || 0),
+        customerMetric(report?.activeTodayTotal),
       );
       appendPulseRow(
         els.overviewWaitlistRows,
         "Published projects",
-        numberFormatter.format(Number(report.publicProjectsTotal) || 0),
+        customerMetric(report?.publicProjectsTotal),
       );
     },
   };
