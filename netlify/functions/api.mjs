@@ -282,7 +282,6 @@ function getEnv() {
     "DASHBOARD_SESSION_SECRET",
     "POSTHOG_PERSONAL_API_KEY",
     "POSTHOG_PROJECT_ID",
-    "APIFY_TOKEN",
     "YOUTUBE_API_KEY",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
@@ -1421,7 +1420,6 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       consistency: "strong",
     });
     const { records: incoming, failures } = await refreshSocialRecords({
-      apifyToken: env.APIFY_TOKEN,
       youtubeApiKey: env.YOUTUBE_API_KEY,
     });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);

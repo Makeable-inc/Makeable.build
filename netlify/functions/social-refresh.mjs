@@ -6,10 +6,9 @@ export const config = { schedule: "0 * * * *" };
 
 export default async function handler(_req, context = {}) {
   try {
-    const apifyToken = globalThis.Netlify?.env?.get("APIFY_TOKEN") || process.env.APIFY_TOKEN || "";
     const youtubeApiKey = globalThis.Netlify?.env?.get("YOUTUBE_API_KEY") || process.env.YOUTUBE_API_KEY || "";
     const store = getStore({ name: socialStoreNameForFunctionContext(context), consistency: "strong" });
-    const { records: incoming, failures } = await refreshSocialRecords({ apifyToken, youtubeApiKey });
+    const { records: incoming, failures } = await refreshSocialRecords({ youtubeApiKey });
     const records = mergeSocialRecords(await readSocialRecords(store), incoming);
     await persistSocialRecords(store, records);
     return jsonResponse({ imported: incoming.length, total: records.length, partialFailures: failures });
