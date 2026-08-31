@@ -34,7 +34,7 @@ export function buildSocialView(records, options = {}) {
   const completeExposures = sum(complete, "impressions");
   const attributionConnected = options.attribution?.status === "connected";
   const sessions = attributionSessions(options.attribution, days, now);
-  const accounts = configuredAccountRows(accountRows(filtered, attributionConnected, sessions), attributionConnected, options.configuredAccounts).sort((left, right) =>
+  const accounts = configuredAccountRows(accountRows(filtered, attributionConnected, sessions, days), attributionConnected, options.configuredAccounts).sort((left, right) =>
     rankValue(right, rankBy) - rankValue(left, rankBy)
     || right.impressions - left.impressions
     || left.account.localeCompare(right.account)
@@ -64,8 +64,8 @@ export function buildSocialView(records, options = {}) {
     websiteVisitRate: websiteSessions !== null && totalImpressions
       ? websiteSessions / totalImpressions
       : null,
-    followersGained: optionalSum(filtered, "followersGained"),
-    totalClicks: optionalSum(filtered, "clicks"),
+    followersGained: optionalSum(accounts, "followersGained"),
+    totalClicks: optionalSum(accounts, "clicks"),
     postsTotal: filtered.length,
     accounts,
     daily: dailyRows(filtered, days, now),
@@ -110,7 +110,7 @@ function inRange(value, days, now) {
     && timestamp <= end + 86_399_999;
 }
 
-function accountRows(records, attributionConnected, sessions) {
+function accountRows(records, attributionConnected, sessions, days) {
   const accounts = new Map();
   records.forEach((record) => {
     const platform = String(record.platform || "").trim().toLowerCase();
@@ -129,6 +129,8 @@ function accountRows(records, attributionConnected, sessions) {
       followers: 0,
       followersGained: 0,
       clicks: 0,
+      ownerFollowersGained: null,
+      ownerClicks: null,
       posts: 0,
       latestPublishedAt: "",
     };
@@ -143,6 +145,15 @@ function accountRows(records, attributionConnected, sessions) {
       optionalNumber(record.followersGained),
     );
     account.clicks = optionalAdd(account.clicks, optionalNumber(record.clicks));
+    const ownerMetrics = rangeAccountAnalytics(record.accountAnalytics, days);
+    if (ownerMetrics) {
+      if (Object.hasOwn(ownerMetrics, "followersGained")) {
+        account.ownerFollowersGained = optionalNumber(ownerMetrics.followersGained);
+      }
+      if (Object.hasOwn(ownerMetrics, "clicks")) {
+        account.ownerClicks = optionalNumber(ownerMetrics.clicks);
+      }
+    }
     account.posts += 1;
     if (record.publishedAt >= account.latestPublishedAt) {
       account.latestPublishedAt = record.publishedAt;
@@ -156,6 +167,8 @@ function accountRows(records, attributionConnected, sessions) {
     const {
       completeExposures,
       completeEngagements,
+      ownerFollowersGained,
+      ownerClicks,
       ...summary
     } = account;
     const websiteSessions = attributionConnected
@@ -163,6 +176,8 @@ function accountRows(records, attributionConnected, sessions) {
       : null;
     return {
       ...summary,
+      followersGained: ownerFollowersGained ?? summary.followersGained,
+      clicks: ownerClicks ?? summary.clicks,
       engagementRate: completeExposures
         ? completeEngagements / completeExposures
         : null,
@@ -172,6 +187,13 @@ function accountRows(records, attributionConnected, sessions) {
         : null,
     };
   });
+}
+
+function rangeAccountAnalytics(value, days) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const key = days === "all" ? 90 : days;
+  const entry = value[key];
+  return entry && typeof entry === "object" && !Array.isArray(entry) ? entry : null;
 }
 
 function attributionSessions(attribution, days, now) {
@@ -253,10 +275,12 @@ function sum(records, key) {
 }
 
 function optionalSum(records, key) {
-  return records.reduce(
-    (total, record) => optionalAdd(total, optionalNumber(record[key])),
-    0,
-  );
+  const measured = records
+    .map((record) => optionalNumber(record[key]))
+    .filter((value) => value !== null);
+  return measured.length
+    ? measured.reduce((total, value) => total + value, 0)
+    : null;
 }
 
 function optionalAdd(total, value) {

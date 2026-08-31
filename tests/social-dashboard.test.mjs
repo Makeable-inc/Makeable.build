@@ -238,6 +238,20 @@ test("mergeSocialRecords updates matching posts without duplicating prior import
   assert.equal(merged.find((record) => record.id === existing[0].id).engagements, 24);
 });
 
+test("mergeSocialRecords preserves bounded range-specific account analytics", () => {
+  const incoming = [socialRecord({
+    accountAnalytics: {
+      7: { clicks: 24, followersGained: 31 },
+      30: { clicks: 112, followersGained: 156 },
+      90: { clicks: 112, followersGained: 156 },
+    },
+  })];
+
+  const [merged] = mergeSocialRecords([], incoming);
+
+  assert.deepEqual(merged.accountAnalytics, incoming[0].accountAnalytics);
+});
+
 test("readSocialRecords seeds the truthful eight-post baseline in a clean store", async () => {
   // Given: a newly deployed store with no operator import.
   const store = new MemoryStore();

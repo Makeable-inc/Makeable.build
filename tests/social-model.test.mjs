@@ -95,7 +95,7 @@ test("buildSocialView keeps public engagement partial and joins website sessions
     },
   });
 
-  // Then: exposures remain additive while incomplete engagement and clicks remain unknown.
+  // Then: exposures and measured owner metrics remain additive while the public account stays unknown.
   assert.equal(view.totalExposures, 1500);
   assert.equal(view.engagementRate, 50 / 1000);
   assert.equal(view.websiteSessions, 11);
@@ -104,8 +104,8 @@ test("buildSocialView keeps public engagement partial and joins website sessions
   assert.equal(view.accounts[1].engagementRate, null);
   assert.equal(view.accounts[1].clicks, null);
   assert.equal(view.accounts[1].websiteSessions, 3);
-  assert.equal(view.totalClicks, null);
-  assert.equal(view.followersGained, null);
+  assert.equal(view.totalClicks, 8);
+  assert.equal(view.followersGained, 3);
   assert.equal(view.daily.find((point) => point.date === "2026-08-20").clicks, null);
 });
 
@@ -252,6 +252,66 @@ test("buildSocialView ranks measured visit rates above zero and null determinist
       { account: "@unknown", websiteVisitRate: null },
     ],
   );
+});
+
+test("buildSocialView uses range-specific owner clicks and follower gains", () => {
+  const source = record({
+    publishedAt: "2026-08-30T00:00:00.000Z",
+    clicks: null,
+    followersGained: null,
+    accountAnalytics: {
+      7: { clicks: 24, followersGained: 31 },
+      30: { clicks: 112, followersGained: 156 },
+      90: { clicks: 112, followersGained: 156 },
+    },
+  });
+
+  const thirtyDays = buildSocialView([source], {
+    days: 30,
+    now: new Date("2026-08-31T12:00:00.000Z"),
+  });
+  const sevenDays = buildSocialView([source], {
+    days: 7,
+    now: new Date("2026-08-31T12:00:00.000Z"),
+  });
+
+  assert.equal(thirtyDays.accounts[0].clicks, 112);
+  assert.equal(thirtyDays.accounts[0].followersGained, 156);
+  assert.equal(thirtyDays.totalClicks, 112);
+  assert.equal(thirtyDays.followersGained, 156);
+  assert.equal(sevenDays.accounts[0].clicks, 24);
+  assert.equal(sevenDays.accounts[0].followersGained, 31);
+});
+
+test("buildSocialView totals measured owner metrics without discarding them for unknown accounts", () => {
+  const measured = record({
+    account: "@measured",
+    attributionKey: "measured",
+    publishedAt: "2026-08-30T00:00:00.000Z",
+    clicks: null,
+    followersGained: null,
+    accountAnalytics: {
+      30: { clicks: 113, followersGained: 155 },
+    },
+  });
+  const unknown = record({
+    platform: "youtube",
+    account: "@unknown",
+    attributionKey: "unknown",
+    publishedAt: "2026-08-30T00:00:00.000Z",
+    clicks: null,
+    followersGained: null,
+  });
+
+  const view = buildSocialView([measured, unknown], {
+    days: 30,
+    now: new Date("2026-08-31T12:00:00.000Z"),
+  });
+
+  assert.equal(view.totalClicks, 113);
+  assert.equal(view.followersGained, 155);
+  assert.equal(view.accounts.find(({ account }) => account === "@unknown").clicks, null);
+  assert.equal(view.accounts.find(({ account }) => account === "@unknown").followersGained, null);
 });
 
 test("mediaKind chooses inline video, thumbnail, or unavailable presentation", () => {

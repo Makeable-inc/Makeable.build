@@ -126,6 +126,9 @@ Spacing intent derives from a 4px base.
   Website visit rate, Followers gained, Published posts. Website attribution
   renders `Not connected` when disconnected and `Unavailable` when its query
   fails; connected zeroes remain visible as `0` or `0.0%`.
+- **Owner metric totals**: platform clicks and follower gains sum only accounts
+  whose owner APIs measured the field. Individual unknown accounts remain an em
+  dash; one unknown account never discards real measurements from other accounts.
 - **States**: loading placeholder, populated, connected zero, not connected,
   unavailable.
 - **Accessibility**: values remain text and preserve semantic reading order.

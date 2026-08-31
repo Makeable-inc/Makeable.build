@@ -123,6 +123,11 @@ test("YouTube owner refresh keeps public play counts and adds private engagement
 test("official refresh reports successful Meta and TikTok sources separately", async () => {
   const fetchImpl = async (url, options = {}) => {
     const parsed = new URL(url);
+    if (parsed.pathname.endsWith("/ig-build/insights")) {
+      return parsed.searchParams.get("metric") === "follows_and_unfollows"
+        ? Response.json({ data: [{ total_value: { breakdowns: [{ results: [] }] } }] })
+        : Response.json({ data: [{ total_value: { value: 0 } }] });
+    }
     if (parsed.pathname.endsWith("/ig-build")) {
       return Response.json({ followers_count: 23, media_count: 1 });
     }
@@ -154,6 +159,12 @@ test("official refresh reports successful Meta and TikTok sources separately", a
     }
     if (parsed.pathname.endsWith("/page-1")) {
       return Response.json({ access_token: "page-token", followers_count: 4, fan_count: 3 });
+    }
+    if (parsed.pathname.endsWith("/page-1/insights")) {
+      return Response.json({ data: [
+        { name: "page_daily_follows", values: [{ value: 0 }] },
+        { name: "page_daily_unfollows", values: [{ value: 0 }] },
+      ] });
     }
     if (parsed.pathname.endsWith("/page-1/posts")) {
       return new Response(JSON.stringify({ data: [{
@@ -190,6 +201,22 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
   const fetchImpl = async (url) => {
     const parsed = new URL(url);
     requests.push(parsed);
+    if (parsed.pathname.endsWith("/ig-build/insights")) {
+      if (parsed.searchParams.get("metric") === "follows_and_unfollows") {
+        assert.equal(parsed.searchParams.get("metric_type"), "total_value");
+        assert.equal(parsed.searchParams.get("breakdown"), "follow_type");
+        return Response.json({ data: [{ total_value: { breakdowns: [{
+          dimension_keys: ["follow_type"],
+          results: [
+            { dimension_values: ["FOLLOWER"], value: 156 },
+            { dimension_values: ["NON_FOLLOWER"], value: 1 },
+          ],
+        }] } }] });
+      }
+      assert.equal(parsed.searchParams.get("metric"), "website_clicks");
+      assert.equal(parsed.searchParams.get("metric_type"), "total_value");
+      return Response.json({ data: [{ total_value: { value: 112 } }] });
+    }
     if (parsed.pathname.endsWith("/ig-build")) {
       assert.equal(parsed.searchParams.get("fields"), "followers_count,media_count");
       return Response.json({ followers_count: 235, media_count: 8 });
@@ -222,6 +249,13 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
       assert.equal(parsed.searchParams.get("fields"), "access_token,followers_count,fan_count");
       return Response.json({ access_token: "page-token", followers_count: 12, fan_count: 10 });
     }
+    if (parsed.pathname.endsWith("/page-1/insights")) {
+      assert.equal(parsed.searchParams.get("metric"), "page_daily_follows,page_daily_unfollows");
+      return Response.json({ data: [
+        { name: "page_daily_follows", values: [{ value: 0 }] },
+        { name: "page_daily_unfollows", values: [{ value: 0 }] },
+      ] });
+    }
     if (parsed.pathname.endsWith("/page-1/posts")) {
       assert.doesNotMatch(parsed.searchParams.get("fields"), /insights\.metric/);
       return Response.json({ data: [{
@@ -250,6 +284,7 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
     instagramAccounts: [{ id: "ig-build", account: "@makeable.build", attributionKey: "makeable_build" }],
     facebookPageId: "page-1",
     fetchImpl,
+    now: new Date("2026-08-31T12:00:00.000Z"),
   });
 
   assert.deepEqual(result.refreshedPlatforms, ["facebook", "instagram"]);
@@ -263,5 +298,15 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
     { platform: "facebook", impressions: 600, engagements: 11, followers: 12, clicks: 9 },
     { platform: "instagram", impressions: 803, engagements: 46, followers: 235, clicks: null },
   ]);
-  assert.equal(requests.length, 6);
+  assert.deepEqual(result.records.find((record) => record.platform === "instagram").accountAnalytics, {
+    7: { clicks: 112, followersGained: 156 },
+    30: { clicks: 112, followersGained: 156 },
+    90: { clicks: 336, followersGained: 468 },
+  });
+  assert.deepEqual(result.records.find((record) => record.platform === "facebook").accountAnalytics, {
+    7: { followersGained: 0 },
+    30: { followersGained: 0 },
+    90: { followersGained: 0 },
+  });
+  assert.equal(requests.length, 19);
 });
