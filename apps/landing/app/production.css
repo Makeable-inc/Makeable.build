@@ -3208,6 +3208,8 @@ a {
 @media (max-width: 640px) {
   .mk-detail-primary-action { width: 100%; }
 
+  .mk-detail-header { padding-right: 1rem; }
+
   .mk-detail-brand-row {
     flex-wrap: nowrap;
     gap: 0.48rem;
