@@ -17,12 +17,14 @@ test("community concepts use a beginner-friendly, retailer-aware parts sheet", a
   assert.match(page, /Parts you need/);
   assert.match(page, /every module has its pins already soldered/);
   assert.match(page, /fetch\(apiUrl\(`\/api\/part-prices\?listingIds=/);
-  assert.match(page, /See current price/);
-  assert.match(page, /Price shown on retailer site/);
+  assert.match(page, /Compare retailer prices/);
+  assert.match(page, /retailerPartPrice/);
+  assert.match(page, /View on Amazon/);
+  assert.match(page, /View on AliExpress/);
   assert.match(page, /amazon\.com/);
   assert.match(page, /aliexpress/);
   assert.match(productionCss, /\.mk-detail-part-card/);
-  assert.match(productionCss, /\.mk-detail-part-shop/);
+  assert.match(productionCss, /\.mk-detail-part-retailers/);
 });
 
 test("the public price endpoint rejects arbitrary listing identifiers", async () => {

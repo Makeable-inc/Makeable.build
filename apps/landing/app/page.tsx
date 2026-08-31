@@ -1803,7 +1803,11 @@ function PartsList({ parts, previewImage }: { parts: BuildPart[]; previewImage: 
   }, [listingIds]);
 
   return (
-    <section className="mk-detail-parts" aria-labelledby="detail-parts-title">
+    <section
+      className="mk-detail-parts"
+      aria-labelledby="detail-parts-title"
+      aria-description="Beginner-friendly: every module has its pins already soldered."
+    >
       <div className="mk-detail-parts-head">
         <h3 id="detail-parts-title">Part</h3>
         <span>Compare retailer prices</span>
