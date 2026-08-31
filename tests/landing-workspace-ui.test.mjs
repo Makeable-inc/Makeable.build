@@ -37,6 +37,13 @@ test("workspace uses SVG arrows and renders a resilient Google avatar", async ()
   assert.match(workspace, /onError=/);
 });
 
+test("a claimed build opens the polished detail sheet instead of the legacy workspace route", async () => {
+  const home = await readFile(homePath, "utf8");
+
+  assert.match(home, /setDetailBuild\(build\)/);
+  assert.doesNotMatch(home, /router\.push\(`\/app\?build=/);
+});
+
 test("desktop parts span the workspace and mobile hero keeps media separate from copy", async () => {
   const [home, app, workspaceCss] = await Promise.all([
     readFile(homePath, "utf8"),
@@ -77,7 +84,7 @@ test("community posts show creator handles and resilient profile pictures", asyn
   assert.match(workspaceCss, /font-family: "Lexend"/);
   assert.match(home, /See what others made/);
   assert.match(home, /Full gallery/);
-  assert.match(home, /pins already soldered/);
+  assert.match(home, /Compare retailer prices/);
   assert.match(home, /\/api\/part-prices/);
   assert.match(home, /Amazon/);
   assert.match(home, /AliExpress/);

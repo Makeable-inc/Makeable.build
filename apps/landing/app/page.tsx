@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   type CSSProperties,
   type FormEvent,
@@ -18,6 +17,7 @@ import {
   makeableDistinctId,
   makeableReferringDomain,
 } from "./analytics";
+import { estimateBuildProgress } from "./generation-progress";
 import { ArrowIcon, GenerationWorkspace, ProfileAvatar, ProfileChip, WorkspaceIcon } from "./workspace-ui";
 
 declare global {
@@ -318,7 +318,7 @@ const generationStages: GenerationStage[] = [
   {
     at: 100,
     label: "Build ready",
-    detail: "Opening your Makeable project workspace.",
+    detail: "Opening your completed build details.",
   },
 ];
 
@@ -351,7 +351,7 @@ const jobCheckpointStages: Record<BuildJobState, GenerationStage & { progress: n
     at: 92,
     progress: 96,
     label: "Build ready",
-    detail: "Sign in to claim it, or opening your Makeable project workspace.",
+    detail: "Sign in to claim it, or opening your completed build details.",
   },
   failed: {
     at: 0,
@@ -381,7 +381,7 @@ function generationStageForJob(jobState: BuildJobState | "", progress: number) {
 }
 
 function progressForJob(job: BuildJob | null) {
-  return job ? jobCheckpointStages[job.state]?.progress ?? 8 : 8;
+  return job ? estimateBuildProgress(job) : 8;
 }
 
 function isActiveBuildJob(job: BuildJob | null) {
@@ -503,7 +503,6 @@ function catalogPart(
 }
 
 export default function Home() {
-  const router = useRouter();
   const [activeHeroId, setActiveHeroId] = useState("ember");
   const [featuredBuildsExpanded, setFeaturedBuildsExpanded] = useState(false);
   const [featuredRailState, setFeaturedRailState] = useState({ canGoBack: false, canGoForward: false });
@@ -564,6 +563,18 @@ export default function Home() {
   useEffect(() => {
     currentJobRef.current = currentJob;
   }, [currentJob]);
+
+  useEffect(() => {
+    if (!generationBusy || !currentJob || ["ready", "failed", "cancelled"].includes(currentJob.state)) return undefined;
+
+    const advanceEstimatedProgress = () => {
+      setGenerationProgress((visibleProgress) => Math.max(visibleProgress, progressForJob(currentJob)));
+    };
+
+    advanceEstimatedProgress();
+    const timer = window.setInterval(advanceEstimatedProgress, 700);
+    return () => window.clearInterval(timer);
+  }, [currentJob, generationBusy]);
 
   const closeLogin = useCallback(() => {
     setLoginOpen(false);
@@ -712,11 +723,13 @@ export default function Home() {
     pendingIdeaRef.current = "";
     pendingClaimJobIdRef.current = "";
     void fetchAccount(false);
-    await abortableDelay(220, signal || new AbortController().signal).catch(() => undefined);
-    if (!signal?.aborted) router.push(`/app?build=${encodeURIComponent(buildId)}`);
+    if (!signal?.aborted) {
+      setWorkspaceOpen(false);
+      setDetailBuild(build);
+    }
     setGenerationBusy(false);
     return build;
-  }, [fetchAccount, openLogin, router]);
+  }, [fetchAccount, openLogin]);
 
   const runBuildJobPoll = useCallback(async (jobId: string, signal: AbortSignal): Promise<"claimed" | "waiting_for_auth"> => {
     setWorkspaceOpen(true);
@@ -1397,6 +1410,9 @@ export default function Home() {
           <a href="https://www.tiktok.com/@trymakeable.build?lang=en" target="_blank" rel="noreferrer" aria-label="TikTok">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3c.7 2.4 2.1 3.9 4.5 4.5v3.1c-1.6-.1-3.1-.6-4.5-1.5v6.2a5.3 5.3 0 1 1-4.6-5.2v3.2a2.1 2.1 0 1 0 1.4 2V3h3.2Z" /></svg>
           </a>
+          <a href="https://discord.gg/vJa8XH5Vg" target="_blank" rel="noreferrer" aria-label="Discord">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.54 4.12A16.6 16.6 0 0 0 15.46 3c-.2.36-.43.85-.59 1.24a15.3 15.3 0 0 0-5.74 0A13.4 13.4 0 0 0 8.54 3 16.6 16.6 0 0 0 4.46 4.12C1.88 7.95 1.18 11.68 1.53 15.36a16.7 16.7 0 0 0 5 2.52c.4-.54.76-1.11 1.06-1.72a10.7 10.7 0 0 1-1.67-.79c.14-.1.27-.2.4-.3 3.22 1.47 6.72 1.47 9.9 0 .13.11.27.21.4.3-.53.31-1.08.58-1.66.79.3.61.65 1.18 1.05 1.72a16.6 16.6 0 0 0 5-2.52c.42-4.27-.72-7.96-2.54-11.24ZM8.68 13.1c-.97 0-1.76-.9-1.76-2s.78-2 1.76-2 1.77.9 1.76 2c0 1.1-.78 2-1.76 2Zm6.64 0c-.97 0-1.76-.9-1.76-2s.78-2 1.76-2 1.77.9 1.76 2c0 1.1-.78 2-1.76 2Z" /></svg>
+          </a>
           <a href="https://www.youtube.com/@makeablebuild" target="_blank" rel="noreferrer" aria-label="YouTube">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c0 3.2-.4 5.2-1.1 6-.7.7-2.5 1-7.9 1s-7.2-.3-7.9-1C3.4 17.2 3 15.2 3 12s.4-5.2 1.1-6C4.8 5.3 6.6 5 12 5s7.2.3 7.9 1c.7.8 1.1 2.8 1.1 6Z" /><path className="mk-footer-social-play" d="m10 8.8 5 3.2-5 3.2V8.8Z" /></svg>
           </a>
@@ -1717,6 +1733,7 @@ function FullGallery({
 
 function CreatorBadge({ build, variant = "card" }: { build: BuildProject; variant?: "card" | "detail" }) {
   const creator = buildCreator(build);
+  const isDetail = variant === "detail";
   return (
     <div className={`mk-community-creator mk-community-creator-${variant}`}>
       <span className="mk-creator-avatar" aria-hidden="true">
@@ -1730,10 +1747,14 @@ function CreatorBadge({ build, variant = "card" }: { build: BuildProject; varian
           />
         )}
       </span>
-      <span className="mk-creator-copy">
-        <strong>{creator.name}</strong>
-        <small>{creator.handle}</small>
-      </span>
+      {isDetail ? (
+        <span className="mk-creator-made-by">Made by {creator.handle}</span>
+      ) : (
+        <span className="mk-creator-copy">
+          <strong>{creator.name}</strong>
+          <small>{creator.handle}</small>
+        </span>
+      )}
     </div>
   );
 }

@@ -14,10 +14,9 @@ test("community concepts use a beginner-friendly, retailer-aware parts sheet", a
     readFile(path.join(root, "apps", "landing", "app", "production.css"), "utf8"),
   ]);
 
-  assert.match(page, /Parts you need/);
-  assert.match(page, /every module has its pins already soldered/);
-  assert.match(page, /fetch\(apiUrl\(`\/api\/part-prices\?listingIds=/);
   assert.match(page, /Compare retailer prices/);
+  assert.match(page, /Why we picked this/);
+  assert.match(page, /fetch\(apiUrl\(`\/api\/part-prices\?listingIds=/);
   assert.match(page, /retailerPartPrice/);
   assert.match(page, /View on Amazon/);
   assert.match(page, /View on AliExpress/);

@@ -89,20 +89,32 @@
 
 .mk-community-creator-detail {
   width: fit-content;
-  margin-bottom: 1rem;
-  padding: 0.38rem 0.72rem 0.38rem 0.4rem;
-  border: 1px solid var(--line);
+  min-height: 2.3rem;
+  margin-bottom: 0;
+  gap: 0.52rem;
+  padding: 0 0.78rem 0 0;
+  border: 1px solid #e9dfd4;
   border-radius: 999px;
-  background: #f4eee5;
-  color: var(--ink);
-}
-
-.mk-community-creator-detail .mk-creator-copy small {
-  color: #6a625a;
+  background: #fffdf9;
+  color: #70685f;
+  box-shadow: none;
+  overflow: hidden;
 }
 
 .mk-community-creator-detail .mk-creator-avatar {
-  border-color: rgba(11, 13, 16, 0.12);
+  width: 2.3rem;
+  height: 2.3rem;
+  flex-basis: 2.3rem;
+  border: 0;
+}
+
+.mk-creator-made-by {
+  display: block;
+  font-size: 0.77rem;
+  font-weight: 520;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .mk-arrow-icon {

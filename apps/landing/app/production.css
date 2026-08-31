@@ -3137,37 +3137,38 @@ a {
 
 .mk-detail-trust-mark {
   display: grid;
-  width: 2.8rem;
-  height: 2.8rem;
+  width: 2.7rem;
+  height: 2.7rem;
   grid-row: 1 / span 2;
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  background: linear-gradient(145deg, #fa5f92, #d92e70);
+  background: linear-gradient(145deg, #f85b91, #d92e70);
   box-shadow: 0 0.35rem 0.75rem rgba(224, 52, 111, 0.2);
 }
 
 .mk-detail-trust-mark i {
-  width: 1.55rem;
-  height: 1.55rem;
-  background-image: url("/makeable-logo-tight.webp");
-  background-position: right top;
-  background-repeat: no-repeat;
-  background-size: 12.4rem 3.1rem;
-  filter: brightness(0) invert(1);
+  display: block;
+  width: 1.52rem;
+  height: 1.52rem;
+  background: #fff;
+  clip-path: polygon(50% 0%, 58% 31%, 80% 12%, 69% 39%, 100% 46%, 70% 55%, 91% 78%, 60% 66%, 52% 100%, 42% 68%, 16% 87%, 31% 57%, 0 50%, 31% 42%, 11% 17%, 42% 33%);
 }
 
 .mk-detail-footer > div small {
   grid-column: 2;
-  color: #927e6c;
-  font-size: 0.78rem;
+  color: #9a897a;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 400;
   line-height: 1.3;
 }
 
 .mk-detail-footer > div small:first-of-type {
   align-self: end;
-  color: #5e5a57;
-  font-weight: 600;
+  color: #59636f;
+  font-size: 0.94rem;
+  font-weight: 450;
 }
 
 .mk-detail-footer > div small:last-child { align-self: start; }
@@ -3192,7 +3193,7 @@ a {
 }
 
 .mk-detail-primary-action {
-  width: calc(100% - 0.9rem);
+  width: min(100%, 26.5rem);
   min-height: 3.5rem;
   margin-top: 1.05rem;
   border-radius: 0.9rem;
@@ -3202,6 +3203,17 @@ a {
 .mk-detail-parts {
   padding-top: 1.15rem;
   border-top: 0;
+}
+
+@media (max-width: 640px) {
+  .mk-detail-primary-action { width: 100%; }
+
+  .mk-detail-brand-row {
+    flex-wrap: nowrap;
+    gap: 0.48rem;
+  }
+
+  .mk-detail-brand-row > img { width: 7.45rem; }
 }
 
 @media (max-width: 640px) {
