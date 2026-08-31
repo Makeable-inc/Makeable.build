@@ -99,7 +99,7 @@ export default function BuildAppPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accountBuilds, setAccountBuilds] = useState<BuildProject[]>([]);
   const [publicBuilds, setPublicBuilds] = useState<BuildProject[]>([]);
-  const [sharedProject] = useState<BuildProject | null>(sharedProjectFromSession);
+  const [sharedProject, setSharedProject] = useState<BuildProject | null>(null);
   const [selectedBuildId, setSelectedBuildId] = useState(() => (
     typeof window === "undefined" ? "" : new URL(window.location.href).searchParams.get("build") || ""
   ));
@@ -115,6 +115,10 @@ export default function BuildAppPage() {
       || (sharedProject?.id === selectedBuildId ? sharedProject : null);
     return selected || builds[0] || publicBuilds[0] || null;
   }, [builds, publicBuilds, selectedBuildId, sharedProject]);
+
+  useEffect(() => {
+    setSharedProject(sharedProjectFromSession());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

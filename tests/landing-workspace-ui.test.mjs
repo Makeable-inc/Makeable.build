@@ -50,6 +50,14 @@ test("a claimed build opens the persistent project workspace with the polished o
   assert.match(workspaceCss, /\.mk-project-overview/);
 });
 
+test("project workspace waits until hydration to read a shared project", async () => {
+  const app = await readFile(appPath, "utf8");
+
+  assert.match(app, /const \[sharedProject, setSharedProject\] = useState<BuildProject \| null>\(null\);/);
+  assert.match(app, /useEffect\(\(\) => \{\s*setSharedProject\(sharedProjectFromSession\(\)\);\s*\}, \[\]\);/);
+  assert.doesNotMatch(app, /useState<BuildProject \| null>\(sharedProjectFromSession\)/);
+});
+
 test("project workspace keeps the solid overview and mobile hero keeps media separate from copy", async () => {
   const [home, app, workspaceCss] = await Promise.all([
     readFile(homePath, "utf8"),
