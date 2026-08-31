@@ -37,14 +37,20 @@ test("workspace uses SVG arrows and renders a resilient Google avatar", async ()
   assert.match(workspace, /onError=/);
 });
 
-test("a claimed build opens the polished detail sheet instead of the legacy workspace route", async () => {
-  const home = await readFile(homePath, "utf8");
+test("a claimed build opens the persistent project workspace with the polished overview", async () => {
+  const [home, app, workspaceCss] = await Promise.all([
+    readFile(homePath, "utf8"),
+    readFile(appPath, "utf8"),
+    readFile(workspaceCssPath, "utf8"),
+  ]);
 
-  assert.match(home, /setDetailBuild\(build\)/);
-  assert.doesNotMatch(home, /router\.push\(`\/app\?build=/);
+  assert.match(home, /window\.location\.assign\(`\/app\?build=/);
+  assert.match(home, /<ProjectOverview build=\{build\}/);
+  assert.match(app, /<ProjectOverview build=\{build\}/);
+  assert.match(workspaceCss, /\.mk-project-overview/);
 });
 
-test("desktop parts span the workspace and mobile hero keeps media separate from copy", async () => {
+test("project workspace keeps the solid overview and mobile hero keeps media separate from copy", async () => {
   const [home, app, workspaceCss] = await Promise.all([
     readFile(homePath, "utf8"),
     readFile(appPath, "utf8"),
@@ -53,9 +59,9 @@ test("desktop parts span the workspace and mobile hero keeps media separate from
 
   assert.doesNotMatch(home, /mk-menu-button/);
   assert.match(home, /className="mk-mobile-hero-media"/);
-  assert.match(home, /<\/section>\s*<section className="mk-parts mk-workspace-parts"/);
-  assert.match(app, /<\/section>\s*<section className="mk-parts mk-workspace-parts"/);
-  assert.match(workspaceCss, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(home, /<ProjectOverview build=\{build\}/);
+  assert.match(app, /<ProjectOverview build=\{build\}/);
+  assert.match(workspaceCss, /grid-template-columns: minmax\(19rem, 0\.78fr\) minmax\(34rem, 1\.22fr\)/);
   assert.match(workspaceCss, /\.mk-mobile-hero-media \{[\s\S]*?aspect-ratio: 16 \/ 10/);
 });
 

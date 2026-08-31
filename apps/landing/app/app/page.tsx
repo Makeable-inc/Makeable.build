@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowIcon, FolderSkeleton, ProfileChip, WorkspaceIcon } from "../workspace-ui";
+import { buildLibrary } from "./build-library";
+import { ProjectOverview } from "../project-overview";
 
 type BuildPart = {
   id?: string;
@@ -78,6 +80,18 @@ function normalizeQuota(value: BuildQuota | undefined | null): BuildQuota {
   return { limit, used, reserved, remaining: Math.max(0, remaining) };
 }
 
+function sharedProjectFromSession(): BuildProject | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = window.sessionStorage.getItem("makeable:open-project");
+    if (!value) return null;
+    const project = JSON.parse(value) as BuildProject;
+    return project?.id && project?.title && Array.isArray(project.parts) && project.image?.url ? project : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function BuildAppPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -85,6 +99,7 @@ export default function BuildAppPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accountBuilds, setAccountBuilds] = useState<BuildProject[]>([]);
   const [publicBuilds, setPublicBuilds] = useState<BuildProject[]>([]);
+  const [sharedProject] = useState<BuildProject | null>(sharedProjectFromSession);
   const [selectedBuildId, setSelectedBuildId] = useState(() => (
     typeof window === "undefined" ? "" : new URL(window.location.href).searchParams.get("build") || ""
   ));
@@ -92,19 +107,14 @@ export default function BuildAppPage() {
   const freeBuildLimit = quota.limit;
   const buildsRemaining = quota.remaining;
 
-  const builds = useMemo(() => {
-    const seen = new Set<string>();
-    return [...accountBuilds, ...publicBuilds].filter((build) => {
-      if (seen.has(build.id)) return false;
-      seen.add(build.id);
-      return true;
-    });
-  }, [accountBuilds, publicBuilds]);
+  const builds = buildLibrary(accountBuilds, publicBuilds, Boolean(user));
 
   const activeBuild = useMemo(() => {
-    if (!builds.length) return null;
-    return builds.find((build) => build.id === selectedBuildId) || builds[0];
-  }, [builds, selectedBuildId]);
+    const selected = builds.find((build) => build.id === selectedBuildId)
+      || publicBuilds.find((build) => build.id === selectedBuildId)
+      || (sharedProject?.id === selectedBuildId ? sharedProject : null);
+    return selected || builds[0] || publicBuilds[0] || null;
+  }, [builds, publicBuilds, selectedBuildId, sharedProject]);
 
   useEffect(() => {
     let cancelled = false;
@@ -209,7 +219,7 @@ export default function BuildAppPage() {
         <button type="button" disabled><WorkspaceIcon kind="wiring" /> Wiring</button>
         <button type="button" disabled><WorkspaceIcon kind="code" /> Code</button>
         <div className="mk-library-list">
-          <span>{accountBuilds.length ? "Your builds" : "Community builds"}</span>
+          <span>{user ? "Your builds" : "Community builds"}</span>
           {builds.length ? builds.map((build) => (
             <button
               type="button"
@@ -240,8 +250,8 @@ export default function BuildAppPage() {
           <div className="mk-coming-banner">
             <span className="mk-banner-mark" aria-hidden="true"><WorkspaceIcon kind="info" /></span>
             <div>
-              <strong>Full Build Coming Soon</strong>
-              <span>CAD files, wiring, code, and the step-by-step build guide are still being prepared.</span>
+              <strong>More project areas are coming soon</strong>
+              <span>Parts, enclosure files, wiring, code, and the step-by-step guide will appear in these tabs as the build is completed.</span>
             </div>
           </div>
         )}
@@ -255,49 +265,7 @@ export default function BuildAppPage() {
 }
 
 function BuildWorkspaceResult({ build }: { build: BuildProject }) {
-  return (
-    <div className="mk-workspace-grid">
-      <figure className="mk-build-render">
-        <img src={build.image.url} alt={`${build.title} product render`} />
-        <figcaption>{build.image.source === "openai" ? "Generated render" : "Preview render"}</figcaption>
-      </figure>
-      <section className="mk-build-brief" aria-labelledby="workspace-title">
-        <div className="mk-workspace-title">
-          <small>{build.status || "ESP32 Project"}</small>
-          <h1 id="workspace-title">{build.title}</h1>
-          <p>{build.summary}</p>
-        </div>
-        {build.behavior && <p className="mk-build-behavior">{build.behavior}</p>}
-        {build.warnings?.length ? (
-          <details className="mk-build-notes">
-            <summary>Design notes <span>{build.warnings.length}</span></summary>
-            <ul className="mk-warnings">
-              {build.warnings.map((warning) => <li key={warning}>{warning}</li>)}
-            </ul>
-          </details>
-        ) : null}
-      </section>
-      <section className="mk-parts mk-workspace-parts" aria-labelledby="parts-title">
-        <h2 id="parts-title">Parts you need</h2>
-        <ul>
-          {build.parts.map((part) => (
-            <li key={`${part.id || part.asin || part.name}`}>
-              <div className="mk-part-thumb" aria-hidden="true">{partCategoryLabel(part).slice(0, 1)}</div>
-              <div>
-                <small>{partPlainLabel(part)}</small>
-                <strong>{part.name}</strong>
-                <span>{[partCategoryLabel(part), part.priceLabel].filter(Boolean).join(" - ")}</span>
-                <p className="mk-part-purpose">{partPurpose(part)}</p>
-                <time className="mk-part-checked" dateTime={part.checkedDate}>Checked {part.checkedDate || "in the verified catalog"}</time>
-              </div>
-              <b className="mk-part-quantity" aria-label="Quantity">×1</b>
-              {part.url && <a href={part.url} target="_blank" rel="noreferrer">Buy</a>}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
+  return <ProjectOverview build={build} />;
 }
 
 function partCategoryLabel(part: BuildPart) {

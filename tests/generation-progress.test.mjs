@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { estimateBuildProgress } from "../apps/landing/app/generation-progress.ts";
+import { advanceBuildProgress, estimateBuildProgress } from "../apps/landing/app/generation-progress.ts";
 
 test("generation progress advances in small increments without exceeding the live stage ceiling", () => {
   const stageStartedAt = "2026-08-30T12:00:00.000Z";
@@ -24,4 +24,17 @@ test("a real backend checkpoint is always allowed to advance the visible progres
 
   assert.ok(planning > queued);
   assert.equal(estimateBuildProgress({ state: "ready", updatedAt: startedAt }, Date.parse(startedAt)), 96);
+});
+
+test("a delayed backend poll cannot move visible generation progress backward", () => {
+  const startedAt = "2026-08-30T12:00:00.000Z";
+
+  assert.equal(
+    advanceBuildProgress(11, { state: "queued", updatedAt: startedAt }, Date.parse(startedAt)),
+    11,
+  );
+  assert.equal(
+    advanceBuildProgress(50, { state: "fitting_parts", updatedAt: startedAt }, Date.parse(startedAt)),
+    50,
+  );
 });

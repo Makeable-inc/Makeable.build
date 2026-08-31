@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  beginnerBuildCopy,
   catalogStats,
   createBuild,
   createBuildImagePrompt,
@@ -13,6 +14,19 @@ import {
   listPublicBuilds,
   verifiedPartsCatalog,
 } from "../lib/makeable-builds.mjs";
+
+test("beginner build copy keeps technical projects brief and easy to understand", () => {
+  const copy = beginnerBuildCopy({
+    title: "Rubik S Cube Inspired ESP32",
+    idea: "a Rubik cube inspired desktop display",
+  });
+
+  assert.ok(copy.title.split(/\s+/).length <= 3);
+  assert.doesNotMatch(copy.title, /esp32|arduino|raspberry|iot/i);
+  assert.ok(copy.summary.length <= 180);
+  assert.ok(copy.summary.split(/[.!?]+/).filter(Boolean).length <= 2);
+  assert.doesNotMatch(copy.summary, /esp32|arduino|raspberry|controller|module/i);
+});
 
 test("verified parts catalog exposes the full pre-soldered source library", () => {
   const stats = catalogStats();

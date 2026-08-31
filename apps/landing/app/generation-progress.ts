@@ -48,3 +48,7 @@ export function estimateBuildProgress(job: BuildProgressJob, nowMs = Date.now())
   const easedCompletion = 1 - (1 - completion) ** 2;
   return Math.round(profile.floor + ((profile.ceiling - profile.floor) * easedCompletion));
 }
+
+export function advanceBuildProgress(visibleProgress: number, job: BuildProgressJob, nowMs = Date.now()): number {
+  return Math.max(visibleProgress, estimateBuildProgress(job, nowMs));
+}

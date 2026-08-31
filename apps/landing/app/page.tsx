@@ -17,7 +17,8 @@ import {
   makeableDistinctId,
   makeableReferringDomain,
 } from "./analytics";
-import { estimateBuildProgress } from "./generation-progress";
+import { advanceBuildProgress, estimateBuildProgress } from "./generation-progress";
+import { ProjectOverview } from "./project-overview";
 import { ArrowIcon, GenerationWorkspace, ProfileAvatar, ProfileChip, WorkspaceIcon } from "./workspace-ui";
 
 declare global {
@@ -568,7 +569,7 @@ export default function Home() {
     if (!generationBusy || !currentJob || ["ready", "failed", "cancelled"].includes(currentJob.state)) return undefined;
 
     const advanceEstimatedProgress = () => {
-      setGenerationProgress((visibleProgress) => Math.max(visibleProgress, progressForJob(currentJob)));
+      setGenerationProgress((visibleProgress) => advanceBuildProgress(visibleProgress, currentJob));
     };
 
     advanceEstimatedProgress();
@@ -723,10 +724,7 @@ export default function Home() {
     pendingIdeaRef.current = "";
     pendingClaimJobIdRef.current = "";
     void fetchAccount(false);
-    if (!signal?.aborted) {
-      setWorkspaceOpen(false);
-      setDetailBuild(build);
-    }
+    if (!signal?.aborted) window.location.assign(`/app?build=${encodeURIComponent(buildId)}`);
     setGenerationBusy(false);
     return build;
   }, [fetchAccount, openLogin]);
@@ -750,7 +748,7 @@ export default function Home() {
       }
       const job = result.job;
       setCurrentJob(job);
-      setGenerationProgress(progressForJob(job));
+      setGenerationProgress((visibleProgress) => advanceBuildProgress(visibleProgress, job));
       setGenerationError("");
 
       if (job.state === "ready") {
@@ -874,7 +872,7 @@ export default function Home() {
         }
       }
       setCurrentJob(job);
-      setGenerationProgress(progressForJob(job));
+      setGenerationProgress((visibleProgress) => advanceBuildProgress(visibleProgress, job));
       captureMakeableEvent("makeable build job started", {
         job_state: job.state,
       });
@@ -1104,6 +1102,11 @@ export default function Home() {
       return;
     }
     fetchAccount(true);
+  }
+
+  function openProject(build: BuildProject) {
+    window.sessionStorage.setItem("makeable:open-project", JSON.stringify(build));
+    window.location.assign(`/app?build=${encodeURIComponent(build.id)}`);
   }
 
   function updateCommunityIndex() {
@@ -1366,7 +1369,7 @@ export default function Home() {
         </div>
         <div className="mk-community-grid" ref={communityGridRef} onScroll={updateCommunityIndex}>
           {communityBuilds.map((build) => (
-            <button className="mk-community-card" type="button" key={build.id} onClick={() => setDetailBuild(build)}>
+            <button className="mk-community-card" type="button" key={build.id} onClick={() => openProject(build)}>
               <img src={build.image.url} alt={`${build.title} product render`} />
               <CreatorBadge build={build} />
               <span>{build.title}</span>
@@ -1449,7 +1452,7 @@ export default function Home() {
           onClose={() => setGalleryOpen(false)}
           onSelect={(build) => {
             setGalleryOpen(false);
-            setDetailBuild(build);
+            openProject(build);
           }}
         />
       )}
@@ -1573,8 +1576,8 @@ function BuildWorkspace({
           <div className="mk-coming-banner">
             <span className="mk-banner-mark" aria-hidden="true"><WorkspaceIcon kind="info" /></span>
             <div>
-              <strong>Full Build Coming Soon</strong>
-              <span>CAD files, wiring, code, and the step-by-step build guide are still being prepared.</span>
+              <strong>More project areas are coming soon</strong>
+              <span>Parts, enclosure files, wiring, code, and the step-by-step guide will appear in these tabs as the build is completed.</span>
             </div>
           </div>
         )}
@@ -1588,49 +1591,7 @@ function BuildWorkspace({
 }
 
 function BuildWorkspaceResult({ build }: { build: BuildProject }) {
-  return (
-    <div className="mk-workspace-grid">
-      <figure className="mk-build-render">
-        <img src={build.image.url} alt={`${build.title} product render`} />
-        <figcaption>{build.image.source === "openai" ? "Generated render" : "Preview render"}</figcaption>
-      </figure>
-      <section className="mk-build-brief" aria-labelledby="workspace-title">
-        <div className="mk-workspace-title">
-          <small>{build.status || "ESP32 Project"}</small>
-          <h1 id="workspace-title">{build.title}</h1>
-          <p>{build.summary}</p>
-        </div>
-        {build.behavior && <p className="mk-build-behavior">{build.behavior}</p>}
-        {build.warnings?.length ? (
-          <details className="mk-build-notes">
-            <summary>Design notes <span>{build.warnings.length}</span></summary>
-            <ul className="mk-warnings">
-              {build.warnings.map((warning) => <li key={warning}>{warning}</li>)}
-            </ul>
-          </details>
-        ) : null}
-      </section>
-      <section className="mk-parts mk-workspace-parts" aria-labelledby="parts-title">
-        <h2 id="parts-title">Parts you need</h2>
-        <ul>
-          {build.parts.map((part) => (
-            <li key={`${part.id || part.asin || part.name}`}>
-              <div className="mk-part-thumb" aria-hidden="true">{partCategoryLabel(part).slice(0, 1)}</div>
-              <div>
-                <small>{partPlainLabel(part)}</small>
-                <strong>{part.name}</strong>
-                <span>{[partCategoryLabel(part), part.priceLabel].filter(Boolean).join(" - ")}</span>
-                <p className="mk-part-purpose">{partPurpose(part)}</p>
-                <time className="mk-part-checked" dateTime={part.checkedDate}>Checked {part.checkedDate || "in the verified catalog"}</time>
-              </div>
-              <b className="mk-part-quantity" aria-label="Quantity one">×1</b>
-              {part.url && <a href={part.url} target="_blank" rel="noreferrer">Buy</a>}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
+  return <ProjectOverview build={build} />;
 }
 
 function BuildDetail({ build, onClose, onMake }: { build: BuildProject; onClose: () => void; onMake: () => void }) {
@@ -1673,7 +1634,7 @@ function BuildDetail({ build, onClose, onMake }: { build: BuildProject; onClose:
             <div>
               <span className="mk-detail-trust-mark" aria-label="Makeable"><i aria-hidden="true" /></span>
               <small>All parts link directly to trusted retailers.</small>
-              <small>We may earn a small commission at no extra cost to you.</small>
+              <small>We select verified, pre-soldered parts to help ensure reliable hardware compatibility.</small>
             </div>
           </footer>
         </div>

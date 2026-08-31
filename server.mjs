@@ -16,6 +16,7 @@ import {
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { WebSocket, WebSocketServer } from "ws";
 import { getBoardProfile, supportedBoardSummary } from "./lib/board-profiles.mjs";
+import { createLocalBuildWorkshop } from "./lib/local-build-workshop.mjs";
 import { createGoogleWaitlistResult } from "./lib/acquisition.mjs";
 import {
   clearDashboardSessionCookie,
@@ -42,6 +43,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
 const initialEnv = getEnv();
 const port = Number(initialEnv.PORT || 8787);
+const localBuildWorkshop = createLocalBuildWorkshop();
 const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
 const MAX_SKETCH_BYTES = 96 * 1024;
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
@@ -107,7 +109,26 @@ async function handleHttpRequest(req, res) {
     }
 
     if (url.pathname === "/api/config") {
-      return sendJson(res, publicConfig(env));
+      return sendJson(res, {
+        ...publicConfig(env),
+        localBuildMode: true,
+        localDeveloperUser: localBuildWorkshop.builder,
+      });
+    }
+
+    if (
+      localApiPath === "/api/builds"
+      || localApiPath === "/api/account/builds"
+      || localApiPath === "/api/build-jobs"
+      || localApiPath.startsWith("/api/build-jobs/")
+    ) {
+      const body = req.method === "POST" ? await readJsonBody(req, 8 * 1024) : undefined;
+      const localResponse = await localBuildWorkshop.handle({
+        method: req.method || "GET",
+        path: localApiPath,
+        body,
+      });
+      if (localResponse) return sendJson(res, localResponse.body, localResponse.status);
     }
 
     if (localApiPath === "/api/dashboard/session") {
@@ -730,6 +751,7 @@ function applyCors(req, res, env) {
   const origin = String(req.headers.origin || "");
   if (isAllowedBrowserOrigin(origin, env)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Makeable-Generation-Id");
