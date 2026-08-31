@@ -122,12 +122,22 @@ test("YouTube owner refresh keeps public play counts and adds private engagement
 
 test("official refresh reports successful Meta and TikTok sources separately", async () => {
   const fetchImpl = async (url, options = {}) => {
-    if (url.includes("graph.facebook.com") && url.includes("ig-build")) {
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith("/ig-build")) {
+      return Response.json({ followers_count: 23, media_count: 1 });
+    }
+    if (parsed.pathname.endsWith("/ig-build/media")) {
       return new Response(JSON.stringify({ data: [{
         id: "ig-post", caption: "Makeable reel", media_type: "REELS", timestamp: "2026-08-30T02:00:00+0000",
         permalink: "https://www.instagram.com/reel/ig-post/", thumbnail_url: "https://cdn.example/ig.jpg",
-        like_count: 10, comments_count: 2, insights: { data: [{ name: "views", values: [{ value: 500 }] }] },
+        like_count: 10, comments_count: 2,
       }] }));
+    }
+    if (parsed.pathname.endsWith("/ig-post/insights")) {
+      return Response.json({ data: [
+        { name: "views", values: [{ value: 500 }] },
+        { name: "total_interactions", values: [{ value: 14 }] },
+      ] });
     }
     if (url.includes("open.tiktokapis.com") && url.includes("/user/info/")) {
       assert.equal(options.method, undefined);
@@ -142,13 +152,18 @@ test("official refresh reports successful Meta and TikTok sources separately", a
         view_count: 700, like_count: 14, comment_count: 3, share_count: 2,
       }] } }));
     }
-    if (url.includes("graph.facebook.com") && url.includes("page-1")) {
+    if (parsed.pathname.endsWith("/page-1")) {
+      return Response.json({ access_token: "page-token", followers_count: 4, fan_count: 3 });
+    }
+    if (parsed.pathname.endsWith("/page-1/posts")) {
       return new Response(JSON.stringify({ data: [{
         id: "fb-post", message: "Makeable Facebook post", created_time: "2026-08-30T03:00:00+0000",
         permalink_url: "https://www.facebook.com/fb-post", full_picture: "https://cdn.example/fb.jpg",
         reactions: { summary: { total_count: 8 } }, comments: { summary: { total_count: 2 } }, shares: { count: 1 },
-        insights: { data: [{ name: "post_impressions", values: [{ value: 600 }] }] },
       }] }));
+    }
+    if (parsed.pathname.endsWith("/fb-post/insights")) {
+      return Response.json({ data: [{ name: "post_media_view", values: [{ value: 600 }] }] });
     }
     throw new Error(`Unexpected request: ${url}`);
   };
@@ -168,4 +183,85 @@ test("official refresh reports successful Meta and TikTok sources separately", a
     ["tiktok", 700],
   ]);
   assert.equal(result.records.find((record) => record.platform === "tiktok").followers, 42);
+});
+
+test("Meta refresh uses current per-content insights without dropping Facebook or Instagram", async () => {
+  const requests = [];
+  const fetchImpl = async (url) => {
+    const parsed = new URL(url);
+    requests.push(parsed);
+    if (parsed.pathname.endsWith("/ig-build")) {
+      assert.equal(parsed.searchParams.get("fields"), "followers_count,media_count");
+      return Response.json({ followers_count: 235, media_count: 8 });
+    }
+    if (parsed.pathname.endsWith("/ig-build/media")) {
+      assert.doesNotMatch(parsed.searchParams.get("fields"), /insights\.metric/);
+      return Response.json({ data: [{
+        id: "ig-post",
+        caption: "Makeable reel",
+        media_type: "VIDEO",
+        media_product_type: "REELS",
+        timestamp: "2026-08-30T02:00:00+0000",
+        permalink: "https://www.instagram.com/reel/ig-post/",
+        thumbnail_url: "https://cdn.example/ig.jpg",
+        like_count: 18,
+        comments_count: 1,
+      }] });
+    }
+    if (parsed.pathname.endsWith("/ig-post/insights")) {
+      assert.equal(parsed.searchParams.get("metric"), "views,reach,shares,saved,total_interactions");
+      return Response.json({ data: [
+        { name: "views", values: [{ value: 803 }] },
+        { name: "reach", values: [{ value: 647 }] },
+        { name: "shares", values: [{ value: 2 }] },
+        { name: "saved", values: [{ value: 21 }] },
+        { name: "total_interactions", values: [{ value: 46 }] },
+      ] });
+    }
+    if (parsed.pathname.endsWith("/page-1")) {
+      assert.equal(parsed.searchParams.get("fields"), "access_token,followers_count,fan_count");
+      return Response.json({ access_token: "page-token", followers_count: 12, fan_count: 10 });
+    }
+    if (parsed.pathname.endsWith("/page-1/posts")) {
+      assert.doesNotMatch(parsed.searchParams.get("fields"), /insights\.metric/);
+      return Response.json({ data: [{
+        id: "fb-post",
+        message: "Makeable Facebook post",
+        created_time: "2026-08-30T03:00:00+0000",
+        permalink_url: "https://www.facebook.com/fb-post",
+        full_picture: "https://cdn.example/fb.jpg",
+        reactions: { summary: { total_count: 8 } },
+        comments: { summary: { total_count: 2 } },
+        shares: { count: 1 },
+      }] });
+    }
+    if (parsed.pathname.endsWith("/fb-post/insights")) {
+      assert.equal(parsed.searchParams.get("metric"), "post_media_view,post_clicks");
+      return Response.json({ data: [
+        { name: "post_media_view", values: [{ value: 600 }] },
+        { name: "post_clicks", values: [{ value: 9 }] },
+      ] });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const result = await refreshSocialRecords({
+    metaAccessToken: "meta-token",
+    instagramAccounts: [{ id: "ig-build", account: "@makeable.build", attributionKey: "makeable_build" }],
+    facebookPageId: "page-1",
+    fetchImpl,
+  });
+
+  assert.deepEqual(result.refreshedPlatforms, ["facebook", "instagram"]);
+  assert.deepEqual(result.records.map((record) => ({
+    platform: record.platform,
+    impressions: record.impressions,
+    engagements: record.engagements,
+    followers: record.followers,
+    clicks: record.clicks,
+  })), [
+    { platform: "facebook", impressions: 600, engagements: 11, followers: 12, clicks: 9 },
+    { platform: "instagram", impressions: 803, engagements: 46, followers: 235, clicks: null },
+  ]);
+  assert.equal(requests.length, 6);
 });
