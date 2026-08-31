@@ -3215,7 +3215,10 @@ a {
     gap: 0.48rem;
   }
 
-  .mk-detail-brand-row > img { width: 7.45rem; }
+  .mk-detail-brand-row > img {
+    width: 6.7rem;
+    flex: 0 0 auto;
+  }
 }
 
 @media (max-width: 640px) {
