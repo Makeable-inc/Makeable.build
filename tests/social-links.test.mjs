@@ -35,6 +35,12 @@ test("social links redirect only the allowlisted social accounts", () => {
     location:
       "/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=makeable&utm_content=trymakeable_build_bio&social_account=trymakeable_build&social_placement=bio",
   });
+  assert.deepEqual(socialLinkRedirect("/r/tiktok/trymakeable-build"), {
+    platform: "tiktok",
+    accountKey: "trymakeable_build",
+    location:
+      "/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=makeable&utm_content=trymakeable_build_bio&social_account=trymakeable_build&social_placement=bio",
+  });
   assert.deepEqual(socialLinkRedirect("/r/youtube/makeable"), {
     platform: "youtube",
     accountKey: "makeable_youtube",
