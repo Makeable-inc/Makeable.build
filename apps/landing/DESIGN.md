@@ -56,3 +56,15 @@ The featured gallery uses **borders-only** depth: white card surfaces, tinted 2p
 - Preserve native button semantics and keyboard operation.
 - Respect `prefers-reduced-motion`.
 - Keep card images flush to the card edge without decorative padding.
+
+## 9. Build detail commerce sheet
+
+- **Shell:** warm `--paper` surface inside the existing dark modal scrim. The sheet uses a 2px cream outer bezel, a 1px inner highlight, and a 2rem radius. The soft glass belongs only to the fixed scrim/sheet layer, never to the scrolling content.
+- **Media:** the product image is a single rounded 1.5rem frame with `object-fit: cover`; it remains the visual anchor. This build-detail surface intentionally has no gallery carousel unless a build ships multiple media assets.
+- **Brand row:** the existing Makeable wordmark (`makeable-logo-tight.webp`) leads the detail header, followed by the creator badge. Do not substitute a letter mark.
+- **Traits:** use fine coral line icons for ready, time, and gifting. Labels remain plain text, without pastel pill backgrounds.
+- **Commerce CTA:** a restrained navy action bar appears above the parts list, with white text and a compact circular trailing arrow island. Press feedback is transform-only and respects reduced motion.
+- **Part comparison row:** a warm-white, 1rem rounded row with a component-specific electronics thumbnail, a numbered role title, muted specification, coral "Why we picked this" disclosure, and two independent retailer cards.
+- **Retailer cards:** Amazon and AliExpress are separate white cards. Their wordmarks are distinct, each has its own dollar price underneath, and each has a bordered one-line retailer action. Verified Amazon quotes replace the catalog fallback when available. Never render a shared price as though it applied to both retailers.
+- **Footer trust note:** a small Makeable coral mark precedes the trusted-retailer notice. Price availability language remains secondary.
+- **Type hierarchy:** only the build title, part role, and primary CTA use display-weight emphasis. Creator information, traits, item specifications, retailer actions, price provenance, and footer notes use the UI font at 400–600 weight. Retailer wordmarks retain their recognizable weight, but price values remain semibold rather than display-bold.

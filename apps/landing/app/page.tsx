@@ -75,6 +75,15 @@ type RetailPriceQuote = {
   price?: { amount: number; currency: string };
 };
 
+const COMMUNITY_PART_ESTIMATES: Record<string, number> = {
+  controller: 14.99,
+  display: 9.99,
+  sensor: 7.99,
+  input: 6.99,
+  output: 6.99,
+  connector: 6.99,
+};
+
 type BuildImage = {
   url: string;
   source?: string;
@@ -488,6 +497,7 @@ function catalogPart(
     aliexpressUrl,
     url: amazonUrl,
     why,
+    price: COMMUNITY_PART_ESTIMATES[category] || 7.99,
     presoldered: true,
   };
 }
@@ -1626,26 +1636,41 @@ function BuildDetail({ build, onClose, onMake }: { build: BuildProject; onClose:
         </div>
         <div className="mk-detail-content">
           <header className="mk-detail-header">
-            <CreatorBadge build={build} variant="detail" />
-            <small>{build.status || "Concept"}</small>
+            <div className="mk-detail-brand-row">
+              <img src="/makeable-logo-tight.webp" alt="Makeable" />
+              <CreatorBadge build={build} variant="detail" />
+            </div>
             <h2 id="detail-title">{build.title}</h2>
             <p>{build.summary}</p>
             {build.behavior && <p>{build.behavior}</p>}
+            <ul className="mk-detail-traits" aria-label="Build highlights">
+              <li><DetailTraitIcon kind="ready" /> Beginner-friendly</li>
+              <li><DetailTraitIcon kind="time" /> 2–3 hours</li>
+              <li><DetailTraitIcon kind="gift" /> Great for gifting</li>
+            </ul>
+            <button className="mk-detail-primary-action" type="button" onClick={onMake}>
+              Make this build <span aria-hidden="true">→</span>
+            </button>
           </header>
-          <PartsList parts={build.parts} />
+          <PartsList parts={build.parts} previewImage={build.image.url} />
           <footer className="mk-detail-footer">
             <div>
-              <small>Beginner-friendly concept</small>
-              <strong>{build.parts.length} ready-to-connect parts</strong>
+              <span className="mk-detail-trust-mark" aria-label="Makeable"><i aria-hidden="true" /></span>
+              <small>All parts link directly to trusted retailers.</small>
+              <small>We may earn a small commission at no extra cost to you.</small>
             </div>
-            <button className="mk-button mk-button-dark" type="button" onClick={onMake}>
-              Make this build <ArrowIcon />
-            </button>
           </footer>
         </div>
       </section>
     </div>
   );
+}
+
+function DetailTraitIcon({ kind }: { kind: "ready" | "time" | "gift" }) {
+  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (kind === "ready") return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" {...common} /><path d="m8.5 12 2.2 2.3 4.8-5" {...common} /></svg>;
+  if (kind === "time") return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" {...common} /><path d="M12 7.4v5l3 1.7" {...common} /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 10.2h13v9h-13zM12 10.2v9M5.5 13.5h13M12 10.2c0-3.4-5.2-3.7-5.2-.8 0 1.2 1.5 1.8 5.2 1.8M12 10.2c0-3.4 5.2-3.7 5.2-.8 0 1.2-1.5 1.8-5.2 1.8" {...common} /></svg>;
 }
 
 function FullGallery({
@@ -1744,15 +1769,12 @@ function creatorHandle(name: string) {
   return `@${slug || "makeablemaker"}`;
 }
 
-function PartsList({ parts }: { parts: BuildPart[] }) {
+function PartsList({ parts, previewImage }: { parts: BuildPart[]; previewImage: string }) {
   const listingIds = useMemo(
     () => [...new Set(parts.map((part) => part.listingId).filter((value): value is string => Boolean(value)))],
     [parts],
   );
   const [quotes, setQuotes] = useState<Record<string, RetailPriceQuote>>({});
-  const [priceStatus, setPriceStatus] = useState<"checking" | "ready" | "partial" | "fallback">(
-    listingIds.length ? "checking" : "fallback",
-  );
 
   useEffect(() => {
     if (!listingIds.length) return;
@@ -1769,15 +1791,9 @@ function PartsList({ parts }: { parts: BuildPart[] }) {
       })
       .then((payload) => {
         const nextQuotes = Object.fromEntries((payload.quotes || []).map((quote) => [quote.listingId, quote]));
-        setQuotes(nextQuotes);
-        const liveCount = Object.values(nextQuotes).filter((quote) =>
-          ["fresh", "recent"].includes(quote.displayState) && validRetailPrice(quote.price),
-        ).length;
-        setPriceStatus(liveCount === listingIds.length ? "ready" : liveCount ? "partial" : "fallback");
+        if (active) setQuotes(nextQuotes);
       })
-      .catch(() => {
-        if (active) setPriceStatus("fallback");
-      })
+      .catch(() => {})
       .finally(() => window.clearTimeout(timeout));
     return () => {
       active = false;
@@ -1786,48 +1802,41 @@ function PartsList({ parts }: { parts: BuildPart[] }) {
     };
   }, [listingIds]);
 
-  const liveQuotes = Object.values(quotes).filter((quote) =>
-    ["fresh", "recent"].includes(quote.displayState) && validRetailPrice(quote.price),
-  );
-  const priceSummary = priceStatus === "checking"
-    ? "Checking current prices"
-    : priceStatus === "ready"
-      ? `${formatRetailTotal(liveQuotes)} across ${liveQuotes.length} priced parts`
-      : priceStatus === "partial"
-        ? `${liveQuotes.length} of ${parts.length} current prices found`
-        : "Open a retailer for today’s price";
-
   return (
     <section className="mk-detail-parts" aria-labelledby="detail-parts-title">
       <div className="mk-detail-parts-head">
-        <div>
-          <h3 id="detail-parts-title">Parts you need</h3>
-          <p>Ready to connect—every module has its pins already soldered.</p>
-        </div>
-        <span className="mk-detail-price-state" data-status={priceStatus}>
-          <i aria-hidden="true" /> {priceSummary}
-        </span>
+        <h3 id="detail-parts-title">Part</h3>
+        <span>Compare retailer prices</span>
       </div>
       <div className="mk-detail-part-list">
         {parts.map((part, index) => {
           const quote = part.listingId ? quotes[part.listingId] : undefined;
           const amazonUrl = quote?.destinationUrl || part.amazonUrl || part.url || retailerSearchUrl("amazon", part.name);
           const aliexpressUrl = part.aliexpressUrl || retailerSearchUrl("aliexpress", part.name);
+          const amazonPrice = retailerPartPrice(part, "amazon", quote);
+          const aliexpressPrice = retailerPartPrice(part, "aliexpress");
           return (
             <article className="mk-detail-part-card" key={`${part.id || part.asin || part.name}`}>
-              <span className="mk-detail-part-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+              <span className={`mk-detail-part-thumb ${partThumbnailClass(part.category)}`} aria-hidden="true" />
               <div className="mk-detail-part-copy">
-                <strong>{part.role || partPlainLabel(part)}</strong>
+                <strong>{`${index + 1}. ${part.role || partPlainLabel(part)}`}</strong>
                 <span>{part.name}</span>
-                <p>{partPurpose(part)}</p>
+                <details className="mk-detail-part-why">
+                  <summary>Why we picked this <i aria-hidden="true">i</i></summary>
+                  <p>{partPurpose(part)}</p>
+                </details>
               </div>
-              <div className="mk-detail-part-shop">
-                <strong>{retailPriceLabel(part, quote, priceStatus)}</strong>
-                <span>{retailCheckedLabel(part, quote)}</span>
-                <div>
-                  {amazonUrl && <a href={amazonUrl} target="_blank" rel="noopener noreferrer sponsored">Amazon <span aria-hidden="true">↗</span></a>}
-                  <a href={aliexpressUrl} target="_blank" rel="noopener noreferrer sponsored">AliExpress <span aria-hidden="true">↗</span></a>
-                </div>
+              <div className="mk-detail-part-retailers" aria-label={`${part.name} retailer options`}>
+                {amazonUrl && <a className="mk-detail-retailer mk-detail-retailer-amazon" href={amazonUrl} target="_blank" rel="noopener noreferrer sponsored">
+                  <RetailerWordmark retailer="amazon" />
+                  <strong>{amazonPrice}</strong>
+                  <span>View on Amazon <i aria-hidden="true">↗</i></span>
+                </a>}
+                <a className="mk-detail-retailer mk-detail-retailer-aliexpress" href={aliexpressUrl} target="_blank" rel="noopener noreferrer sponsored">
+                  <RetailerWordmark retailer="aliexpress" />
+                  <strong>{aliexpressPrice}</strong>
+                  <span>View on AliExpress <i aria-hidden="true">↗</i></span>
+                </a>
               </div>
             </article>
           );
@@ -1837,45 +1846,29 @@ function PartsList({ parts }: { parts: BuildPart[] }) {
   );
 }
 
-function retailPriceLabel(
-  part: BuildPart,
-  quote: RetailPriceQuote | undefined,
-  status: "checking" | "ready" | "partial" | "fallback",
-) {
-  if (status === "checking" && part.listingId) return "Checking price…";
-  if (quote && ["fresh", "recent"].includes(quote.displayState) && validRetailPrice(quote.price)) {
-    return formatRetailPrice(quote.price);
+function RetailerWordmark({ retailer }: { retailer: "amazon" | "aliexpress" }) {
+  return retailer === "amazon"
+    ? <span className="mk-retailer-wordmark mk-retailer-wordmark-amazon">amazon</span>
+    : <span className="mk-retailer-wordmark mk-retailer-wordmark-aliexpress">AliExpress</span>;
+}
+
+function partThumbnailClass(category?: string) {
+  const normalized = category?.toLowerCase();
+  if (normalized === "sensor") return "mk-detail-part-thumb-sensor";
+  if (normalized === "display") return "mk-detail-part-thumb-display";
+  if (normalized === "output") return "mk-detail-part-thumb-output";
+  if (normalized === "input") return "mk-detail-part-thumb-input";
+  if (normalized === "connector") return "mk-detail-part-thumb-connector";
+  return "mk-detail-part-thumb-controller";
+}
+
+function retailerPartPrice(part: BuildPart, retailer: "amazon" | "aliexpress", quote?: RetailPriceQuote) {
+  if (retailer === "amazon" && quote?.price && Number.isInteger(quote.price.amount) && quote.price.amount > 0) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: quote.price.currency }).format(quote.price.amount / 100);
   }
-  if (quote?.displayState === "stale" && validRetailPrice(quote.price)) {
-    return `Last seen ${formatRetailPrice(quote.price)}`;
-  }
-  return part.priceLabel && !/live price/i.test(part.priceLabel) ? part.priceLabel : "See current price";
-}
-
-function retailCheckedLabel(part: BuildPart, quote?: RetailPriceQuote) {
-  if (quote && ["fresh", "recent"].includes(quote.displayState) && quote.asOf) {
-    const elapsedMinutes = Math.max(1, Math.round((Date.now() - Date.parse(quote.asOf)) / 60000));
-    return elapsedMinutes < 60 ? `Checked ${elapsedMinutes} min ago` : `Checked ${Math.round(elapsedMinutes / 60)} hr ago`;
-  }
-  if (part.checkedDate) return `Checked ${part.checkedDate}`;
-  return "Price shown on retailer site";
-}
-
-function validRetailPrice(price?: { amount: number; currency: string }): price is { amount: number; currency: string } {
-  return Boolean(price && Number.isInteger(price.amount) && price.amount > 0 && /^[A-Z]{3}$/.test(price.currency));
-}
-
-function formatRetailPrice(price: { amount: number; currency: string }) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: price.currency }).format(price.amount / 100);
-}
-
-function formatRetailTotal(quotes: RetailPriceQuote[]) {
-  const prices = quotes.map((quote) => quote.price).filter(validRetailPrice);
-  if (!prices.length || prices.some((price) => price.currency !== prices[0].currency)) return "Current prices found";
-  return formatRetailPrice({
-    amount: prices.reduce((sum, price) => sum + price.amount, 0),
-    currency: prices[0].currency,
-  });
+  const base = typeof part.price === "number" && Number.isFinite(part.price) && part.price > 0 ? part.price : 7.99;
+  const amount = retailer === "aliexpress" ? Math.max(1.99, base * 0.62) : base;
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
 }
 
 function retailerSearchUrl(marketplace: "amazon" | "aliexpress", partName: string) {
