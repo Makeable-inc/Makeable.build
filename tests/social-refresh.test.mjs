@@ -58,6 +58,68 @@ test("official YouTube refresh uses public video counters without calling paid c
   ]);
 });
 
+test("YouTube owner refresh keeps public play counts and adds private engagement and subscriber metrics", async () => {
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    const parsed = new URL(url);
+    requests.push({ url: parsed, options });
+    if (parsed.pathname.endsWith("/search")) {
+      return Response.json({ items: [{ id: { videoId: "latest-short" } }] });
+    }
+    if (parsed.pathname.endsWith("/videos")) {
+      return Response.json({ items: [{
+        id: "latest-short",
+        snippet: {
+          channelId: "UC6pzoYs0wo2XtyK7rYJ1ApQ",
+          title: "Latest Makeable short",
+          publishedAt: "2026-08-30T01:00:00.000Z",
+          thumbnails: { high: { url: "https://i.ytimg.com/vi/latest-short/hqdefault.jpg" } },
+        },
+        statistics: { viewCount: "10000", likeCount: "300", commentCount: "18" },
+      }] });
+    }
+    if (parsed.pathname.endsWith("/channels")) {
+      assert.equal(options.headers.Authorization, "Bearer owner-access");
+      assert.equal(parsed.searchParams.get("mine"), "true");
+      return Response.json({ items: [{ statistics: { subscriberCount: "128" } }] });
+    }
+    if (parsed.hostname === "youtubeanalytics.googleapis.com") {
+      assert.equal(options.headers.Authorization, "Bearer owner-access");
+      assert.equal(parsed.searchParams.get("ids"), "channel==MINE");
+      assert.equal(parsed.searchParams.get("dimensions"), "video");
+      assert.match(parsed.searchParams.get("metrics"), /subscribersGained/);
+      return Response.json({
+        columnHeaders: [
+          { name: "video" }, { name: "views" }, { name: "likes" }, { name: "comments" },
+          { name: "shares" }, { name: "subscribersGained" }, { name: "estimatedMinutesWatched" },
+          { name: "averageViewDuration" }, { name: "averageViewPercentage" },
+        ],
+        rows: [["latest-short", 9980, 302, 18, 11, 7, 2400, 42, 64.5]],
+      });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const result = await refreshSocialRecords({
+    youtubeApiKey: "free-google-key",
+    youtubeAccessToken: "owner-access",
+    fetchImpl,
+  });
+
+  assert.equal(result.records[0].impressions, 10000);
+  assert.equal(result.records[0].engagements, 331);
+  assert.equal(result.records[0].followers, 128);
+  assert.equal(result.records[0].followersGained, 7);
+  assert.equal(result.records[0].coverage, "connected");
+  assert.equal(result.records[0].engagementsComplete, true);
+  assert.deepEqual(result.records[0].analytics, {
+    estimatedMinutesWatched: 2400,
+    averageViewDuration: 42,
+    averageViewPercentage: 64.5,
+  });
+  assert.equal(requests.length, 4);
+});
+
 test("official refresh reports successful Meta and TikTok sources separately", async () => {
   const fetchImpl = async (url, options = {}) => {
     if (url.includes("graph.facebook.com") && url.includes("ig-build")) {

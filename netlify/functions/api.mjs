@@ -79,6 +79,14 @@ import {
   verifyTikTokState,
 } from "../../lib/tiktok-oauth.mjs";
 import {
+  createYouTubeAuthorization,
+  createYouTubeState,
+  exchangeYouTubeCode,
+  loadYouTubeAccessToken,
+  saveYouTubeToken,
+  verifyYouTubeState,
+} from "../../lib/youtube-oauth.mjs";
+import {
   clearWaitlistSessionCookie,
   createWaitlistSession,
   forgetWaitlistSession,
@@ -205,6 +213,14 @@ export default async function handler(req, context = {}) {
       return await dashboardTikTokCallback(req, env, context);
     }
 
+    if (localApiPath === "/api/dashboard/social/youtube/connect") {
+      return dashboardYouTubeConnect(req, env);
+    }
+
+    if (localApiPath === "/api/dashboard/youtube/callback") {
+      return await dashboardYouTubeCallback(req, env, context);
+    }
+
     if (localApiPath === "/api/dashboard") {
       return await dashboardData(req, env, context);
     }
@@ -307,6 +323,10 @@ function getEnv() {
     "TIKTOK_REDIRECT_URI",
     "FACEBOOK_PAGE_ID",
     "YOUTUBE_API_KEY",
+    "YOUTUBE_ACCESS_TOKEN",
+    "YOUTUBE_OAUTH_CLIENT_ID",
+    "YOUTUBE_OAUTH_CLIENT_SECRET",
+    "YOUTUBE_OAUTH_REDIRECT_URI",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "OPENAI_BUILD_MODEL",
@@ -1444,8 +1464,10 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       consistency: "strong",
     });
     const tiktokAccessToken = await resolvedTikTokAccessToken(store, env);
+    const youtubeAccessToken = await resolvedYouTubeAccessToken(store, env);
     const { records: incoming, failures } = await refreshSocialRecords({
       youtubeApiKey: env.YOUTUBE_API_KEY,
+      youtubeAccessToken,
       metaAccessToken: env.META_ACCESS_TOKEN,
       instagramAccounts: instagramAccountsFromEnv(env),
       tiktokAccessToken,
@@ -1533,8 +1555,75 @@ async function resolvedTikTokAccessToken(store, env) {
   }
 }
 
+function dashboardYouTubeConnect(req, env) {
+  const authFailure = dashboardAuthorizationFailure(req, env, "POST");
+  if (authFailure) return authFailure;
+  const csrfFailure = sameOriginFailure(req);
+  if (csrfFailure) return csrfFailure;
+  if (!env.YOUTUBE_OAUTH_CLIENT_ID || !env.YOUTUBE_OAUTH_CLIENT_SECRET) {
+    return jsonResponse({ error: "YouTube owner access is not configured." }, 503, { "Cache-Control": "no-store" });
+  }
+  const state = createYouTubeState(env.DASHBOARD_SESSION_SECRET);
+  const authorization = createYouTubeAuthorization({
+    clientId: env.YOUTUBE_OAUTH_CLIENT_ID,
+    redirectUri: youtubeRedirectUri(env),
+    state,
+  });
+  return jsonResponse({ authorizationUrl: authorization.href }, 200, { "Cache-Control": "no-store" });
+}
+
+async function dashboardYouTubeCallback(req, env, context) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, { Allow: "GET", "Cache-Control": "no-store" });
+  }
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code") || "";
+  const state = url.searchParams.get("state") || "";
+  if (!code || !verifyYouTubeState(state, env.DASHBOARD_SESSION_SECRET)) {
+    return jsonResponse({ error: "YouTube authorization could not be verified." }, 400, { "Cache-Control": "no-store" });
+  }
+  const token = await exchangeYouTubeCode({
+    code,
+    clientId: env.YOUTUBE_OAUTH_CLIENT_ID,
+    clientSecret: env.YOUTUBE_OAUTH_CLIENT_SECRET,
+    redirectUri: youtubeRedirectUri(env),
+    fetchImpl: fetch,
+  });
+  const store = getStore({
+    name: socialStoreNameForFunctionContext(context),
+    consistency: "strong",
+  });
+  await saveYouTubeToken(store, token);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: "/dashboard/?youtube=connected",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function resolvedYouTubeAccessToken(store, env) {
+  try {
+    return await loadYouTubeAccessToken({
+      store,
+      clientId: env.YOUTUBE_OAUTH_CLIENT_ID,
+      clientSecret: env.YOUTUBE_OAUTH_CLIENT_SECRET,
+      fallbackToken: env.YOUTUBE_ACCESS_TOKEN,
+      fetchImpl: fetch,
+    });
+  } catch (error) {
+    console.warn("YouTube owner token refresh failed", error instanceof Error ? error.message : "Unknown error");
+    return env.YOUTUBE_ACCESS_TOKEN;
+  }
+}
+
 function tiktokRedirectUri(env) {
   return env.TIKTOK_REDIRECT_URI || "https://makeable.build/api/dashboard/tiktok/callback";
+}
+
+function youtubeRedirectUri(env) {
+  return env.YOUTUBE_OAUTH_REDIRECT_URI || "https://makeable.build/api/dashboard/youtube/callback";
 }
 
 function instagramAccountsFromEnv(env) {

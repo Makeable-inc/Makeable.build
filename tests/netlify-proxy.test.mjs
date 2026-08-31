@@ -399,6 +399,8 @@ test("dashboard routes stay private and issue signed owner sessions", async (t) 
     POSTHOG_PROJECT_ID: "12345",
     TIKTOK_CLIENT_KEY: "tiktok-client-key",
     TIKTOK_CLIENT_SECRET: "tiktok-client-secret",
+    YOUTUBE_OAUTH_CLIENT_ID: "youtube-client-id",
+    YOUTUBE_OAUTH_CLIENT_SECRET: "youtube-client-secret",
   });
   let fetchCalls = 0;
   globalThis.fetch = async () => {
@@ -469,6 +471,23 @@ test("dashboard routes stay private and issue signed owner sessions", async (t) 
     new Request(`${productionOrigin}/api/dashboard/tiktok/callback?code=untrusted&state=invalid`),
   );
   assert.equal(invalidTikTokCallback.status, 400);
+
+  const youtubeConnect = await handler(
+    new Request(`${productionOrigin}/api/dashboard/social/youtube/connect`, {
+      method: "POST",
+      headers: { Cookie: cookie.split(";")[0], Origin: productionOrigin },
+    }),
+  );
+  assert.equal(youtubeConnect.status, 200);
+  const youtubeAuthorization = new URL((await youtubeConnect.json()).authorizationUrl);
+  assert.equal(youtubeAuthorization.origin, "https://accounts.google.com");
+  assert.equal(youtubeAuthorization.searchParams.get("client_id"), "youtube-client-id");
+  assert.match(youtubeAuthorization.searchParams.get("scope"), /yt-analytics\.readonly/);
+
+  const invalidYouTubeCallback = await handler(
+    new Request(`${productionOrigin}/api/dashboard/youtube/callback?code=untrusted&state=invalid`),
+  );
+  assert.equal(invalidYouTubeCallback.status, 400);
 
   const exportWithoutSession = await handler(
     new Request(`${productionOrigin}/api/dashboard/export`),

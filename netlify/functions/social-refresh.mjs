@@ -2,6 +2,7 @@ import { getStore } from "@netlify/blobs";
 import { refreshSocialRecords } from "../../lib/social-refresh.mjs";
 import { mergeSocialRecords, persistSocialRecords, readSocialRecords, socialStoreNameForFunctionContext } from "../../lib/social-dashboard.mjs";
 import { loadTikTokAccessToken } from "../../lib/tiktok-oauth.mjs";
+import { loadYouTubeAccessToken } from "../../lib/youtube-oauth.mjs";
 
 export const config = { schedule: "0 * * * *" };
 
@@ -11,8 +12,10 @@ export default async function handler(_req, context = {}) {
     const youtubeApiKey = globalThis.Netlify?.env?.get("YOUTUBE_API_KEY") || process.env.YOUTUBE_API_KEY || "";
     const store = getStore({ name: socialStoreNameForFunctionContext(context), consistency: "strong" });
     const tiktokAccessToken = await resolvedTikTokAccessToken(store);
+    const youtubeAccessToken = await resolvedYouTubeAccessToken(store);
     const { records: incoming, failures } = await refreshSocialRecords({
       youtubeApiKey,
+      youtubeAccessToken,
       metaAccessToken,
       instagramAccounts: [
         { id: value("INSTAGRAM_MAKEABLE_BUILD_ID"), account: "@makeable.build", attributionKey: "makeable_build" },
@@ -27,6 +30,21 @@ export default async function handler(_req, context = {}) {
   } catch (error) {
     console.error("Scheduled social refresh failed", error);
     return jsonResponse({ error: "Scheduled social refresh failed." }, 500);
+  }
+}
+
+async function resolvedYouTubeAccessToken(store) {
+  try {
+    return await loadYouTubeAccessToken({
+      store,
+      clientId: value("YOUTUBE_OAUTH_CLIENT_ID"),
+      clientSecret: value("YOUTUBE_OAUTH_CLIENT_SECRET"),
+      fallbackToken: value("YOUTUBE_ACCESS_TOKEN"),
+      fetchImpl: fetch,
+    });
+  } catch (error) {
+    console.warn("Scheduled YouTube token refresh failed", error instanceof Error ? error.message : "Unknown error");
+    return value("YOUTUBE_ACCESS_TOKEN");
   }
 }
 
