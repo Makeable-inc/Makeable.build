@@ -1,5 +1,5 @@
 import { buildSocialView, mediaKind } from "./social-model.js";
-import { renderSocialAccounts } from "./social-account-table.js";
+import { formatSocialPercent, renderSocialAccounts } from "./social-account-table.js";
 import { renderSocialChart } from "./social-chart.js";
 
 const numberFormatter = new Intl.NumberFormat();
@@ -127,7 +127,7 @@ function render(state, els, options) {
   const view = state.view;
   const display = state.photoDemo ? photoDemoView(view) : view;
   els.exposures.textContent = compact(display.totalExposures);
-  els.engagementRate.textContent = optionalPercent(display.engagementRate);
+  els.engagementRate.textContent = formatSocialPercent(display.engagementRate);
   els.websiteSessions.textContent = attributionMetric(
     display.websiteSessions,
     display.attributionStatus,
@@ -136,7 +136,7 @@ function render(state, els, options) {
   els.websiteVisitRate.textContent = attributionMetric(
     display.websiteVisitRate,
     display.attributionStatus,
-    optionalPercent,
+    formatSocialPercent,
   );
   els.websiteSessions.classList.toggle("is-status", display.attributionStatus !== "connected");
   els.websiteVisitRate.classList.toggle("is-status", display.attributionStatus !== "connected");
@@ -469,9 +469,6 @@ function textElement(name, value, className = "") {
 }
 function compact(value) {
   return compactFormatter.format(Number(value) || 0);
-}
-function optionalPercent(value) {
-  return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "—";
 }
 function optionalSigned(value) {
   if (!Number.isFinite(value)) return "—";

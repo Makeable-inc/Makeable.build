@@ -16,10 +16,10 @@ export function renderSocialAccounts(view, { rows, count }) {
       accountCell(account),
       cell(account.platform, "platform-name"),
       cell(account.coverage === "unavailable" ? "—" : numberFormatter.format(account.impressions)),
-      cell(optionalPercent(account.engagementRate)),
+      cell(formatSocialPercent(account.engagementRate)),
       cell(formatOptionalNumber(account.clicks)),
       cell(formatOptionalNumber(account.websiteSessions)),
-      cell(optionalPercent(account.websiteVisitRate)),
+      cell(formatSocialPercent(account.websiteVisitRate)),
       cell(
         formatOptionalSigned(account.followersGained),
         account.followersGained > 0 ? "positive-value" : "",
@@ -65,8 +65,10 @@ function cell(value, className = "") {
   return element;
 }
 
-function optionalPercent(value) {
-  return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "—";
+export function formatSocialPercent(value) {
+  if (!Number.isFinite(value)) return "—";
+  const percent = value * 100;
+  return `${percent.toFixed(percent > 0 && percent < 0.1 ? 3 : 1)}%`;
 }
 
 function formatOptionalSigned(value) {

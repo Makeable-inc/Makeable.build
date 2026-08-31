@@ -1,3 +1,5 @@
+import { formatSocialPercent } from "./social-account-table.js";
+
 const numberFormatter = new Intl.NumberFormat();
 const compactFormatter = new Intl.NumberFormat(undefined, {
   notation: "compact",
@@ -18,7 +20,7 @@ export function createOverview({ state, els }) {
       const customerMetric = (value) => report ? numberFormatter.format(Number(value) || 0) : "Loading…";
       els.overviewExposures.textContent = socialMetric(() => compactFormatter.format(display.totalExposures));
       els.overviewEngagements.textContent = socialMetric(() => compactFormatter.format(display.totalEngagements));
-      els.overviewEngagementRate.textContent = socialMetric(() => optionalPercent(display.engagementRate));
+      els.overviewEngagementRate.textContent = socialMetric(() => formatSocialPercent(display.engagementRate));
       els.overviewFollowers.textContent = socialMetric(() => optionalSigned(display.followersGained));
       els.overviewContacts.textContent = customerMetric(report?.total);
       els.overviewBuilders.textContent = customerMetric(report?.builderAccountsTotal);
@@ -31,7 +33,7 @@ export function createOverview({ state, els }) {
       appendPulseRow(
         els.overviewSocialRows,
         "Engagement rate",
-        socialMetric(() => optionalPercent(display.engagementRate)),
+        socialMetric(() => formatSocialPercent(display.engagementRate)),
       );
       if (display?.attributionStatus === "connected") {
         appendPulseRow(
@@ -42,7 +44,7 @@ export function createOverview({ state, els }) {
         appendPulseRow(
           els.overviewSocialRows,
           "Website visit rate",
-          optionalPercent(display.websiteVisitRate),
+          formatSocialPercent(display.websiteVisitRate),
         );
       } else {
         appendPulseRow(
@@ -89,10 +91,6 @@ function appendPulseRow(container, label, value) {
   metric.textContent = value;
   row.append(name, metric);
   container.append(row);
-}
-
-function optionalPercent(value) {
-  return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "—";
 }
 
 function optionalSigned(value) {

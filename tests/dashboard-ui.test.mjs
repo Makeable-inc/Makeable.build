@@ -51,12 +51,16 @@ test("social UI names the exposure-to-website funnel and its sortable account me
 
 test("account table formatting preserves unknown and connected-zero values", async () => {
   // Break caught: coercing unknown attribution to zero makes disconnected accounts look measured.
-  const { formatOptionalNumber } = await import(accountTableScriptPath);
+  const { formatOptionalNumber, formatSocialPercent } = await import(accountTableScriptPath);
 
   assert.equal(formatOptionalNumber(null), "—");
   assert.equal(formatOptionalNumber(undefined), "—");
   assert.equal(formatOptionalNumber(0), "0");
   assert.equal(formatOptionalNumber(1234), "1,234");
+  assert.equal(formatSocialPercent(null), "—");
+  assert.equal(formatSocialPercent(0), "0.0%");
+  assert.equal(formatSocialPercent(0.000068243), "0.007%");
+  assert.equal(formatSocialPercent(0.04388), "4.4%");
 });
 
 test("social chart rates exclude partial public engagement", async () => {
