@@ -64,6 +64,7 @@ import {
   buildSocialDashboardReport,
   dashboardSocialResult,
   mergeSocialRecords,
+  reconcileRefreshedSocialRecords,
   persistSocialRecords,
   readSocialRecords,
   socialStoreNameForFunctionContext,
@@ -1465,7 +1466,7 @@ async function dashboardSocialPublicRefresh(req, env, context) {
     });
     const tiktokAccessToken = await resolvedTikTokAccessToken(store, env);
     const youtubeAccessToken = await resolvedYouTubeAccessToken(store, env);
-    const { records: incoming, failures } = await refreshSocialRecords({
+    const { records: incoming, failures, refreshedPlatforms } = await refreshSocialRecords({
       youtubeApiKey: env.YOUTUBE_API_KEY,
       youtubeAccessToken,
       metaAccessToken: env.META_ACCESS_TOKEN,
@@ -1473,7 +1474,11 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       tiktokAccessToken,
       facebookPageId: env.FACEBOOK_PAGE_ID,
     });
-    const records = mergeSocialRecords(await readSocialRecords(store), incoming);
+    const records = reconcileRefreshedSocialRecords(
+      await readSocialRecords(store),
+      incoming,
+      refreshedPlatforms,
+    );
     await persistSocialRecords(store, records);
     const attribution = await readSocialWebsiteSessions({
       personalApiKey: env.POSTHOG_PERSONAL_API_KEY,
@@ -1483,6 +1488,7 @@ async function dashboardSocialPublicRefresh(req, env, context) {
     return jsonResponse({
       imported: incoming.length,
       partialFailures: failures,
+      refreshedPlatforms,
       report: buildSocialDashboardReport(records, { attribution }),
     }, 200, { "Cache-Control": "no-store", Vary: "Cookie" });
   } catch (error) {

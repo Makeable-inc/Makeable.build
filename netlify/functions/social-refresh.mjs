@@ -1,6 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import { refreshSocialRecords } from "../../lib/social-refresh.mjs";
-import { mergeSocialRecords, persistSocialRecords, readSocialRecords, socialStoreNameForFunctionContext } from "../../lib/social-dashboard.mjs";
+import { persistSocialRecords, readSocialRecords, reconcileRefreshedSocialRecords, socialStoreNameForFunctionContext } from "../../lib/social-dashboard.mjs";
 import { loadTikTokAccessToken } from "../../lib/tiktok-oauth.mjs";
 import { loadYouTubeAccessToken } from "../../lib/youtube-oauth.mjs";
 
@@ -13,7 +13,7 @@ export default async function handler(_req, context = {}) {
     const store = getStore({ name: socialStoreNameForFunctionContext(context), consistency: "strong" });
     const tiktokAccessToken = await resolvedTikTokAccessToken(store);
     const youtubeAccessToken = await resolvedYouTubeAccessToken(store);
-    const { records: incoming, failures } = await refreshSocialRecords({
+    const { records: incoming, failures, refreshedPlatforms } = await refreshSocialRecords({
       youtubeApiKey,
       youtubeAccessToken,
       metaAccessToken,
@@ -24,9 +24,13 @@ export default async function handler(_req, context = {}) {
       tiktokAccessToken,
       facebookPageId: value("FACEBOOK_PAGE_ID"),
     });
-    const records = mergeSocialRecords(await readSocialRecords(store), incoming);
+    const records = reconcileRefreshedSocialRecords(
+      await readSocialRecords(store),
+      incoming,
+      refreshedPlatforms,
+    );
     await persistSocialRecords(store, records);
-    return jsonResponse({ imported: incoming.length, total: records.length, partialFailures: failures });
+    return jsonResponse({ imported: incoming.length, total: records.length, partialFailures: failures, refreshedPlatforms });
   } catch (error) {
     console.error("Scheduled social refresh failed", error);
     return jsonResponse({ error: "Scheduled social refresh failed." }, 500);

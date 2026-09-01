@@ -31,6 +31,8 @@ test("dashboard keeps private auth and separates contacts, builders, and project
   assert.match(waitlistScript, /point\.projects/);
   assert.match(script, /setAttribute\("aria-pressed"/);
   assert.match(socialScript, /setAttribute\("aria-pressed"/);
+  assert.match(script, /refreshSources: true/);
+  assert.match(script, /socialDashboard\.refresh\(\)/);
   assert.match(html, /data-social-range="30" aria-pressed="true"/);
   assert.doesNotMatch(script, /localStorage|sessionStorage/);
   assert.doesNotMatch(script, /\/api\/admin\/waitlist/);
@@ -305,6 +307,33 @@ test("media viewer clears a prior playback failure before the next open", async 
   assert.equal(harness.els.dialogUnavailable.textContent, "");
 });
 
+test("media viewer opens official embedded players without redirecting", async () => {
+  const { createMediaViewer } = await import(socialScriptPath);
+  const harness = mediaViewerHarness();
+  const viewer = createMediaViewer(harness.els, harness.options);
+
+  await viewer.open(mediaRecord({ previewUrl: "", embedUrl: "https://www.youtube.com/embed/video-one", platform: "youtube" }));
+
+  assert.equal(harness.els.dialog.open, true);
+  assert.equal(harness.els.dialogVideo.hidden, true);
+  assert.equal(harness.els.dialogEmbed.hidden, false);
+  assert.equal(harness.els.dialogEmbed.src, "https://www.youtube.com/embed/video-one");
+});
+
+test("media viewer clears an embedded player before reopening native media", async () => {
+  const { createMediaViewer } = await import(socialScriptPath);
+  const harness = mediaViewerHarness();
+  const viewer = createMediaViewer(harness.els, harness.options);
+  await viewer.open(mediaRecord({ previewUrl: "", embedUrl: "https://www.youtube.com/embed/video-one", platform: "youtube" }));
+  harness.els.dialog.close();
+
+  await viewer.open(mediaRecord({ contentId: "native-video" }));
+
+  assert.equal(harness.els.dialogEmbed.hidden, true);
+  assert.equal(harness.els.dialogEmbed.src, "");
+  assert.equal(harness.els.dialogVideo.hidden, false);
+});
+
 test("video error events transition the open viewer to unavailable", async () => {
   // Given: an open video viewer with successful initial playback.
   const { createMediaViewer } = await import(socialScriptPath);
@@ -446,6 +475,7 @@ function mediaViewerHarness({ openError = null, playError = null } = {}) {
     dialogCaption: new TestElement(),
     dialogClose: new TestElement(),
     dialogEngagements: new TestElement(),
+    dialogEmbed: new TestElement(),
     dialogImage: new TestElement(),
     dialogImpressions: new TestElement(),
     dialogTitle: new TestElement(),

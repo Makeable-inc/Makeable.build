@@ -73,7 +73,7 @@ const socialDashboard = createSocialDashboard({
 
 els.authForm.addEventListener("submit", authenticate);
 els.toggleAccessKey.addEventListener("click", toggleAccessKeyVisibility);
-els.refreshButton.addEventListener("click", () => refreshActiveSection({ announce: true }));
+els.refreshButton.addEventListener("click", () => refreshActiveSection({ announce: true, refreshSources: true }));
 els.downloadButton.addEventListener("click", downloadCsv);
 els.signOutButton.addEventListener("click", signOut);
 els.dashboardSection.addEventListener("change", () => {
@@ -205,12 +205,15 @@ async function loadDashboard(options = {}) {
 async function refreshActiveSection(options = {}) {
   setButtonBusy(els.refreshButton, true);
   try {
+    const refreshSocial = options.refreshSources
+      ? () => socialDashboard.refresh()
+      : () => socialDashboard.load();
     if (state.currentSection === "social") {
-      await socialDashboard.load();
+      await refreshSocial();
     } else if (state.currentSection === "waitlist") {
       await loadDashboard({ manageButton: false });
     } else {
-      await Promise.all([loadDashboard({ manageButton: false }), socialDashboard.load()]);
+      await Promise.all([loadDashboard({ manageButton: false }), refreshSocial()]);
     }
     if (options.announce) showToast("Dashboard refreshed");
   } finally {

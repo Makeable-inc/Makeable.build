@@ -47,6 +47,7 @@ export function buildSocialView(records, options = {}) {
   const websiteSessions = attributionConnected
     ? accounts.reduce((total, account) => total + account.websiteSessions, 0)
     : null;
+  const groupedContent = groupContentRecords(filtered);
   return {
     rankBy,
     attributionStatus: attributionConnected
@@ -69,12 +70,34 @@ export function buildSocialView(records, options = {}) {
     postsTotal: filtered.length,
     accounts,
     daily: dailyRows(filtered, days, now),
-    content: [...filtered].sort((left, right) =>
-      right.impressions - left.impressions
-      || right.engagements - left.engagements
-      || right.publishedAt.localeCompare(left.publishedAt),
-    ),
+    content: selectAccountBalancedContent(groupedContent, accounts),
   };
+}
+
+function selectAccountBalancedContent(content, accounts, limit = 16) {
+  if (content.length <= limit) return content;
+  const selected = [];
+  const selectedIds = new Set();
+  accounts
+    .filter((account) => account.posts > 0)
+    .forEach((account) => {
+      const match = content.find((group) =>
+        (Array.isArray(group.crossPosts) ? group.crossPosts : [group]).some((record) =>
+          record.platform === account.platform
+          && attributionKey(record.attributionKey, record.account) === account.attributionKey),
+      );
+      if (match && !selectedIds.has(match.id)) {
+        selected.push(match);
+        selectedIds.add(match.id);
+      }
+    });
+  content.forEach((group) => {
+    if (selected.length < limit && !selectedIds.has(group.id)) {
+      selected.push(group);
+      selectedIds.add(group.id);
+    }
+  });
+  return selected.sort(contentOrder);
 }
 
 function configuredAccountRows(accounts, attributionConnected, configuredAccounts = []) {
@@ -91,9 +114,75 @@ function configuredAccountRows(accounts, attributionConnected, configuredAccount
 }
 
 export function mediaKind(record) {
-  if (record?.previewUrl) return "video";
+  if (record?.previewUrl || record?.embedUrl) return "video";
   if (record?.thumbnailUrl) return "image";
   return "unavailable";
+}
+
+export function groupContentRecords(records) {
+  const groups = [];
+  [...records]
+    .sort(contentOrder)
+    .forEach((record) => {
+      const identity = crossPostIdentity(record);
+      const publishedAt = new Date(record.publishedAt).getTime();
+      const match = identity && groups.find((group) =>
+        group.identity === identity
+        && Math.abs(group.publishedAt - publishedAt) <= 3 * 86_400_000
+        && !group.records.some((entry) => entry.platform === record.platform),
+      );
+      if (match) {
+        match.records.push(record);
+        return;
+      }
+      groups.push({ identity, publishedAt, records: [record] });
+    });
+  return groups
+    .map(({ records: crossPosts }) => groupedRecord(crossPosts))
+    .sort(contentOrder);
+}
+
+function groupedRecord(crossPosts) {
+  const ordered = [...crossPosts].sort((left, right) =>
+    mediaRank(right) - mediaRank(left)
+    || right.impressions - left.impressions
+    || right.publishedAt.localeCompare(left.publishedAt),
+  );
+  const representative = ordered[0];
+  return {
+    ...representative,
+    impressions: sum(crossPosts, "impressions"),
+    engagements: sum(crossPosts, "engagements"),
+    publishedAt: [...crossPosts]
+      .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt))[0].publishedAt,
+    crossPosts: [...crossPosts].sort((left, right) =>
+      left.platform.localeCompare(right.platform) || left.account.localeCompare(right.account)),
+  };
+}
+
+function crossPostIdentity(record) {
+  const contentType = String(record?.contentType || "").toLowerCase();
+  if (!/(video|reel|short)/.test(contentType)) return "";
+  const caption = String(record?.caption || "")
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/#[\p{L}\p{N}_]+/gu, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+  return caption.length >= 12 ? caption : "";
+}
+
+function mediaRank(record) {
+  if (record?.previewUrl) return 3;
+  if (record?.embedUrl) return 2;
+  if (record?.thumbnailUrl) return 1;
+  return 0;
+}
+
+function contentOrder(left, right) {
+  return right.impressions - left.impressions
+    || right.engagements - left.engagements
+    || right.publishedAt.localeCompare(left.publishedAt);
 }
 
 function rangeRecords(records, days, now) {

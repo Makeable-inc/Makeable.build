@@ -7,6 +7,7 @@ import {
   mergeSocialRecords,
   parseSocialCsv,
   readSocialRecords,
+  reconcileRefreshedSocialRecords,
 } from "../lib/social-dashboard.mjs";
 
 const now = new Date("2026-08-26T18:00:00.000Z");
@@ -252,6 +253,22 @@ test("mergeSocialRecords preserves bounded range-specific account analytics", ()
   assert.deepEqual(merged.accountAnalytics, incoming[0].accountAnalytics);
 });
 
+test("reconcileRefreshedSocialRecords replaces successful sources and preserves failed ones", () => {
+  const existing = [
+    socialRecord({ contentId: "stale-instagram", id: "instagram:@makeable.build:stale-instagram" }),
+    socialRecord({ platform: "facebook", account: "Makeable Facebook", attributionKey: "makeable_facebook", contentId: "kept-facebook", id: "facebook:Makeable Facebook:kept-facebook" }),
+  ];
+  const incoming = [
+    socialRecord({ contentId: "current-instagram", id: "instagram:@makeable.build:current-instagram", impressions: 2400 }),
+  ];
+
+  const reconciled = reconcileRefreshedSocialRecords(existing, incoming, ["instagram"]);
+
+  assert.equal(reconciled.some(({ contentId }) => contentId === "stale-instagram"), false);
+  assert.equal(reconciled.some(({ contentId }) => contentId === "current-instagram"), true);
+  assert.equal(reconciled.some(({ contentId }) => contentId === "kept-facebook"), true);
+});
+
 test("readSocialRecords seeds the truthful eight-post baseline in a clean store", async () => {
   // Given: a newly deployed store with no operator import.
   const store = new MemoryStore();
@@ -294,6 +311,18 @@ test("readSocialRecords lets a stored post update its seeded identity without du
     records.find((record) => record.contentId === "DcgtZHVA9Y7").impressions,
     2_000,
   );
+});
+
+test("readSocialRecords does not restore stale seed posts after a reconciled refresh", async () => {
+  const store = new MemoryStore();
+  await store.setJSON("v1/social-records.json", {
+    schemaVersion: 2,
+    records: [socialRecord({ contentId: "current-only", id: "instagram:@makeable.build:current-only" })],
+  });
+
+  const records = await readSocialRecords(store);
+
+  assert.deepEqual(records.map(({ contentId }) => contentId), ["current-only"]);
 });
 
 test("dashboardSocialResult imports and persists new social posts", async () => {

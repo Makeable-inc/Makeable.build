@@ -50,6 +50,7 @@ test("official YouTube refresh uses public video counters without calling paid c
     engagementsComplete: false,
     thumbnailUrl: "https://i.ytimg.com/vi/latest-short/hqdefault.jpg",
     previewUrl: "",
+    embedUrl: "https://www.youtube.com/embed/latest-short",
     postUrl: "https://www.youtube.com/watch?v=latest-short",
   });
   assert.deepEqual(requests.map((url) => new URL(url).host), [
@@ -153,7 +154,7 @@ test("official refresh reports successful Meta and TikTok sources separately", a
       assert.deepEqual(JSON.parse(options.body), { max_count: 20 });
       return new Response(JSON.stringify({ data: { videos: [{
         id: "tt-post", title: "Makeable TikTok", create_time: 1_788_131_600,
-        cover_image_url: "https://cdn.example/tt.jpg", share_url: "https://www.tiktok.com/@trymakeable.build/video/tt-post",
+        cover_image_url: "https://cdn.example/tt.jpg", share_url: "https://www.tiktok.com/@trymakeable.build/video/tt-post", embed_link: "https://www.tiktok.com/player/v1/tt-post",
         view_count: 700, like_count: 14, comment_count: 3, share_count: 2,
       }] } }));
     }
@@ -194,6 +195,7 @@ test("official refresh reports successful Meta and TikTok sources separately", a
     ["tiktok", 700],
   ]);
   assert.equal(result.records.find((record) => record.platform === "tiktok").followers, 42);
+  assert.equal(result.records.find((record) => record.platform === "tiktok").embedUrl, "https://www.tiktok.com/player/v1/tt-post");
 });
 
 test("Meta refresh uses current per-content insights without dropping Facebook or Instagram", async () => {
@@ -231,6 +233,7 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
         timestamp: "2026-08-30T02:00:00+0000",
         permalink: "https://www.instagram.com/reel/ig-post/",
         thumbnail_url: "https://cdn.example/ig.jpg",
+        media_url: "https://cdn.example/ig.mp4",
         like_count: 18,
         comments_count: 1,
       }] });
@@ -264,6 +267,7 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
         created_time: "2026-08-30T03:00:00+0000",
         permalink_url: "https://www.facebook.com/fb-post",
         full_picture: "https://cdn.example/fb.jpg",
+        attachments: { data: [{ media_type: "video_inline", url: "https://www.facebook.com/fb-post" }] },
         reactions: { summary: { total_count: 8 } },
         comments: { summary: { total_count: 2 } },
         shares: { count: 1 },
@@ -308,5 +312,7 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
     30: { followersGained: 0 },
     90: { followersGained: 0 },
   });
+  assert.equal(result.records.find((record) => record.platform === "instagram").previewUrl, "https://cdn.example/ig.mp4");
+  assert.match(result.records.find((record) => record.platform === "facebook").embedUrl, /^https:\/\/www\.facebook\.com\/plugins\/video\.php\?/);
   assert.equal(requests.length, 19);
 });

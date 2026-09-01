@@ -321,6 +321,47 @@ test("mediaKind chooses inline video, thumbnail, or unavailable presentation", (
   assert.equal(mediaKind(record()), "unavailable");
 });
 
+test("buildSocialView groups the same cross-posted video and retains every platform", () => {
+  const shared = {
+    caption: "Anything is Makeable #makeable",
+    contentType: "video",
+    publishedAt: "2026-08-24T00:00:00.000Z",
+  };
+  const view = buildSocialView([
+    record({ ...shared, id: "instagram:@makeable.build:ig-1", contentId: "ig-1", impressions: 1200 }),
+    record({ ...shared, id: "tiktok:@trymakeable.build:tt-1", platform: "tiktok", account: "@trymakeable.build", attributionKey: "trymakeable_build", contentId: "tt-1", impressions: 800, embedUrl: "https://www.tiktok.com/player/v1/tt-1" }),
+    record({ ...shared, id: "youtube:@makeablebuild:yt-1", platform: "youtube", account: "@makeablebuild", attributionKey: "makeable_youtube", contentId: "yt-1", impressions: 600, embedUrl: "https://www.youtube.com/embed/yt-1" }),
+  ], { days: 30, now });
+
+  assert.equal(view.content.length, 1);
+  assert.equal(view.content[0].impressions, 2600);
+  assert.deepEqual(view.content[0].crossPosts.map(({ platform }) => platform).sort(), ["instagram", "tiktok", "youtube"]);
+  assert.equal(mediaKind(view.content[0]), "video");
+});
+
+test("buildSocialView keeps a low-volume connected account in the bounded gallery", () => {
+  const records = Array.from({ length: 17 }, (_, index) => record({
+    id: `instagram:@makeable:ig-${index}`,
+    contentId: `ig-${index}`,
+    caption: `Distinct Instagram video ${index}`,
+    impressions: 10_000 - index,
+  }));
+  records.push(record({
+    id: "facebook:Makeable Facebook:fb-low",
+    platform: "facebook",
+    account: "Makeable Facebook",
+    attributionKey: "makeable_facebook",
+    contentId: "fb-low",
+    caption: "Distinct Facebook video",
+    impressions: 1,
+  }));
+
+  const view = buildSocialView(records, { days: 30, now });
+
+  assert.equal(view.content.length, 16);
+  assert.equal(view.content.some((group) => group.crossPosts.some(({ platform }) => platform === "facebook")), true);
+});
+
 function record(overrides = {}) {
   return {
     id: "instagram:@makeable:post-1",

@@ -1,6 +1,7 @@
 import { buildSocialView, mediaKind } from "./social-model.js";
 import { formatSocialPercent, renderSocialAccounts } from "./social-account-table.js";
 import { renderSocialChart } from "./social-chart.js";
+import { renderSocialContent } from "./social-content.js";
 
 const numberFormatter = new Intl.NumberFormat();
 const compactFormatter = new Intl.NumberFormat(undefined, {
@@ -84,6 +85,9 @@ export function createSocialDashboard(options) {
         state.loading = false;
       }
     },
+    async refresh() {
+      return refreshPublicData(state, els, renderOptions);
+    },
     show() {
       window.requestAnimationFrame(() => renderChart(state, els));
     },
@@ -99,7 +103,7 @@ function socialElements() {
       "accountRows", "accountCount", "contentGrid", "contentCount", "emptyState",
     ]),
     ...elementMap("media", [
-      "dialog", "dialogClose", "dialogTitle", "dialogVideo", "dialogImage",
+      "dialog", "dialogClose", "dialogTitle", "dialogVideo", "dialogEmbed", "dialogImage",
       "dialogUnavailable", "dialogCaption", "dialogImpressions", "dialogEngagements",
     ]),
     rangeButtons: [...document.querySelectorAll("[data-social-range]")],
@@ -151,7 +155,10 @@ function render(state, els, options) {
   }
   renderChart(state, els);
   renderSocialAccounts(view, { rows: els.accountRows, count: els.accountCount });
-  renderContent(view, els, options.mediaViewer);
+  renderSocialContent(view, els, options.mediaViewer, {
+    compact,
+    number: (value) => numberFormatter.format(value),
+  });
   options.onReport(view);
 }
 function photoDemoView(view) {
@@ -163,64 +170,6 @@ function photoDemoView(view) {
 function renderChart(state, els) {
   renderSocialChart({ chart: els.chart, chartWrap: els.chartWrap, data: state.view.daily });
 }
-function renderContent(view, els, mediaViewer) {
-  els.contentGrid.replaceChildren();
-  view.content.slice(0, 12).forEach((record) => {
-    const card = document.createElement("article");
-    const media = document.createElement("div");
-    const body = document.createElement("div");
-    card.className = "content-card";
-    media.className = "content-media";
-    body.className = "content-card-body";
-    appendMedia(media, record, mediaViewer);
-    body.append(
-      metaRow(record),
-      paragraph(record.caption || "Untitled social post", "content-card-caption"),
-      statRow(record),
-    );
-    card.append(media, body);
-    els.contentGrid.append(card);
-  });
-  els.emptyState.hidden = view.content.length > 0;
-  els.contentCount.textContent = `${numberFormatter.format(view.content.length)} posts`;
-}
-function appendMedia(container, record, mediaViewer) {
-  const kind = mediaKind(record);
-  if (record.thumbnailUrl) {
-    const image = document.createElement("img");
-    image.src = record.thumbnailUrl;
-    image.alt = `${capitalize(record.platform)} preview for ${record.caption || "social post"}`;
-    image.loading = "lazy";
-    image.width = 640;
-    image.height = 360;
-    container.append(image);
-  } else if (kind === "video") {
-    const video = document.createElement("video");
-    video.src = record.previewUrl;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "metadata";
-    video.setAttribute("aria-hidden", "true");
-    container.append(video);
-  } else {
-    container.append(paragraph("Preview unavailable", "media-unavailable"));
-  }
-  if (kind !== "unavailable") {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "play-control";
-    button.setAttribute(
-      "aria-label",
-      kind === "video"
-        ? `Play ${record.caption || "social preview"}`
-        : `View ${record.caption || "social preview"}`,
-    );
-    button.addEventListener("click", () => void mediaViewer.open(record));
-    if (kind === "image") button.classList.add("image-control");
-    container.append(button);
-  }
-}
-
 export function createMediaViewer(els, viewerOptions = {}) {
   const documentRef = viewerOptions.documentRef || document;
   const windowRef = viewerOptions.windowRef || window;
@@ -266,7 +215,7 @@ export function createMediaViewer(els, viewerOptions = {}) {
         showToast("Media preview could not be opened.");
         return false;
       }
-      if (mediaKind(record) === "video") {
+      if (mediaKind(record) === "video" && record.previewUrl) {
         try {
           await els.dialogVideo.play();
         } catch {
@@ -329,14 +278,21 @@ export function lockDocumentScroll(documentRef, windowRef) {
 
 function prepareDialog(record, els) {
   const kind = mediaKind(record);
+  const sources = Array.isArray(record.crossPosts) ? record.crossPosts : [record];
   els.dialogTitle.textContent = record.caption || "Content preview";
-  els.dialogCaption.textContent = `${capitalize(record.platform)} ${record.account} · ${dateFormatter.format(new Date(record.publishedAt))}`;
+  els.dialogCaption.textContent = `${sources.map((source) => `${capitalize(source.platform)} ${source.account}`).join(" + ")} · ${dateFormatter.format(new Date(record.publishedAt))}`;
   els.dialogImpressions.textContent = `${compact(record.impressions)} content exposures`;
   els.dialogEngagements.textContent = `${compact(record.engagements)} engagements`;
   if (kind === "video") {
-    els.dialogVideo.src = record.previewUrl;
-    if (record.thumbnailUrl) els.dialogVideo.poster = record.thumbnailUrl;
-    els.dialogVideo.hidden = false;
+    if (record.previewUrl) {
+      els.dialogVideo.src = record.previewUrl;
+      if (record.thumbnailUrl) els.dialogVideo.poster = record.thumbnailUrl;
+      els.dialogVideo.hidden = false;
+    } else {
+      els.dialogEmbed.src = record.embedUrl;
+      els.dialogEmbed.title = `${capitalize(record.platform)} player for ${record.caption || "social post"}`;
+      els.dialogEmbed.hidden = false;
+    }
   } else if (kind === "image") {
     els.dialogImage.src = record.thumbnailUrl;
     els.dialogImage.alt = `${capitalize(record.platform)} preview for ${record.caption || "social post"}`;
@@ -353,6 +309,9 @@ function showVideoUnavailable(els) {
   els.dialogVideo.removeAttribute("src");
   els.dialogVideo.removeAttribute("poster");
   els.dialogVideo.load();
+  els.dialogEmbed.removeAttribute("src");
+  els.dialogEmbed.title = "";
+  els.dialogEmbed.hidden = true;
   els.dialogUnavailable.hidden = false;
   els.dialogUnavailable.textContent = "Video preview unavailable.";
 }
@@ -363,6 +322,9 @@ function resetDialog(els) {
   els.dialogVideo.removeAttribute("src");
   els.dialogVideo.removeAttribute("poster");
   els.dialogVideo.load();
+  els.dialogEmbed.removeAttribute("src");
+  els.dialogEmbed.title = "";
+  els.dialogEmbed.hidden = true;
   els.dialogImage.removeAttribute("src");
   els.dialogImage.alt = "";
   els.dialogImage.hidden = true;
@@ -421,13 +383,18 @@ async function refreshPublicData(state, els, options) {
     applyReport(payload.report, state, els, options);
     const unavailable = Array.isArray(payload.partialFailures)
       ? payload.partialFailures.map((failure) => failure.platform).filter(Boolean) : [];
+    const refreshed = Array.isArray(payload.refreshedPlatforms)
+      ? payload.refreshedPlatforms.map(capitalize).filter(Boolean) : [];
+    const sourceSummary = refreshed.length ? ` from ${refreshed.join(", ")}` : "";
     const message = unavailable.length
-      ? `Refreshed ${numberFormatter.format(payload.imported)} public posts. ${unavailable.join(", ")} will retry automatically.`
-      : `Refreshed ${numberFormatter.format(payload.imported)} public posts.`;
+      ? `Refreshed ${numberFormatter.format(payload.imported)} public posts${sourceSummary}. ${unavailable.join(", ")} will retry automatically.`
+      : `Refreshed ${numberFormatter.format(payload.imported)} public posts${sourceSummary}.`;
     setRefreshState(els, false, message, "success");
     options.showToast(unavailable.length ? "Public social data partially refreshed" : "Public social data refreshed");
+    return true;
   } catch (error) {
     setRefreshState(els, false, errorMessage(error, "Public social refresh failed"), "error");
+    return false;
   }
 }
 
@@ -438,35 +405,6 @@ function setRefreshState(els, busy, message, tone = "") {
   els.importStatus.className = `import-status${tone ? ` is-${tone}` : ""}`;
 }
 
-function metaRow(record) {
-  const row = document.createElement("div");
-  row.className = "content-card-meta";
-  row.append(span(capitalize(record.platform)), span(record.account));
-  return row;
-}
-
-function statRow(record) {
-  const row = document.createElement("div");
-  row.className = "content-card-stats";
-  row.append(
-    span(`${compact(record.impressions)} content exposures`),
-    span(`${compact(record.engagements)} engagements`),
-  );
-  return row;
-}
-
-function paragraph(value, className) {
-  return textElement("p", value, className);
-}
-function span(value) {
-  return textElement("span", value);
-}
-function textElement(name, value, className = "") {
-  const element = document.createElement(name);
-  if (className) element.className = className;
-  element.textContent = value;
-  return element;
-}
 function compact(value) {
   return compactFormatter.format(Number(value) || 0);
 }
