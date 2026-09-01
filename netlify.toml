@@ -72,7 +72,7 @@ force = true
 
 [[redirects]]
   from = "/ember/download"
-  to = "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg"
+  to = "/ember/releases/Ember-0.2.0-Developer-Preview-arm64.dmg"
   status = 302
   force = true
 
@@ -127,6 +127,18 @@ for = "/r/youtube/makeable"
   for = "/assets/ember/*"
   [headers.values]
     Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+
+[[headers]]
+  for = "/ember/updates/appcast.xml"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type = "application/rss+xml; charset=utf-8"
+
+[[headers]]
+  for = "/ember/releases/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Content-Type = "application/x-apple-diskimage"
 
 [[headers]]
   for = "/_next/static/*"

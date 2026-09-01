@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Ember updates</title>
+    <link>https://makeable.build/ember/updates/appcast.xml</link>
+    <description>Signed automatic updates for Ember on macOS.</description>
+    <language>en</language>
+  </channel>
+</rss>
