@@ -372,7 +372,7 @@
 .account-link {
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--accent-bright) 50%, transparent);
-  text-underline-offset: 3px;
+  text-underline-offset: var(--link-underline-offset);
 }
 
 .account-link:hover {
@@ -381,9 +381,9 @@
 }
 
 .account-link:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid var(--accent-bright);
-  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  outline: var(--focus-ring-width) solid var(--accent-bright);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .coverage-badge {

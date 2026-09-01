@@ -87,6 +87,15 @@ Spacing intent derives from a 4px base.
 | `--space-6` | `24px` | Page groups |
 | `--space-8` | `32px` | Major separation |
 
+Interactive geometry uses shared tokens rather than component-local values.
+
+| Token | Value | Usage |
+|---|---:|---|
+| `--radius-sm` | `4px` | Compact focus and inline interaction rounding |
+| `--focus-ring-width` | `2px` | Keyboard focus outline thickness |
+| `--focus-ring-offset` | `2px` | Keyboard focus outline separation |
+| `--link-underline-offset` | `3px` | Readable inline-link underline spacing |
+
 ### Grid and shell
 
 - Maximum content width: 1600px.
