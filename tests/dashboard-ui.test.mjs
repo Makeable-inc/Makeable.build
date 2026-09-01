@@ -10,6 +10,7 @@ const socialChartScriptPath = new URL("../dashboard/social-chart.js", import.met
 const accountTableScriptPath = new URL("../dashboard/social-account-table.js", import.meta.url);
 const socialModelScriptPath = new URL("../dashboard/social-model.js", import.meta.url);
 const socialMediaStylePath = new URL("../dashboard/social-media.css", import.meta.url);
+const landingPagePath = new URL("../apps/landing/app/page.tsx", import.meta.url);
 
 test("dashboard keeps private auth and separates contacts, builders, and projects", async () => {
   const [html, script, socialScript, waitlistScript] = await Promise.all([
@@ -49,6 +50,19 @@ test("social UI names the exposure-to-website funnel and its sortable account me
   assert.match(html, /<option value="websiteVisitRate">Website visit rate<\/option>/);
   assert.match(html, />Platform link clicks<\/th>/);
   assert.doesNotMatch(html, />Site clicks</);
+});
+
+test("Facebook links target the live Page used by owner analytics", async () => {
+  // Break caught: the obsolete profile identifier renders Facebook's unavailable-content page.
+  const [socialScript, landingPage] = await Promise.all([
+    readFile(socialScriptPath, "utf8"),
+    readFile(landingPagePath, "utf8"),
+  ]);
+
+  for (const source of [socialScript, landingPage]) {
+    assert.match(source, /https:\/\/www\.facebook\.com\/1321564764369821/);
+    assert.doesNotMatch(source, /61593471075023/);
+  }
 });
 
 test("account table formatting preserves unknown and connected-zero values", async () => {
