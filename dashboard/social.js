@@ -11,9 +11,11 @@ const compactFormatter = new Intl.NumberFormat(undefined, {
 const dateFormatter = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const CONFIGURED_ACCOUNTS = [
-  ["instagram", "@makeable.build", "makeable_build"], ["instagram", "@makeable.zak", "makeable_zak"],
-  ["tiktok", "@trymakeable.build", "trymakeable_build"], ["facebook", "Makeable Facebook", "makeable_facebook"],
-  ["youtube", "@makeablebuild", "makeable_youtube"],
+  ["instagram", "@makeable.build", "makeable_build", "https://www.instagram.com/makeable.build/"],
+  ["instagram", "@makeable.zak", "makeable_zak", "https://www.instagram.com/makeable.zak/"],
+  ["tiktok", "@trymakeable.build", "trymakeable_build", "https://www.tiktok.com/@trymakeable.build"],
+  ["facebook", "Makeable Facebook", "makeable_facebook", "https://www.facebook.com/profile.php?id=61593471075023"],
+  ["youtube", "@makeablebuild", "makeable_youtube", "https://www.youtube.com/@makeablebuild"],
 ];
 export function createSocialDashboard(options) {
   const state = {

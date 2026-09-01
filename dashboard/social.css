@@ -369,6 +369,23 @@
   text-overflow: ellipsis;
 }
 
+.account-link {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent-bright) 50%, transparent);
+  text-underline-offset: 3px;
+}
+
+.account-link:hover {
+  color: var(--accent-bright);
+  text-decoration-color: currentColor;
+}
+
+.account-link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
 .coverage-badge {
   display: inline-flex;
   min-height: 20px;

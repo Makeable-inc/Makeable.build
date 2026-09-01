@@ -299,6 +299,33 @@ test("buildSocialView preserves the last-verified status for retained owner metr
   assert.equal(view.accounts[0].followersGained, 155);
 });
 
+test("buildSocialView attaches canonical profile links to every configured account", () => {
+  const configuredAccounts = [
+    ["instagram", "@makeable.build", "makeable_build", "https://www.instagram.com/makeable.build/"],
+    ["instagram", "@makeable.zak", "makeable_zak", "https://www.instagram.com/makeable.zak/"],
+    ["tiktok", "@trymakeable.build", "trymakeable_build", "https://www.tiktok.com/@trymakeable.build"],
+    ["facebook", "Makeable Facebook", "makeable_facebook", "https://www.facebook.com/profile.php?id=61593471075023"],
+    ["youtube", "@makeablebuild", "makeable_youtube", "https://www.youtube.com/@makeablebuild"],
+  ];
+  const view = buildSocialView([record({
+    account: "@makeable.build",
+    attributionKey: "makeable_build",
+  })], {
+    days: 30,
+    now,
+    configuredAccounts,
+  });
+
+  assert.deepEqual(
+    view.accounts
+      .map(({ platform, account, profileUrl }) => ({ platform, account, profileUrl }))
+      .sort((left, right) => left.platform.localeCompare(right.platform) || left.account.localeCompare(right.account)),
+    configuredAccounts
+      .map(([platform, account, , profileUrl]) => ({ platform, account, profileUrl }))
+      .sort((left, right) => left.platform.localeCompare(right.platform) || left.account.localeCompare(right.account)),
+  );
+});
+
 test("buildSocialView totals measured owner metrics without discarding them for unknown accounts", () => {
   const measured = record({
     account: "@measured",

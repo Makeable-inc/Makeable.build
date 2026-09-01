@@ -102,16 +102,25 @@ function selectAccountBalancedContent(content, accounts, limit = 16) {
 }
 
 function configuredAccountRows(accounts, attributionConnected, configuredAccounts = []) {
-  const existing = new Set(accounts.map((account) => `${account.platform}:${account.attributionKey}`));
+  const profileUrls = new Map(configuredAccounts.map(([platform, , key, profileUrl]) => [
+    `${platform}:${key}`,
+    profileUrl,
+  ]));
+  const linkedAccounts = accounts.map((account) => ({
+    ...account,
+    profileUrl: profileUrls.get(`${account.platform}:${account.attributionKey}`) || "",
+  }));
+  const existing = new Set(linkedAccounts.map((account) => `${account.platform}:${account.attributionKey}`));
   const unavailable = configuredAccounts
     .filter(([platform, , key]) => !existing.has(`${platform}:${key}`))
-    .map(([platform, account, attributionKey]) => ({
+    .map(([platform, account, attributionKey, profileUrl]) => ({
       rank: 0, platform, account, attributionKey, coverage: "unavailable", impressions: 0,
       engagements: 0, followers: 0, followersGained: null, clicks: null, posts: 0,
       latestPublishedAt: "", engagementRate: null,
+      profileUrl,
       websiteSessions: attributionConnected ? 0 : null, websiteVisitRate: null,
     }));
-  return [...accounts, ...unavailable];
+  return [...linkedAccounts, ...unavailable];
 }
 
 export function mediaKind(record) {

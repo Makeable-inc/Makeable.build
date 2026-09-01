@@ -147,6 +147,8 @@ Spacing intent derives from a 4px base.
 - **Structure**: rank; account identity with a visible coverage badge; platform;
   content exposures; engagement rate; platform link clicks; website
   conversions; website visit rate; followers gained; posts.
+- **Account links**: every configured account identity is a keyboard-focusable
+  external link to its canonical social profile and opens in a new tab.
 - **Coverage badge variants**: Connected, Platform only, Public snapshot,
   Attribution only, Unavailable. The badge reports which measurement sources
   support each row and never implies partial engagement is measured.

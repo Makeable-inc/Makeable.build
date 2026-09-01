@@ -47,11 +47,18 @@ export function formatOptionalNumber(value) {
 function accountCell(account) {
   const element = document.createElement("td");
   const wrapper = document.createElement("div");
-  const name = document.createElement("span");
+  const name = document.createElement(account.profileUrl ? "a" : "span");
   const coverage = document.createElement("span");
   wrapper.className = "account-cell";
   name.className = "account-name";
   name.textContent = account.account;
+  if (account.profileUrl) {
+    name.classList.add("account-link");
+    name.href = account.profileUrl;
+    name.target = "_blank";
+    name.rel = "noopener noreferrer";
+    name.setAttribute("aria-label", `Open ${account.platform} profile for ${account.account}`);
+  }
   coverage.className = `coverage-badge is-${account.coverage}`;
   coverage.textContent = coverageLabels[account.coverage] || "Unavailable";
   wrapper.append(name, coverage);
