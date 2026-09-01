@@ -28,6 +28,7 @@ export default async function handler(_req, context = {}) {
       await readSocialRecords(store),
       incoming,
       refreshedPlatforms,
+      failures.map(({ platform }) => platform),
     );
     await persistSocialRecords(store, records);
     return jsonResponse({ imported: incoming.length, total: records.length, partialFailures: failures, refreshedPlatforms });

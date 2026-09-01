@@ -9,6 +9,7 @@ const RANK_FIELDS = new Set([
 ]);
 const COVERAGE_STATES = new Set([
   "connected",
+  "stale",
   "platform-only",
   "public-snapshot",
   "attribution-only",

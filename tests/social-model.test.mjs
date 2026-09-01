@@ -283,6 +283,22 @@ test("buildSocialView uses range-specific owner clicks and follower gains", () =
   assert.equal(sevenDays.accounts[0].followersGained, 31);
 });
 
+test("buildSocialView preserves the last-verified status for retained owner metrics", () => {
+  const view = buildSocialView([record({
+    coverage: "stale",
+    accountAnalytics: {
+      30: { clicks: 113, followersGained: 155 },
+    },
+  })], {
+    days: 30,
+    now: new Date("2026-08-31T12:00:00.000Z"),
+  });
+
+  assert.equal(view.accounts[0].coverage, "stale");
+  assert.equal(view.accounts[0].clicks, 113);
+  assert.equal(view.accounts[0].followersGained, 155);
+});
+
 test("buildSocialView totals measured owner metrics without discarding them for unknown accounts", () => {
   const measured = record({
     account: "@measured",

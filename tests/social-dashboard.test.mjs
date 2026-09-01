@@ -269,6 +269,34 @@ test("reconcileRefreshedSocialRecords replaces successful sources and preserves 
   assert.equal(reconciled.some(({ contentId }) => contentId === "kept-facebook"), true);
 });
 
+test("reconcileRefreshedSocialRecords marks failed connected sources as last verified", () => {
+  const existing = [
+    socialRecord({ coverage: "connected", contentId: "connected-instagram" }),
+    socialRecord({
+      account: "@makeable.zak",
+      attributionKey: "makeable_zak",
+      coverage: "public-snapshot",
+      contentId: "public-instagram",
+    }),
+  ];
+
+  const reconciled = reconcileRefreshedSocialRecords(
+    existing,
+    [],
+    [],
+    ["instagram"],
+  );
+
+  assert.equal(
+    reconciled.find(({ contentId }) => contentId === "connected-instagram").coverage,
+    "stale",
+  );
+  assert.equal(
+    reconciled.find(({ contentId }) => contentId === "public-instagram").coverage,
+    "public-snapshot",
+  );
+});
+
 test("readSocialRecords seeds the truthful eight-post baseline in a clean store", async () => {
   // Given: a newly deployed store with no operator import.
   const store = new MemoryStore();

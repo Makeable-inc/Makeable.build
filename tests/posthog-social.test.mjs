@@ -61,6 +61,35 @@ test("PostHog attribution assigns each session to one last-touch social account"
   });
 });
 
+test("PostHog attribution retries one transient failure before reporting unavailable", async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return calls === 1
+      ? new Response("temporary failure", { status: 503 })
+      : Response.json({
+        results: [["2026-08-31", "youtube", "makeable_youtube", 12]],
+      });
+  };
+
+  const result = await readSocialWebsiteSessions({
+    personalApiKey: "phx_test_secret",
+    projectId: "12345",
+    fetchImpl,
+  });
+
+  assert.equal(calls, 2);
+  assert.deepEqual(result, {
+    status: "connected",
+    daily: [{
+      date: "2026-08-31",
+      platform: "youtube",
+      accountKey: "makeable_youtube",
+      websiteSessions: 12,
+    }],
+  });
+});
+
 test("PostHog attribution limits the query to the 90-day dashboard horizon", async () => {
   // Given: a connected PostHog project.
   let query = "";

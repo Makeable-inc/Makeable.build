@@ -1,6 +1,7 @@
 const numberFormatter = new Intl.NumberFormat("en-US");
 const coverageLabels = {
   connected: "Connected",
+  stale: "Last verified",
   "platform-only": "Platform only",
   "public-snapshot": "Public snapshot",
   "attribution-only": "Attribution only",

@@ -1478,6 +1478,7 @@ async function dashboardSocialPublicRefresh(req, env, context) {
       await readSocialRecords(store),
       incoming,
       refreshedPlatforms,
+      failures.map(({ platform }) => platform),
     );
     await persistSocialRecords(store, records);
     const attribution = await readSocialWebsiteSessions({
