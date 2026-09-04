@@ -1,0 +1,1524 @@
+/* Premium project workspace — intentionally scoped to the authenticated/build shell. */
+.mk-app-shell {
+  --studio-ink: #0b0d10;
+  --studio-ink-soft: #07152b;
+  --studio-paper: #fff8ed;
+  --studio-white: #fffdf9;
+  --studio-line: rgba(14, 16, 20, 0.13);
+  --studio-muted: #6f675f;
+  --studio-orange: #ff2d73;
+  --font-display: "Fredoka", "Arial Rounded MT Bold", ui-rounded, system-ui, sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-rows: 72px minmax(0, 1fr);
+  min-height: 100svh;
+  overflow: clip;
+  background: var(--studio-paper);
+  color: var(--studio-ink);
+  font-family: var(--font-ui);
+}
+
+.mk-app-shell button,
+.mk-app-shell input,
+.mk-app-shell textarea {
+  font: inherit;
+}
+
+.mk-app-shell * {
+  font-family: inherit;
+}
+
+.mk-app-header {
+  z-index: 20;
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--studio-line);
+  background: rgba(255, 248, 237, 0.96);
+}
+
+.mk-app-user {
+  gap: 10px;
+  color: var(--studio-ink);
+}
+
+.mk-app-user-copy span { font-weight: 650; }
+.mk-app-user-copy small { color: var(--studio-muted); }
+
+.mk-project-sidebar {
+  z-index: 30;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px 18px 18px;
+  border: 0;
+  background: #020714;
+  color: #f6f5f1;
+  overflow: hidden;
+}
+
+.mk-project-sidebar .mk-sidebar-logo {
+  display: flex;
+  width: 126px;
+  min-height: 30px;
+  aspect-ratio: var(--brand-logo-aspect);
+  margin: 0 8px 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.mk-project-sidebar .mk-sidebar-logo img {
+  width: 100%;
+  max-height: 30px;
+  object-fit: contain;
+  object-position: left center;
+  filter: brightness(0) invert(1);
+}
+
+.mk-project-sidebar .mk-sidebar-logo::before {
+  background-size: 100% 100%;
+}
+
+.mk-project-sidebar .mk-sidebar-back {
+  justify-content: flex-start;
+  min-height: 38px;
+  margin: 0 4px 20px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #aeb3b3;
+  font-size: 13px;
+}
+
+.mk-project-sidebar .mk-sidebar-back:hover {
+  background: #1a1d1f;
+  color: #fff;
+}
+
+.mk-sidebar-project {
+  display: grid;
+  gap: 8px;
+  margin: 0 8px 22px;
+  padding: 0 0 22px;
+  border-bottom: 1px solid #323638;
+}
+
+.mk-project-sidebar .mk-sidebar-project > span {
+  color: #7f8587;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mk-project-sidebar .mk-sidebar-project > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #f6f5f1;
+  font-size: 15px;
+  font-weight: 590;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.mk-project-nav {
+  display: grid;
+  gap: 4px;
+}
+
+.mk-project-sidebar .mk-project-nav > button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 42px;
+  gap: 10px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #aeb3b3;
+  font-size: 13px;
+  font-weight: 550;
+  text-align: left;
+}
+
+.mk-project-sidebar .mk-project-nav > button[aria-current="true"] {
+  border-color: #3c4143;
+  background: #1a1d1f;
+  color: #fff;
+}
+
+.mk-project-sidebar .mk-project-nav > button:not(:disabled):hover {
+  background: #16191a;
+  color: #fff;
+}
+
+.mk-project-sidebar .mk-project-nav > button:disabled {
+  opacity: 0.34;
+}
+
+.mk-nav-lock {
+  margin-left: auto;
+  color: #73797a;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mk-project-sidebar .mk-project-nav > button[aria-current="true"] .mk-nav-lock {
+  color: #ff8b72;
+}
+
+.mk-build-stage-list {
+  display: grid;
+  gap: 0;
+  margin: 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-build-stage-list li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  min-height: 58px;
+  gap: 10px;
+  color: #747a7c;
+}
+
+.mk-build-stage-list li:not(:last-child)::after {
+  position: absolute;
+  top: 43px;
+  bottom: -15px;
+  left: 13px;
+  width: 1px;
+  background: #363b3d;
+  content: "";
+}
+
+.mk-build-stage-list li > span {
+  z-index: 1;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid #555b5d;
+  border-radius: 50%;
+  background: #020714;
+  color: #9ca1a3;
+  font-size: 12px;
+}
+
+.mk-build-stage-list li > strong { color: inherit; font-size: 13px; font-weight: 570; }
+.mk-build-stage-list li[data-state="done"] { color: #c7cbca; }
+.mk-build-stage-list li[data-state="current"] { color: #fff; }
+.mk-build-stage-list li[data-state="current"] > span { border-color: var(--studio-orange); color: var(--studio-orange); }
+.mk-build-stage-list li[data-state="done"] > span { border-color: #727879; color: #fff; }
+
+.mk-build-switcher {
+  margin: auto 4px 0;
+  border-top: 1px solid #323638;
+  padding-top: 14px;
+}
+
+.mk-build-switcher summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 0 8px;
+  color: #aeb3b3;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+}
+
+.mk-build-switcher summary::-webkit-details-marker { display: none; }
+.mk-build-switcher summary > span { display: grid; min-width: 22px; height: 22px; place-items: center; border-radius: 11px; background: #25292b; color: #c9cdcc; font-size: 10px; }
+.mk-build-switcher > div { display: grid; max-height: 228px; gap: 3px; overflow-y: auto; padding-top: 6px; }
+.mk-project-sidebar .mk-build-switcher button { justify-content: flex-start; min-height: 36px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #858b8d; font-size: 12px; line-height: 1.25; text-align: left; }
+.mk-project-sidebar .mk-build-switcher button[aria-current="true"] { background: #1a1d1f; color: #fff; }
+.mk-project-sidebar .mk-build-switcher button:hover { color: #fff; }
+
+.mk-workspace-main {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  background: var(--studio-paper);
+  overflow: auto;
+}
+
+/* Generation / waiting experience */
+.mk-generation-workshop { min-height: calc(100svh - 72px); }
+
+.mk-generation-workshop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 92px;
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--studio-line);
+}
+
+.mk-generation-workshop-header > div { display: grid; gap: 4px; }
+.mk-generation-workshop-header span { color: var(--studio-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.mk-generation-workshop-header h1 { margin: 0; font-size: clamp(24px, 2.1vw, 34px); font-weight: 650; letter-spacing: -0.035em; }
+.mk-generation-workshop-header > p { display: flex; align-items: center; gap: 8px; margin: 0; padding: 9px 12px; border: 1px solid var(--studio-line); border-radius: 7px; color: var(--studio-muted); font-size: 12px; }
+
+.mk-generation-workshop-body {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.05fr) minmax(420px, 0.95fr);
+  min-height: calc(100svh - 164px);
+}
+
+.mk-generation-drawing {
+  position: relative;
+  display: grid;
+  min-height: 650px;
+  place-items: center;
+  border-right: 1px solid var(--studio-line);
+  background-color: #fbf1e4;
+  overflow: hidden;
+}
+
+.mk-generation-drawing::before,
+.mk-generation-drawing::after {
+  position: absolute;
+  border: 1px solid #bbbdb9;
+  border-radius: 22px;
+  content: "";
+}
+
+.mk-generation-drawing::before { width: 300px; height: 218px; transform: translateY(-16px) rotate(-4deg); }
+.mk-generation-drawing::after { width: 246px; height: 176px; transform: translateY(88px) rotate(5deg); border-style: dashed; }
+.mk-generation-drawing .mk-product-blueprint { z-index: 2; transform: scale(1.25); filter: grayscale(1); }
+.mk-generation-drawing > small { position: absolute; right: 30px; bottom: 24px; left: 30px; color: #898b88; font-size: 11px; text-align: center; }
+
+.mk-drawing-callout { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #c5c3bd; background: #fbf1e4; color: #696c69; font-size: 10px; letter-spacing: 0.04em; }
+.mk-drawing-callout-one { top: 28%; right: 8%; }
+.mk-drawing-callout-two { bottom: 31%; left: 8%; }
+
+.mk-generation-workshop-status {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: clamp(40px, 5vw, 72px);
+  background: var(--studio-white);
+}
+
+.mk-generation-workshop-status .mk-loader-copy { display: grid; gap: 10px; }
+.mk-generation-workshop-status .mk-loader-copy > span { color: var(--studio-orange); font-size: 10px; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; }
+.mk-generation-workshop-status .mk-loader-copy > strong { max-width: 560px; color: var(--studio-ink); font-family: var(--font-display); font-size: clamp(28px, 3vw, 44px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.04; }
+.mk-generation-workshop-status .mk-loader-copy > p { max-width: 540px; margin: 0; color: #616462; font-size: 15px; line-height: 1.6; }
+
+.mk-generation-time { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-top: 38px; }
+.mk-generation-time p { display: flex; align-items: baseline; gap: 8px; margin: 0; }
+.mk-generation-time p strong { color: var(--studio-orange); font-size: 24px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.mk-generation-time p span, .mk-generation-time small { color: var(--studio-muted); font-size: 11px; }
+
+.mk-generation-segments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 14px; }
+.mk-generation-segments > span { height: 3px; background: #d9d8d3; }
+.mk-generation-segments > span[data-state="done"],
+.mk-generation-segments > span[data-state="current"] { background: var(--studio-orange); }
+.mk-generation-segments > span[data-state="current"] { animation: mk-segment-pulse 1.5s ease-in-out infinite; }
+
+@keyframes mk-segment-pulse { 50% { opacity: 0.48; } }
+
+.mk-generation-workshop-status .mk-generation-checkpoints { display: grid; grid-template-columns: 1fr; gap: 0; margin: 26px 0 0; padding: 0; }
+.mk-generation-workshop-status .mk-generation-checkpoints li { display: grid; grid-template-columns: 24px 1fr; align-items: start; gap: 12px; min-height: 54px; padding: 8px 0; color: #9b9d9a; }
+.mk-generation-workshop-status .mk-generation-checkpoints li > span { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid #c7c7c3; border-radius: 50%; background: transparent; color: transparent; font-size: 12px; }
+.mk-generation-workshop-status .mk-generation-checkpoints li > div { display: grid; gap: 3px; }
+.mk-generation-workshop-status .mk-generation-checkpoints li strong { color: inherit; font-size: 13px; font-weight: 610; }
+.mk-generation-workshop-status .mk-generation-checkpoints li small { color: #a1a29f; font-size: 10px; }
+.mk-generation-workshop-status .mk-generation-checkpoints li[data-state="done"],
+.mk-generation-workshop-status .mk-generation-checkpoints li[data-state="current"] { color: var(--studio-ink); }
+.mk-generation-workshop-status .mk-generation-checkpoints li[data-state="done"] > span { border-color: var(--studio-ink); color: var(--studio-ink); }
+.mk-generation-workshop-status .mk-generation-checkpoints li[data-state="current"] > span { border-color: var(--studio-orange); color: var(--studio-orange); font-size: 22px; line-height: 1; }
+
+.mk-generation-brief { display: grid; gap: 8px; margin-top: 18px; padding: 16px 18px; border: 1px solid var(--studio-line); background: #faf9f6; }
+.mk-generation-brief > span { color: var(--studio-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.mk-generation-brief p { margin: 0; color: #373a39; font-size: 13px; line-height: 1.55; }
+.mk-generation-workshop-status .mk-progress-actions { display: flex; align-items: center; gap: 18px; margin-top: 24px; }
+.mk-generation-workshop-status .mk-progress-dismiss { min-height: 42px; padding: 0 17px; border: 1px solid var(--studio-ink); border-radius: 7px; background: transparent; color: var(--studio-ink); font-size: 12px; font-weight: 620; }
+.mk-generation-workshop-status .mk-progress-cancel { min-height: 42px; padding: 0; border: 0; background: transparent; color: var(--studio-orange); font-size: 12px; }
+.mk-generation-leave-note { margin: 16px 0 0; color: var(--studio-muted); font-size: 11px; }
+
+/* Finished project workspace */
+.mk-project-overview {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.05fr) minmax(480px, 0.95fr);
+  min-width: 0;
+  background: var(--studio-white);
+}
+
+.mk-project-overview-visual {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: calc(100svh - 72px);
+  min-height: 620px;
+  margin: 0;
+  border-right: 1px solid var(--studio-line);
+  background: #eceae5;
+  overflow: hidden;
+}
+
+.mk-project-overview-visual > img,
+.mk-project-overview-visual > .mk-build-image-fallback,
+.mk-project-overview-visual > .mk-project-overview-exact-assembly,
+.mk-project-overview-visual > .mk-project-preview-unavailable { width: 100%; height: 100%; object-fit: cover; border: 0; }
+.mk-project-overview-visual::after { display: none; }
+.mk-project-overview-visual figcaption { position: absolute; right: 24px; bottom: 24px; left: 24px; display: grid; gap: 5px; padding: 16px; border: 1px solid rgba(255,255,255,.45); border-radius: 8px; background: rgba(11,13,14,.86); color: #fff; backdrop-filter: blur(8px); }
+.mk-project-overview-visual figcaption small { color: #b7bcbb; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.mk-project-overview-visual figcaption strong { color: #fff; font-size: 18px; font-weight: 580; }
+
+.mk-project-overview-content { min-width: 0; padding: 0; background: var(--studio-white); }
+.mk-project-overview-header { display: grid; gap: 18px; padding: 56px clamp(32px, 5vw, 72px) 40px; border-bottom: 1px solid var(--studio-line); }
+.mk-project-brand-row { display: flex; align-items: center; justify-content: space-between; }
+.mk-project-brand-row > img { display: none; }
+.mk-project-creator { color: var(--studio-muted); font-size: 11px; }
+.mk-project-overview-header h1 { max-width: 720px; margin: 4px 0 0; color: var(--studio-ink); font-size: clamp(38px, 4.2vw, 66px); font-weight: 620; letter-spacing: -0.055em; line-height: .98; }
+.mk-project-overview-header > p { max-width: 670px; margin: 0; color: #555957; font-size: 15px; line-height: 1.65; }
+
+.mk-project-brief,
+.mk-project-behavior { display: grid; gap: 5px; max-width: 690px; padding-left: 14px; border-left: 2px solid var(--studio-line); }
+.mk-project-brief > span,
+.mk-project-behavior > span { color: var(--studio-muted); font-size: 9px; font-weight: 720; letter-spacing: .1em; text-transform: uppercase; }
+.mk-project-brief p,
+.mk-project-behavior p { margin: 0; color: #393d3b; font-size: 12px; line-height: 1.5; }
+.mk-project-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 0; padding: 0; list-style: none; }
+.mk-project-facts li { display: grid; min-width: 116px; gap: 2px; padding: 10px 12px; border: 1px solid var(--studio-line); border-radius: 6px; background: #faf9f6; }
+.mk-project-facts strong { color: var(--studio-ink); font-size: 12px; font-weight: 650; }
+.mk-project-facts span { color: var(--studio-muted); font-size: 9px; }
+
+.mk-project-readiness { display: flex; align-items: center; gap: 12px; margin-top: 4px; padding: 14px 16px; border: 1px solid #d6d8d2; border-radius: 7px; background: #f7f8f4; }
+.mk-project-readiness > span { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #20a267; box-shadow: 0 0 0 4px rgba(32,162,103,.12); }
+.mk-project-readiness > div { display: grid; gap: 2px; }
+.mk-project-readiness strong { color: var(--studio-ink); font-size: 12px; }
+.mk-project-readiness small { color: var(--studio-muted); font-size: 10px; }
+
+.mk-project-parts { padding: 38px clamp(32px, 5vw, 72px) 48px; }
+.mk-project-parts-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+.mk-project-parts-head h2 { margin: 0; color: var(--studio-ink); font-size: 24px; font-weight: 630; letter-spacing: -.03em; }
+.mk-project-parts-head > span { color: var(--studio-muted); font-size: 10px; }
+.mk-project-part-list { display: grid; gap: 10px; }
+.mk-project-part-card { display: grid; grid-template-columns: 72px minmax(0, 1fr) minmax(132px, .6fr); align-items: center; gap: 14px; min-width: 0; padding: 12px; border: 1px solid var(--studio-line); border-radius: 8px; background: #fff; box-shadow: none; }
+.mk-detail-part-thumb { width: 72px; height: 72px; border-radius: 6px; background: #f2f1ed; }
+.mk-project-part-copy { display: grid; min-width: 0; gap: 4px; }
+.mk-part-title-row { display: flex; justify-content: space-between; gap: 8px; }
+.mk-project-part-copy strong { color: var(--studio-ink); font-size: 12px; }
+.mk-project-part-copy > span, .mk-part-package-note { overflow: hidden; color: var(--studio-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.mk-detail-part-why summary { color: #555957; font-size: 10px; }
+.mk-project-part-retailers { display: grid; grid-template-columns: 1fr; gap: 5px; }
+.mk-project-retailer { min-height: 34px; padding: 7px 9px; border: 1px solid var(--studio-line); border-radius: 5px; background: #faf9f6; color: var(--studio-ink); box-shadow: none; }
+.mk-project-retailer > svg, .mk-project-retailer > .mk-retailer-brand { max-height: 14px; }
+.mk-project-retailer > span { font-size: 9px; }
+.mk-project-retailer-unavailable { color: var(--studio-muted); font-size: 10px; line-height: 1.4; }
+.mk-project-cost-note { margin: 18px 0 0; color: var(--studio-muted); font-size: 10px; line-height: 1.5; }
+.mk-project-warnings { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--studio-line); }
+.mk-project-warnings summary { width: fit-content; color: #4d514f; cursor: pointer; font-size: 11px; font-weight: 650; }
+.mk-project-warnings ul { display: grid; gap: 8px; margin: 12px 0 0; padding-left: 18px; color: var(--studio-muted); font-size: 10px; line-height: 1.55; }
+
+.mk-project-preview-unavailable { display: grid; align-content: center; justify-items: center; gap: 12px; padding: 48px; background: #ebe9e4; color: var(--studio-ink); text-align: center; }
+.mk-project-preview-unavailable > strong { font-size: 18px; font-weight: 620; }
+.mk-project-preview-unavailable > small { max-width: 340px; color: var(--studio-muted); font-size: 11px; line-height: 1.55; }
+.mk-preview-mark { position: relative; display: grid; width: 210px; height: 150px; place-items: center; margin-bottom: 16px; border: 1px solid #bfc0bc; border-radius: 18px; transform: rotate(-3deg); }
+.mk-preview-mark::after { position: absolute; width: 160px; height: 104px; border: 1px dashed #bfc0bc; border-radius: 13px; content: ""; transform: translate(28px, 48px) rotate(6deg); }
+.mk-preview-mark i { position: absolute; display: block; background: #aeb0ad; }
+.mk-preview-mark i:nth-child(1) { width: 70px; height: 50px; border-radius: 9px; }
+.mk-preview-mark i:nth-child(2) { width: 30px; height: 5px; transform: translateY(48px); }
+.mk-preview-mark i:nth-child(3) { width: 150px; height: 1px; transform: translateY(-60px); }
+.mk-project-trust { margin: 0 clamp(32px, 5vw, 72px) 60px; padding: 18px 0; border-top: 1px solid var(--studio-line); color: var(--studio-muted); }
+
+.mk-coming-banner { display: flex; align-items: center; gap: 14px; margin: 24px clamp(32px, 5vw, 72px) 48px; padding: 16px 18px; border: 1px solid var(--studio-line); border-radius: 8px; background: var(--studio-white); box-shadow: none; }
+.mk-coming-banner > div { display: grid; flex: 1; gap: 3px; }
+.mk-coming-banner strong { color: var(--studio-ink); font-size: 12px; }
+.mk-coming-banner span { color: var(--studio-muted); font-size: 10px; }
+.mk-coming-banner > button { display: inline-flex; align-items: center; min-height: 38px; gap: 8px; padding: 0 13px; border: 0; border-radius: 6px; background: var(--studio-ink); color: #fff; font-size: 11px; font-weight: 600; }
+.mk-banner-mark { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 6px; background: #f0efeb; color: var(--studio-ink); }
+
+.mk-project-wiring { max-width: 1440px; margin: 0 auto; padding: 44px 48px 72px; }
+.mk-wiring-header h1 { color: var(--studio-ink); font-size: clamp(34px, 4vw, 56px); font-weight: 620; letter-spacing: -.05em; }
+.mk-wiring-simulation { overflow: hidden; border: 1px solid var(--studio-line); border-radius: 8px; background: var(--studio-white); }
+.mk-wiring-artifact-visual { display: grid; min-height: 430px; grid-template-rows: 1fr auto; background: #f3f1ec; }
+.mk-wiring-artifact-parts { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 24px; padding: 56px 36px; }
+.mk-wiring-artifact-parts article { display: grid; width: min(230px, 100%); min-height: 172px; align-content: center; justify-items: center; gap: 13px; padding: 22px; border: 1px solid var(--studio-line); border-radius: 8px; background: var(--studio-white); text-align: center; }
+.mk-wiring-artifact-parts .mk-detail-part-thumb { width: 82px; height: 82px; }
+.mk-wiring-artifact-parts article > div { display: grid; gap: 4px; }
+.mk-wiring-artifact-parts article small { color: var(--studio-orange); font-size: 9px; font-weight: 720; letter-spacing: .09em; text-transform: uppercase; }
+.mk-wiring-artifact-parts article strong { color: var(--studio-ink); font-size: 11px; line-height: 1.4; }
+.mk-wiring-part-placeholder { width: 82px; height: 82px; border: 1px dashed #bfc0bc; border-radius: 8px; }
+.mk-wiring-artifact-lines { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--studio-line); background: var(--studio-white); }
+.mk-wiring-artifact-lines > span { display: inline-flex; min-height: 30px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--studio-line); border-radius: 5px; color: var(--studio-muted); font-size: 10px; }
+.mk-wiring-artifact-lines i { width: 18px; height: 3px; border-radius: 2px; background: #777; }
+.mk-wiring-artifact-lines [data-wireless="true"] i { height: 0; border-top: 2px dashed var(--studio-orange); background: transparent; }
+.mk-wiring-no-connection { border-color: transparent !important; background: transparent; }
+.mk-wiring-progress { overflow-x: auto; }
+.mk-wiring-step-card { border: 1px solid var(--studio-line); border-radius: 8px; background: var(--studio-white); }
+
+/* Intentional locked state for the future Code surface. */
+.mk-code-locked {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.05fr) minmax(420px, .95fr);
+  min-height: calc(100svh - 72px);
+  background: var(--studio-white);
+}
+
+.mk-code-editor-ghost {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: clamp(48px, 7vw, 104px);
+  border-right: 1px solid var(--studio-line);
+  background: #101315;
+  opacity: .96;
+}
+
+.mk-code-editor-ghost span {
+  display: block;
+  height: 9px;
+  border-radius: 2px;
+  background: #343a3c;
+}
+
+.mk-code-editor-ghost span:nth-child(1) { width: 72%; }
+.mk-code-editor-ghost span:nth-child(2) { width: 46%; margin-left: 9%; background: #5d423a; }
+.mk-code-editor-ghost span:nth-child(3) { width: 64%; margin-left: 9%; }
+.mk-code-editor-ghost span:nth-child(4) { width: 38%; margin-left: 18%; background: #514841; }
+.mk-code-editor-ghost span:nth-child(5) { width: 58%; margin-left: 9%; }
+.mk-code-editor-ghost span:nth-child(6) { width: 30%; }
+
+.mk-code-locked-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(48px, 7vw, 104px);
+}
+
+.mk-code-lock-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 30px;
+  place-items: center;
+  border: 1px solid var(--studio-line);
+  border-radius: 8px;
+  color: var(--studio-orange);
+}
+
+.mk-code-lock-mark svg { width: 23px; height: 23px; }
+.mk-code-locked-copy > small { color: var(--studio-orange); font-size: 10px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.mk-code-locked-copy h1 { max-width: 600px; margin: 14px 0 18px; color: var(--studio-ink); font-size: clamp(36px, 4.2vw, 62px); font-weight: 620; letter-spacing: -.055em; line-height: .98; }
+.mk-code-locked-copy > p { max-width: 540px; margin: 0; color: var(--studio-muted); font-size: 15px; line-height: 1.65; }
+.mk-code-locked-copy > button { display: inline-flex; align-items: center; min-height: 43px; gap: 9px; margin-top: 32px; padding: 0 16px; border: 1px solid var(--studio-ink); border-radius: 7px; background: transparent; color: var(--studio-ink); font-size: 12px; font-weight: 620; }
+.mk-code-locked-copy > span:last-child { margin-top: 18px; color: #8a8c89; font-size: 10px; line-height: 1.5; }
+
+/* Failure/recovery keeps the same editorial hierarchy and separates recovery choices. */
+.mk-workspace-main > .mk-build-failure {
+  width: auto;
+  max-width: 1120px;
+  min-height: 0;
+  margin: 40px auto;
+  padding: clamp(32px, 5vw, 64px);
+  border-radius: 10px;
+  background: var(--studio-white);
+  box-shadow: none;
+}
+
+.mk-workspace-main > .mk-build-failure h1 {
+  max-width: 820px;
+  font-size: clamp(38px, 4.4vw, 62px);
+  font-weight: 560;
+  letter-spacing: -0.045em;
+}
+
+.mk-workspace-main > .mk-build-failure .mk-failure-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.mk-workspace-main > .mk-build-failure .mk-button {
+  width: auto;
+  min-height: 43px;
+  padding: 0 16px;
+  border: 1px solid var(--studio-ink);
+  border-radius: 7px;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.mk-workspace-main > .mk-build-failure .mk-button-quiet {
+  border-color: transparent;
+}
+
+.mk-back-home,
+.mk-workspace-next { display: none !important; }
+
+@media (max-width: 1050px) {
+  .mk-generation-workshop-body,
+  .mk-project-overview { grid-template-columns: 1fr; }
+  .mk-generation-drawing { min-height: 420px; border-right: 0; border-bottom: 1px solid var(--studio-line); }
+  .mk-project-overview-visual { position: relative; height: 56svh; min-height: 430px; border-right: 0; border-bottom: 1px solid var(--studio-line); }
+  .mk-code-locked { grid-template-columns: 1fr; }
+  .mk-code-editor-ghost { min-height: 340px; border-right: 0; border-bottom: 1px solid var(--studio-line); }
+}
+
+@media (max-width: 760px) {
+  .mk-app-shell { display: block; overflow: visible; }
+  .mk-app-header { position: sticky; top: 0; min-height: 58px; padding: 0 16px; }
+  .mk-project-sidebar { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 14px 16px; overflow: visible; }
+  .mk-project-sidebar .mk-sidebar-logo { display: flex; min-height: 44px; align-self: center; align-items: center; margin: 0; }
+  .mk-project-sidebar .mk-sidebar-logo { width: 112px; }
+  .mk-project-sidebar .mk-sidebar-back { display: flex; min-height: 44px !important; align-self: center; margin: 0; white-space: nowrap; }
+  .mk-sidebar-project { grid-column: 1 / -1; margin: 8px 0 12px; padding: 12px 0; }
+  .mk-project-nav { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); }
+  .mk-project-sidebar .mk-project-nav > button { justify-content: center; padding: 0 6px; }
+  .mk-project-sidebar .mk-project-nav > button .mk-nav-lock { display: none; }
+  .mk-build-stage-list { grid-column: 1 / -1; grid-template-columns: repeat(4, 1fr); margin: 0; }
+  .mk-build-stage-list li { display: flex; min-height: 38px; gap: 6px; }
+  .mk-build-stage-list li:not(:last-child)::after { display: none; }
+  .mk-build-switcher { display: none; }
+  .mk-workspace-main { overflow: visible; }
+  .mk-generation-workshop-header { min-height: 78px; padding: 16px 20px; }
+  .mk-generation-workshop-header > p { display: none; }
+  .mk-generation-drawing { min-height: 320px; }
+  .mk-generation-workshop-status { padding: 30px 20px 48px; }
+  .mk-project-overview-visual { height: 52svh; min-height: 360px; }
+  .mk-project-overview-header { padding: 34px 20px 28px; }
+  .mk-project-overview-header h1 { font-size: clamp(36px, 12vw, 54px); }
+  .mk-project-parts { padding: 28px 20px 36px; }
+  .mk-project-part-card { grid-template-columns: 58px minmax(0, 1fr); }
+  .mk-detail-part-thumb { width: 58px; height: 58px; }
+  .mk-project-part-retailers { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
+  .mk-project-trust { margin: 0 20px 40px; }
+  .mk-coming-banner { align-items: flex-start; margin: 16px 20px 36px; }
+  .mk-coming-banner > button { width: 100%; justify-content: center; }
+  .mk-project-wiring { padding: 28px 20px 60px; }
+  .mk-wiring-artifact-visual { min-height: 360px; }
+  .mk-wiring-artifact-parts { gap: 12px; padding: 28px 16px; }
+  .mk-wiring-artifact-parts article { width: calc(50% - 6px); min-height: 150px; padding: 16px 10px; }
+  .mk-code-editor-ghost { min-height: 250px; padding: 52px 38px; }
+  .mk-code-locked-copy { padding: 42px 20px 60px; }
+  .mk-workspace-main > .mk-build-failure { margin: 20px; padding: 28px 20px; }
+  .mk-workspace-main > .mk-build-failure .mk-failure-actions,
+  .mk-workspace-main > .mk-build-failure .mk-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-generation-segments > span[data-state="current"] { animation: none; }
+}
+
+/* One-viewport workspace v2 -------------------------------------------------
+   The workspace is an application surface, not a vertically scrolling page. */
+.mk-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.mk-app-shell {
+  display: grid;
+  width: 100%;
+  height: 100svh;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 64px 76px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.mk-workspace-topbar {
+  z-index: 50;
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-columns: 220px minmax(320px, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  padding: 0 24px;
+  background: #020714;
+  color: #fff;
+}
+
+.mk-topbar-logo {
+  display: flex;
+  width: 142px;
+  height: 34px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.mk-topbar-logo img {
+  width: 100%;
+  max-height: 31px;
+  object-fit: contain;
+  object-position: left center;
+  filter: brightness(0) invert(1);
+}
+
+.mk-topbar-navigation { display: flex; height: 100%; justify-content: center; min-width: 0; }
+.mk-topbar-navigation .mk-project-nav { display: flex; height: 100%; align-items: stretch; gap: 34px; }
+.mk-topbar-navigation .mk-project-nav > button {
+  position: relative;
+  display: flex;
+  min-width: 88px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: #aeb4bd;
+  font-size: 13px;
+  font-weight: 620;
+}
+.mk-topbar-navigation .mk-project-nav > button::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: transparent;
+  content: "";
+}
+.mk-topbar-navigation .mk-project-nav > button[aria-current="true"] { color: #fff; }
+.mk-topbar-navigation .mk-project-nav > button[aria-current="true"]::after { background: #fff8ed; }
+.mk-topbar-navigation .mk-project-nav > button:disabled { cursor: not-allowed; opacity: .38; }
+.mk-topbar-navigation .mk-nav-lock { margin-left: 1px; color: #8f96a0; font-size: 8px; letter-spacing: .06em; }
+.mk-topbar-navigation .mk-workspace-icon { width: 16px; height: 16px; }
+
+.mk-topbar-utilities { display: flex; align-items: center; justify-content: flex-end; gap: 18px; min-width: 0; }
+.mk-topbar-utilities .mk-app-user { color: #fff; }
+.mk-topbar-utilities .mk-app-user-copy span { color: #fff; font-size: 12px; }
+.mk-topbar-utilities .mk-app-user-copy small { color: #adb3bc; font-size: 10px; }
+.mk-topbar-utilities .mk-app-avatar,
+.mk-topbar-utilities .mk-app-avatar-frame { width: 38px; height: 38px; flex-basis: 38px; }
+
+.mk-topbar-utilities .mk-build-switcher {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.mk-topbar-utilities .mk-build-switcher summary {
+  min-height: 40px;
+  gap: 9px;
+  padding: 0 13px;
+  border: 1px solid #363d49;
+  border-radius: 8px;
+  color: #e7e9ed;
+}
+.mk-topbar-utilities .mk-build-switcher summary > span { background: #232a37; color: #fff; }
+.mk-topbar-utilities .mk-build-switcher > div {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: grid;
+  width: min(340px, 80vw);
+  max-height: min(360px, 60vh);
+  gap: 3px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid #303845;
+  border-radius: 10px;
+  background: #09101d;
+  box-shadow: 0 16px 50px rgba(0,0,0,.28);
+}
+.mk-topbar-utilities .mk-build-switcher button {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #b6bdc6;
+  font-size: 11px;
+  text-align: left;
+}
+.mk-topbar-utilities .mk-build-switcher button:hover,
+.mk-topbar-utilities .mk-build-switcher button[aria-current="true"] { background: #182130; color: #fff; }
+
+.mk-build-stage-list {
+  display: grid;
+  width: min(100%, 620px);
+  height: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  margin: 0;
+}
+.mk-build-stage-list li {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #777f8b;
+}
+.mk-build-stage-list li:not(:last-child)::after { top: 50%; right: -18%; bottom: auto; left: auto; width: 36%; height: 1px; background: #303744; }
+.mk-build-stage-list li > span { width: 24px; height: 24px; border-color: #525b68; background: #020714; font-size: 10px; }
+.mk-build-stage-list li > strong { font-size: 11px; }
+.mk-build-stage-list li[data-state="current"] { color: #fff; }
+.mk-build-stage-list li[data-state="current"] > span { border-color: #ff2d73; color: #ff7aa7; }
+
+.mk-workspace-context {
+  z-index: 20;
+  display: grid;
+  grid-column: 1;
+  grid-row: 2;
+  grid-template-columns: auto minmax(220px, 360px) minmax(260px, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  gap: 22px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--studio-line);
+  background: var(--studio-white);
+}
+.mk-context-back {
+  display: inline-flex;
+  min-width: 70px;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--studio-line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--studio-ink);
+  font-size: 11px;
+  font-weight: 620;
+}
+.mk-context-title,
+.mk-context-idea { min-width: 0; }
+.mk-context-title { display: grid; gap: 4px; }
+.mk-context-title small,
+.mk-context-idea small { color: var(--studio-muted); font-size: 8px; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
+.mk-context-title strong {
+  overflow: hidden;
+  color: var(--studio-ink);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: -.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mk-context-idea { display: grid; gap: 3px; padding-left: 22px; border-left: 1px solid var(--studio-line); }
+.mk-context-idea p {
+  display: -webkit-box;
+  max-width: 780px;
+  margin: 0;
+  overflow: hidden;
+  color: #4f5352;
+  font-size: 11px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.mk-context-primary {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 15px;
+  border: 1px solid var(--studio-ink);
+  border-radius: 7px;
+  background: var(--studio-ink-soft);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+}
+.mk-context-primary:disabled { opacity: .5; }
+
+.mk-workspace-main {
+  position: relative;
+  display: block;
+  grid-column: 1;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.mk-workspace-main > * { max-height: 100%; }
+.mk-wiring-load-error { position: absolute; right: 16px; bottom: 16px; z-index: 60; max-width: 420px; margin: 0; }
+
+/* Overview fits the remaining viewport. Only the parts body may scroll when a
+   project has more rows than the available display can show. */
+.mk-project-overview {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(420px, 1.02fr) minmax(500px, .98fr);
+  gap: 12px;
+  align-items: stretch;
+  padding: 12px;
+  background: var(--studio-paper);
+  overflow: hidden;
+}
+.mk-project-overview-primary {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background: var(--studio-white);
+}
+.mk-project-overview-visual {
+  position: relative;
+  top: auto;
+  align-self: stretch;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--studio-line);
+}
+.mk-project-overview-visual figcaption { right: 16px; bottom: 14px; left: 16px; padding: 11px 13px; backdrop-filter: none; }
+.mk-project-overview-visual figcaption strong { font-size: 15px; }
+.mk-project-overview-header {
+  display: grid;
+  gap: 8px;
+  padding: 13px 16px 14px;
+  border: 0;
+  background: var(--studio-white);
+}
+.mk-project-brand-row { min-height: 18px; }
+.mk-project-creator { font-size: 9px; }
+.mk-project-overview-header > p {
+  display: -webkit-box;
+  max-width: none;
+  margin: 0;
+  overflow: hidden;
+  color: #474b49;
+  font-size: 11px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.mk-project-story-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
+.mk-project-brief,
+.mk-project-behavior { min-width: 0; max-width: none; gap: 3px; padding-left: 9px; }
+.mk-project-brief p,
+.mk-project-behavior p { display: -webkit-box; overflow: hidden; font-size: 9px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.mk-project-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.mk-project-facts li { min-width: 0; gap: 1px; padding: 7px 9px; }
+.mk-project-facts strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.mk-project-readiness { gap: 9px; margin: 0; padding: 8px 10px; }
+.mk-project-readiness strong { font-size: 10px; }
+.mk-project-readiness small { display: -webkit-box; overflow: hidden; font-size: 8px; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+
+.mk-project-overview-content {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background: var(--studio-white);
+}
+.mk-project-parts { display: flex; min-height: 0; flex: 1; flex-direction: column; padding: 14px 16px 8px; overflow: hidden; }
+.mk-project-parts-head { flex: 0 0 auto; margin-bottom: 8px; }
+.mk-project-parts-head h2 { font-size: 18px; }
+.mk-project-part-list { min-height: 0; flex: 1; gap: 6px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c9c6bf transparent; }
+.mk-project-part-card {
+  grid-template-columns: 50px minmax(0, 1fr) minmax(112px, .5fr);
+  gap: 9px;
+  min-height: 78px;
+  padding: 7px 8px;
+  border-radius: 7px;
+}
+.mk-detail-part-thumb { width: 48px; height: 48px; }
+.mk-project-part-copy { gap: 2px; }
+.mk-project-part-copy strong { font-size: 10px; }
+.mk-project-part-copy > span,
+.mk-part-package-note,
+.mk-detail-part-why summary { font-size: 8px; }
+.mk-detail-part-quantity { padding: 2px 5px; font-size: 7px; }
+.mk-project-part-retailers { gap: 3px; }
+.mk-project-retailer { min-height: 29px; gap: 2px; padding: 4px 7px; }
+.mk-project-retailer strong { font-size: 9px; }
+.mk-project-retailer > span { font-size: 8px; }
+.mk-project-retailer-mobile { display: none; }
+.mk-project-cost-note { flex: 0 0 auto; margin: 7px 0 0; font-size: 8px; line-height: 1.35; }
+.mk-project-warnings { flex: 0 0 auto; margin-top: 6px; padding-top: 6px; }
+.mk-project-warnings summary { font-size: 9px; }
+.mk-project-trust { flex: 0 0 auto; gap: 9px; margin: 0 16px 12px; padding: 9px 0 0; }
+.mk-project-trust strong { font-size: 9px; }
+.mk-project-trust span { font-size: 8px; line-height: 1.3; }
+.mk-project-preview-unavailable { gap: 8px; padding: 20px; }
+.mk-project-preview-unavailable > strong { font-size: 14px; }
+.mk-project-preview-unavailable > small { font-size: 9px; }
+.mk-preview-mark { width: 144px; height: 102px; margin-bottom: 7px; }
+.mk-preview-mark::after { width: 112px; height: 72px; }
+
+/* Wiring is a two-pane workbench with controls outside content flow. */
+.mk-project-wiring {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  grid-template-rows: 64px minmax(0, 1fr) 54px;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  overflow: hidden;
+}
+.mk-wiring-toolbar { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.mk-wiring-progress {
+  display: grid;
+  height: 64px;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  padding: 7px;
+  overflow: hidden;
+  border: 1px solid var(--studio-line);
+  border-radius: 10px;
+  background: var(--studio-white);
+  box-shadow: none;
+}
+.mk-wiring-progress button { min-width: 0; min-height: 48px; grid-template-columns: 28px minmax(0,1fr); gap: 7px; padding: 5px 7px; border-radius: 7px; }
+.mk-wiring-progress button strong { width: 26px; height: 26px; }
+.mk-wiring-progress button span { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.mk-wiring-pane-toggle { display: none; }
+.mk-wiring-workbench { display: grid; min-width: 0; min-height: 0; grid-template-columns: minmax(0, 1.62fr) minmax(360px, .88fr); gap: 10px; overflow: hidden; }
+.mk-wiring-simulation,
+.mk-wiring-step-card { min-width: 0; min-height: 0; border: 1px solid var(--studio-line); border-radius: 10px; background: var(--studio-white); box-shadow: none; }
+.mk-wiring-simulation { display: grid; grid-template-rows: 58px minmax(0, 1fr); overflow: hidden; }
+.mk-wiring-simulation-heading { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 14px; }
+.mk-wiring-simulation-heading h2 { margin-top: 2px; font-size: 15px; }
+.mk-wiring-simulation-heading span { font-size: 8px; }
+.mk-wiring-simulation-heading p { font-size: 9px; text-align: right; }
+.mk-wiring-artifact-visual { display: grid; min-height: 0; grid-template-rows: minmax(0, 1fr) 42px; }
+.mk-wiring-artifact-parts {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(3, minmax(0, 220px));
+  align-items: center;
+  justify-content: space-around;
+  gap: 22px;
+  padding: 24px 28px;
+  overflow: hidden;
+}
+.mk-wiring-connection-map { position: absolute; inset: 18% 3%; z-index: 0; width: 94%; height: 64%; overflow: visible; }
+.mk-wiring-connection-map path { fill: none; stroke-width: 5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.mk-wiring-artifact-parts article {
+  z-index: 1;
+  display: grid;
+  width: auto;
+  min-width: 0;
+  min-height: 160px;
+  align-content: center;
+  justify-items: center;
+  gap: 9px;
+  padding: 14px 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 9px;
+  background: var(--studio-white);
+  text-align: center;
+}
+.mk-wiring-artifact-parts .mk-detail-part-thumb { width: 76px; height: 76px; }
+.mk-wiring-artifact-parts article small { font-size: 8px; }
+.mk-wiring-artifact-parts article strong { display: -webkit-box; overflow: hidden; font-size: 9px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.mk-wiring-artifact-lines { min-height: 42px; align-items: center; gap: 6px; padding: 5px 10px; }
+.mk-wiring-artifact-lines > span { min-height: 28px; padding: 0 8px; font-size: 9px; }
+.mk-wiring-step-card { display: flex; flex-direction: column; overflow: hidden; }
+.mk-wiring-step-heading { flex: 0 0 auto; padding: 15px 16px 12px; }
+.mk-wiring-step-heading > span { font-size: 8px; }
+.mk-wiring-step-heading h2 { display: -webkit-box; margin: 5px 0 6px; overflow: hidden; font-size: clamp(18px, 2vw, 25px); line-height: 1.02; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.mk-wiring-step-heading p { display: -webkit-box; overflow: hidden; font-size: 10px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.mk-wiring-connections { display: grid; min-height: 0; flex: 1; align-content: center; gap: 6px; padding: 10px 14px; overflow: hidden; }
+.mk-wiring-connection { min-height: 54px; grid-template-columns: 4px minmax(0,1fr); gap: 9px; padding: 7px 9px; border-radius: 7px; }
+.mk-wiring-connection strong { font-size: 10px; }
+.mk-wiring-connection span { overflow: hidden; font-size: 9px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.mk-wiring-connection span b { min-width: 34px; font-size: 7px; }
+.mk-wiring-preparation { margin: auto 0; padding: 14px; }
+.mk-wiring-safety { flex: 0 0 auto; gap: 2px; margin: 0 14px 13px; padding: 9px 10px; border-radius: 7px; }
+.mk-wiring-safety strong { font-size: 10px; }
+.mk-wiring-safety span { display: -webkit-box; overflow: hidden; font-size: 9px; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.mk-wiring-step-controls {
+  display: grid;
+  width: min(100%, calc((100% - 10px) * .352));
+  min-height: 54px;
+  grid-template-columns: minmax(90px, auto) 1fr minmax(100px, auto);
+  justify-self: end;
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border: 1px solid var(--studio-line);
+  border-radius: 10px;
+  background: var(--studio-white);
+}
+.mk-wiring-step-controls button { min-height: 40px; border-radius: 7px; }
+
+/* Remaining states use the same bounded shell. */
+.mk-code-locked { width: 100%; height: 100%; min-height: 0; }
+.mk-code-editor-ghost,
+.mk-code-locked-copy { min-height: 0; padding: clamp(28px, 5vw, 72px); }
+.mk-code-locked-copy h1 { font-size: clamp(30px, 4vw, 54px); }
+.mk-generation-workshop { display: grid; width: 100%; height: 100%; min-height: 0; grid-template-rows: 66px minmax(0, 1fr); overflow: hidden; }
+.mk-generation-workshop-header { min-height: 66px; padding: 10px 24px; }
+.mk-generation-workshop-body { min-height: 0; grid-template-columns: minmax(320px, 1.08fr) minmax(390px, .92fr); overflow: hidden; }
+.mk-generation-drawing { min-height: 0; }
+.mk-generation-workshop-status { min-height: 0; padding: clamp(22px, 3.5vw, 46px); overflow: hidden; }
+.mk-generation-workshop-status .mk-loader-copy > strong { font-size: clamp(26px, 3vw, 40px); }
+.mk-generation-workshop-status .mk-loader-copy > p { font-size: 12px; line-height: 1.4; }
+.mk-generation-time { margin-top: 18px; }
+.mk-generation-workshop-status .mk-generation-checkpoints { grid-template-columns: 1fr 1fr; gap: 5px 14px; margin-top: 14px; }
+.mk-generation-workshop-status .mk-generation-checkpoints li { min-height: 42px; padding: 4px 0; }
+.mk-generation-brief { margin-top: 10px; padding: 10px 12px; }
+.mk-generation-workshop-status .mk-progress-actions { margin-top: 12px; }
+.mk-generation-leave-note { margin-top: 8px; }
+.mk-workspace-main > .mk-build-clarification,
+.mk-workspace-main > .mk-build-failure,
+.mk-empty-library {
+  width: min(calc(100% - 32px), 1080px);
+  height: calc(100% - 32px);
+  max-height: calc(100% - 32px);
+  margin: 16px auto;
+  overflow: auto;
+}
+.mk-workspace-main > .mk-build-clarification { align-content: center; gap: 12px; padding: 22px 28px; }
+.mk-workspace-main > .mk-build-failure { align-content: center; margin: 16px auto; padding: 28px; }
+.mk-terminal-failure-layout { width: 100%; height: 100%; min-height: 0; grid-template-columns: minmax(260px,.7fr) minmax(420px,1.3fr); gap: 12px; padding: 12px; overflow: hidden; }
+.mk-terminal-failure-visual { min-height: 0; }
+
+@media (max-width: 1000px) {
+  .mk-workspace-topbar { grid-template-columns: 170px minmax(280px,1fr) auto; padding: 0 16px; }
+  .mk-topbar-navigation .mk-project-nav { gap: 14px; }
+  .mk-topbar-utilities .mk-app-user-copy { display: none; }
+  .mk-project-overview { grid-template-columns: minmax(360px,.9fr) minmax(430px,1.1fr); }
+  .mk-wiring-workbench { grid-template-columns: minmax(0,1.35fr) minmax(330px,.9fr); }
+}
+
+@media (max-width: 760px) {
+  .mk-app-shell {
+    display: grid;
+    height: 100svh;
+    min-height: 0;
+    grid-template-rows: 104px 58px minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .mk-workspace-topbar {
+    position: relative;
+    display: grid;
+    height: 104px;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: 54px 50px;
+    gap: 0;
+    padding: 0 12px;
+  }
+  .mk-topbar-logo { width: 118px; height: 44px; }
+  .mk-topbar-logo img { max-height: 27px; }
+  .mk-topbar-navigation { grid-column: 1 / -1; grid-row: 2; }
+  .mk-topbar-navigation .mk-project-nav { width: 100%; justify-content: space-around; gap: 0; }
+  .mk-topbar-navigation .mk-project-nav > button { min-width: 0; flex: 1; min-height: 48px; font-size: 12px; }
+  .mk-topbar-navigation .mk-project-nav > button .mk-nav-lock { display: none; }
+  .mk-topbar-utilities { grid-column: 2; grid-row: 1; gap: 8px; }
+  .mk-topbar-utilities .mk-build-switcher { display: none; }
+  .mk-topbar-utilities .mk-app-user-copy { display: grid; }
+  .mk-topbar-utilities .mk-app-user-copy span { display: none; }
+  .mk-topbar-utilities .mk-app-user-copy small { max-width: 92px; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+  .mk-topbar-utilities .mk-app-avatar,
+  .mk-topbar-utilities .mk-app-avatar-frame { width: 34px; height: 34px; flex-basis: 34px; }
+  .mk-build-stage-list { width: 100%; }
+  .mk-build-stage-list li { min-width: 0; gap: 4px; }
+  .mk-build-stage-list li > strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+  .mk-build-stage-list li:not(:last-child)::after { display: none; }
+
+  .mk-workspace-context {
+    height: 58px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 6px 10px;
+  }
+  .mk-context-back { min-width: 42px; min-height: 44px; padding: 0 10px; }
+  .mk-context-back span { display: none; }
+  .mk-context-title { gap: 2px; }
+  .mk-context-title strong { font-size: 15px; }
+  .mk-context-idea { display: none; }
+  .mk-context-primary { min-height: 44px; padding: 0 11px; font-size: 10px; }
+  .mk-context-primary .mk-arrow-icon { display: none; }
+  .mk-workspace-main { min-height: 0; overflow: hidden; }
+
+  .mk-project-overview {
+    display: grid;
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(248px, 43%) minmax(0, 57%);
+    gap: 7px;
+    padding: 7px;
+  }
+  .mk-project-overview-primary { grid-template-columns: minmax(120px, .42fr) minmax(0, .58fr); grid-template-rows: minmax(0, 1fr); }
+  .mk-project-overview-visual { border-right: 1px solid var(--studio-line); border-bottom: 0; }
+  .mk-project-overview-visual figcaption { right: 6px; bottom: 6px; left: 6px; gap: 2px; padding: 7px; }
+  .mk-project-overview-visual figcaption small { font-size: 7px; }
+  .mk-project-overview-visual figcaption strong { display: -webkit-box; overflow: hidden; font-size: 10px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .mk-project-overview-header { align-content: center; gap: 6px; padding: 8px; }
+  .mk-project-brand-row { display: none; }
+  .mk-project-overview-header > p { font-size: 9px; -webkit-line-clamp: 3; }
+  .mk-project-story-grid { grid-template-columns: 1fr; gap: 5px; }
+  .mk-project-brief,
+  .mk-project-behavior { padding-left: 6px; }
+  .mk-project-brief p,
+  .mk-project-behavior p { font-size: 7px; -webkit-line-clamp: 2; }
+  .mk-project-facts { grid-template-columns: 1fr 1fr; gap: 4px; }
+  .mk-project-facts li { padding: 5px 6px; }
+  .mk-project-facts li:last-child { display: none; }
+  .mk-project-facts strong { font-size: 8px; }
+  .mk-project-facts span { font-size: 6px; }
+  .mk-project-readiness { padding: 5px 7px; }
+  .mk-project-readiness small { display: none; }
+  .mk-project-readiness strong { font-size: 8px; }
+  .mk-preview-mark { width: 74px; height: 56px; margin: 0; }
+  .mk-preview-mark::after { width: 58px; height: 38px; transform: translate(10px, 24px) rotate(6deg); }
+  .mk-project-preview-unavailable { gap: 5px; padding: 8px; }
+  .mk-project-preview-unavailable > strong { font-size: 10px; }
+  .mk-project-preview-unavailable > small { display: none; }
+
+  .mk-project-parts { padding: 8px 8px 5px; }
+  .mk-project-parts-head { align-items: center; margin-bottom: 4px; }
+  .mk-project-parts-head h2 { font-size: 14px; }
+  .mk-project-parts-head > span { max-width: 56%; overflow: hidden; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+  .mk-project-part-list { gap: 3px; overflow: hidden; }
+  .mk-project-part-card { grid-template-columns: 32px minmax(0,1fr) 78px; gap: 5px; min-height: 48px; padding: 3px 4px; }
+  .mk-detail-part-thumb { width: 30px; height: 30px; }
+  .mk-part-title-row { gap: 3px; }
+  .mk-project-part-copy strong { font-size: 9px; }
+  .mk-project-part-copy > span { font-size: 7px; }
+  .mk-part-package-note,
+  .mk-detail-part-why,
+  .mk-detail-part-quantity { display: none; }
+  .mk-project-part-retailers { display: block; min-width: 0; grid-column: auto; }
+  .mk-project-retailer { width: 100%; min-height: 44px; justify-content: center; padding: 2px 4px; }
+  .mk-project-retailer > .mk-retailer-brand,
+  .mk-project-retailer > .mk-retailer-wordmark,
+  .mk-project-retailer > strong,
+  .mk-project-retailer > span:not(.mk-project-retailer-mobile) { display: none; }
+  .mk-project-retailer > .mk-project-retailer-mobile { display: block; width: 100%; font-size: 8px; text-align: center; }
+  .mk-project-retailer-unavailable { font-size: 7px; }
+  .mk-project-cost-note,
+  .mk-project-warnings { display: none; }
+  .mk-project-trust { margin: 0 8px 6px; padding-top: 4px; }
+  .mk-project-trust .mk-detail-trust-mark { display: none; }
+  .mk-project-trust strong { font-size: 7px; }
+  .mk-project-trust span { display: none; }
+
+  .mk-project-wiring { grid-template-rows: 54px minmax(0, 1fr) 56px; gap: 7px; padding: 7px; }
+  .mk-wiring-toolbar { min-width: 0; }
+  .mk-wiring-progress { height: 54px; gap: 3px; padding: 4px; }
+  .mk-wiring-progress button { display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 3px; }
+  .mk-wiring-progress button strong { width: 28px; height: 28px; flex: 0 0 28px; }
+  .mk-wiring-progress button span { display: none; }
+  .mk-wiring-pane-toggle {
+    position: absolute;
+    z-index: 10;
+    top: 66px;
+    right: 18px;
+    display: flex;
+    overflow: hidden;
+    border: 1px solid var(--studio-line);
+    border-radius: 7px;
+    background: var(--studio-white);
+  }
+  .mk-wiring-pane-toggle button { min-width: 62px; min-height: 44px; padding: 0 9px; border: 0; background: transparent; color: var(--studio-muted); font-size: 10px; font-weight: 650; }
+  .mk-wiring-pane-toggle button[aria-pressed="true"] { background: #fff1f5; color: var(--studio-orange); }
+  .mk-wiring-workbench { display: grid; grid-template-columns: minmax(0,1fr); min-height: 0; }
+  .mk-project-wiring[data-mobile-pane="visual"] .mk-wiring-step-card,
+  .mk-project-wiring[data-mobile-pane="details"] .mk-wiring-simulation { display: none; }
+  .mk-wiring-simulation { grid-template-rows: 50px minmax(0,1fr); }
+  .mk-wiring-simulation-heading { display: block; padding: 8px 12px; }
+  .mk-wiring-simulation-heading h2 { max-width: calc(100% - 140px); margin: 2px 0 0; font-size: 13px; }
+  .mk-wiring-simulation-heading p { display: none; }
+  .mk-wiring-artifact-visual { grid-template-rows: minmax(0,1fr) 38px; }
+  .mk-wiring-artifact-parts { gap: 6px; padding: 48px 8px 10px; }
+  .mk-wiring-connection-map { inset: 25% 2%; width: 96%; height: 55%; }
+  .mk-wiring-artifact-parts article { min-height: 128px; gap: 6px; padding: 8px 4px; }
+  .mk-wiring-artifact-parts .mk-detail-part-thumb { width: 52px; height: 52px; }
+  .mk-wiring-artifact-parts article small { font-size: 6px; }
+  .mk-wiring-artifact-parts article strong { font-size: 7px; -webkit-line-clamp: 4; }
+  .mk-wiring-artifact-lines { min-height: 38px; padding: 4px; }
+  .mk-wiring-artifact-lines > span { min-height: 26px; padding: 0 6px; font-size: 8px; }
+  .mk-wiring-step-card { display: flex; }
+  .mk-wiring-step-heading { padding: 54px 12px 8px; }
+  .mk-wiring-step-heading h2 { font-size: 20px; -webkit-line-clamp: 2; }
+  .mk-wiring-step-heading p { font-size: 9px; -webkit-line-clamp: 3; }
+  .mk-wiring-connections { align-content: start; gap: 5px; padding: 7px 10px; }
+  .mk-wiring-connection { min-height: 49px; padding: 6px 8px; }
+  .mk-wiring-connection strong { font-size: 9px; }
+  .mk-wiring-connection span { font-size: 8px; }
+  .mk-wiring-safety { margin: 0 10px 9px; padding: 7px 8px; }
+  .mk-wiring-safety span { font-size: 8px; }
+  .mk-wiring-step-controls { width: 100%; min-height: 56px; grid-template-columns: minmax(95px,1fr) auto minmax(110px,1fr); padding: 5px; }
+  .mk-wiring-step-controls > span { grid-column: auto; grid-row: auto; }
+  .mk-wiring-step-controls button { min-height: 44px; }
+
+  .mk-code-locked { grid-template-columns: 1fr; grid-template-rows: minmax(160px, .42fr) minmax(0, .58fr); }
+  .mk-code-editor-ghost { min-height: 0; padding: 28px; border-right: 0; border-bottom: 1px solid var(--studio-line); }
+  .mk-code-locked-copy { min-height: 0; justify-content: center; padding: 18px 20px; }
+  .mk-code-lock-mark { width: 38px; height: 38px; margin-bottom: 12px; }
+  .mk-code-locked-copy h1 { margin: 8px 0 10px; font-size: clamp(25px, 8.5vw, 34px); }
+  .mk-code-locked-copy > p { font-size: 11px; line-height: 1.4; }
+  .mk-code-locked-copy > button { min-height: 44px; margin-top: 14px; }
+  .mk-code-locked-copy > span:last-child { margin-top: 8px; font-size: 8px; }
+
+  .mk-generation-workshop { grid-template-rows: 54px minmax(0,1fr); }
+  .mk-generation-workshop-header { min-height: 54px; padding: 7px 12px; }
+  .mk-generation-workshop-header h1 { font-size: 20px; }
+  .mk-generation-workshop-header > p { display: flex; max-width: 155px; padding: 6px 8px; font-size: 8px; }
+  .mk-generation-workshop-body { display: grid; min-height: 0; grid-template-columns: 1fr; grid-template-rows: minmax(110px, .28fr) minmax(0, .72fr); }
+  .mk-generation-drawing { display: grid; min-height: 0; border-right: 0; border-bottom: 1px solid var(--studio-line); }
+  .mk-generation-drawing::before { width: 120px; height: 80px; }
+  .mk-generation-drawing::after { width: 96px; height: 65px; transform: translateY(28px) rotate(5deg); }
+  .mk-generation-drawing .mk-product-blueprint { transform: scale(.45); }
+  .mk-generation-drawing > small,
+  .mk-drawing-callout { display: none; }
+  .mk-generation-workshop-status { padding: 12px; }
+  .mk-generation-workshop-status .mk-loader-copy { gap: 5px; }
+  .mk-generation-workshop-status .mk-loader-copy > strong { font-size: 22px; }
+  .mk-generation-workshop-status .mk-loader-copy > p { font-size: 9px; }
+  .mk-generation-time { margin-top: 7px; }
+  .mk-generation-time p strong { font-size: 18px; }
+  .mk-generation-segments { margin-top: 6px; }
+  .mk-generation-workshop-status .mk-generation-checkpoints { grid-template-columns: 1fr 1fr; margin-top: 7px; }
+  .mk-generation-workshop-status .mk-generation-checkpoints li { min-height: 32px; grid-template-columns: 18px 1fr; gap: 6px; padding: 2px 0; }
+  .mk-generation-workshop-status .mk-generation-checkpoints li > span { width: 18px; height: 18px; }
+  .mk-generation-workshop-status .mk-generation-checkpoints li strong { font-size: 9px; }
+  .mk-generation-workshop-status .mk-generation-checkpoints li small { display: none; }
+  .mk-generation-brief { margin-top: 5px; padding: 7px 8px; }
+  .mk-generation-brief p { display: -webkit-box; overflow: hidden; font-size: 8px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .mk-generation-workshop-status .mk-progress-actions { margin-top: 7px; }
+  .mk-generation-workshop-status .mk-progress-dismiss,
+  .mk-generation-workshop-status .mk-progress-cancel { min-height: 44px; }
+  .mk-generation-leave-note { display: none; }
+
+  .mk-workspace-main > .mk-build-clarification,
+  .mk-workspace-main > .mk-build-failure,
+  .mk-empty-library { width: calc(100% - 14px); height: calc(100% - 14px); max-height: calc(100% - 14px); margin: 7px; padding: 14px; }
+  .mk-workspace-main > .mk-build-clarification { gap: 7px; }
+  .mk-clarification-heading h1 { font-size: 25px; }
+  .mk-clarification-heading p { font-size: 10px; }
+  .mk-clarification-original { padding: 7px 8px; font-size: 9px; }
+  .mk-clarification-options { grid-template-columns: 1fr 1fr; gap: 5px; }
+  .mk-clarification-option { gap: 3px; min-height: 64px; padding: 7px; }
+  .mk-clarification-option small { display: none; }
+  .mk-clarification-custom textarea { min-height: 52px; max-height: 60px; resize: none; padding: 6px 8px; }
+  .mk-clarification-actions { flex-wrap: nowrap; }
+  .mk-clarification-actions .mk-button { width: auto; min-height: 44px; }
+  .mk-clarification-credit { font-size: 8px; }
+  .mk-terminal-failure-layout { grid-template-columns: 1fr; grid-template-rows: 130px minmax(0,1fr); padding: 7px; }
+  .mk-terminal-failure-visual { min-height: 0; }
+  .mk-workspace-main > .mk-build-failure { overflow: auto; }
+  .mk-workspace-main > .mk-build-failure h1 { font-size: 28px; }
+  .mk-workspace-main > .mk-build-failure .mk-failure-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .mk-workspace-main > .mk-build-failure .mk-button { width: 100%; min-height: 44px; }
+}
+
+@media (max-height: 720px) and (min-width: 761px) {
+  .mk-app-shell { grid-template-rows: 58px 64px minmax(0,1fr); }
+  .mk-workspace-topbar { height: 58px; }
+  .mk-workspace-context { height: 64px; padding-top: 7px; padding-bottom: 7px; }
+  .mk-project-overview { padding: 8px; }
+  .mk-project-overview-header { gap: 5px; padding: 8px 12px; }
+  .mk-project-readiness { display: none; }
+  .mk-project-part-card { min-height: 63px; }
+  .mk-project-wiring { grid-template-rows: 54px minmax(0,1fr) 48px; padding: 8px; }
+  .mk-wiring-progress { height: 54px; }
+  .mk-wiring-step-controls { min-height: 48px; }
+}
+
+/* Final behavior pass: keep every detail reachable within the fixed shell. */
+.mk-part-mobile-facts, .mk-wiring-mobile-instruction { display: none; }
+.mk-topbar-utilities .mk-build-switcher:not([open]) > div { display: none; }
+.mk-topbar-utilities .mk-build-switcher summary,
+.mk-topbar-utilities .mk-build-switcher button { min-height: 44px; }
+.mk-project-part-list { display: flex; flex-direction: column; overflow: auto; align-content: start; overscroll-behavior: contain; }
+.mk-project-part-card { flex: 0 0 auto; height: auto; }
+.mk-project-part-card .mk-detail-part-thumb { width: 48px; height: 48px; }
+.mk-project-overview-header { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.mk-project-overview-header > p,
+.mk-project-brief p,
+.mk-project-behavior p { display: block; overflow: visible; -webkit-line-clamp: unset; }
+.mk-project-warnings { flex: 0 0 auto; max-height: none; overflow: visible; }
+.mk-wiring-connections { overflow: auto; align-content: start; grid-auto-rows: max-content; overscroll-behavior: contain; }
+.mk-wiring-connection span { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.mk-wiring-step-heading { max-height: 44%; overflow: auto; }
+.mk-wiring-step-heading p,
+.mk-wiring-safety span { display: block; overflow: visible; -webkit-line-clamp: unset; }
+.mk-wiring-safety { max-height: 30%; overflow: auto; }
+.mk-generation-workshop-status { overflow: auto; overscroll-behavior: contain; }
+.mk-generation-brief p { display: block; -webkit-line-clamp: unset; }
+.mk-code-locked-copy { overflow: auto; }
+.mk-terminal-failure-layout { display: block; }
+.mk-terminal-failure-visual { display: none; }
+.mk-terminal-failure-layout > .mk-build-failure { height: 100%; max-height: 100%; min-height: 0; overflow: auto; margin: 0; }
+.mk-wiring-load-error { position: absolute; bottom: 8px; left: 16px; right: 16px; z-index: 12; padding: 10px 14px; border: 1px solid #d9c3bf; background: #fff8f0; border-radius: 8px; font-size: 12px; }
+.mk-wiring-artifact-parts .mk-wiring-connection-map { inset: 0; width: 100%; height: 100%; }
+.mk-workspace-main .mk-build-failure { display: grid; grid-template-rows: minmax(0,1fr) auto; align-content: stretch; gap: 16px; overflow: hidden; }
+.mk-build-failure-body { display: grid; align-content: safe center; gap: 14px; min-height: 0; overflow: auto; }
+.mk-build-failure-body > small { color: #a33232; font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.mk-build-failure-body > p { margin: 0; color: #4e4541; line-height: 1.5; }
+.mk-build-failure-footer { border-top: 1px solid var(--studio-line); padding-top: 10px; }
+.mk-workspace-main .mk-build-failure .mk-failure-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0; }
+.mk-workspace-main .mk-build-failure .mk-button { min-height: 44px; width: auto; padding: 0 14px; border: 1px solid var(--studio-line); border-radius: 7px; box-shadow: none; font-size: 12px; }
+.mk-workspace-main .mk-build-failure .mk-button-dark { background: var(--studio-ink); color: #fff; }
+.mk-build-failure-footer > p { font-size: 11px; margin: 9px 0 0; }
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .mk-project-overview { grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr); }
+  .mk-workspace-topbar { grid-template-columns: 140px minmax(250px,1fr) auto; padding: 0 10px; }
+  .mk-topbar-logo { width: 130px; }
+  .mk-project-part-card { grid-template-columns: 40px minmax(0,1fr) 100px; }
+  .mk-project-part-card .mk-detail-part-thumb { width: 38px; height: 38px; }
+  .mk-project-part-retailers { grid-column: auto; }
+}
+
+@media (max-width: 760px) {
+  .mk-workspace-main .mk-build-failure { padding: 16px; gap: 12px; }
+  .mk-workspace-main .mk-build-failure h1 { font-size: 28px; }
+  .mk-build-failure-body { align-content: start; font-size: 13px; }
+  .mk-workspace-main .mk-build-failure .mk-failure-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .mk-workspace-main .mk-build-failure .mk-failure-actions button:last-child { grid-column: 1 / -1; }
+  .mk-topbar-utilities .mk-build-switcher { display: block; }
+  .mk-topbar-utilities .mk-build-switcher summary { padding: 0 8px; font-size: 11px; }
+  .mk-topbar-utilities .mk-app-user-copy { display: none; }
+  .mk-project-overview { grid-template-rows: minmax(0,42fr) minmax(0,58fr); }
+  .mk-project-overview-primary { grid-template-columns: minmax(100px,.36fr) minmax(0,.64fr); }
+  .mk-project-overview-header { align-content: start; }
+  .mk-project-overview-header > p,
+  .mk-project-brief p,
+  .mk-project-behavior p { font-size: 11px; line-height: 1.4; }
+  .mk-project-facts strong { font-size: 10px; white-space: normal; }
+  .mk-project-facts span { font-size: 9px; }
+  .mk-project-parts-head > span { font-size: 10px; white-space: normal; }
+  .mk-project-part-list { overflow: auto; gap: 5px; }
+  .mk-project-part-card { min-height: 76px; grid-template-columns: 32px minmax(0,1fr) 60px; }
+  .mk-project-part-card .mk-detail-part-thumb { width: 30px; height: 30px; }
+  .mk-project-part-copy strong { font-size: 11px; }
+  .mk-project-part-copy > span { font-size: 10px; }
+  .mk-part-mobile-facts { display: block; font-size: 10px; color: #615a53; line-height: 1.3; }
+  .mk-project-retailer > .mk-project-retailer-mobile { font-size: 11px; }
+  .mk-project-cost-note { display: block; max-height: none; overflow: visible; font-size: 10px; }
+  .mk-project-warnings { display: block; }
+  .mk-project-warnings summary { min-height: 44px; display: flex; align-items: center; font-size: 11px; }
+  .mk-project-trust { display: none; }
+  .mk-project-wiring { grid-template-rows: 54px auto minmax(0,1fr) 56px; }
+  .mk-wiring-mobile-instruction { display: grid; gap: 4px; padding: 4px 8px; max-height: 112px; overflow: auto; }
+  .mk-wiring-mobile-instruction strong { font-size: 14px; }
+  .mk-wiring-mobile-instruction span { font-size: 11px; line-height: 1.4; }
+  .mk-wiring-mobile-safety { color: #8b3035; }
+  .mk-project-wiring[data-mobile-pane="details"] .mk-wiring-step-heading { display: none; }
+  .mk-project-wiring .mk-wiring-safety { display: none; }
+  .mk-wiring-pane-toggle { position: static; flex-shrink: 0; }
+  .mk-wiring-toolbar { display: flex; gap: 6px; }
+  .mk-wiring-progress { flex: 1; min-width: 0; overflow: auto; }
+  .mk-wiring-progress button { min-width: 38px; flex-shrink: 0; }
+  .mk-wiring-pane-toggle button { min-width: 46px; padding: 0 5px; }
+  .mk-wiring-step-heading { padding: 10px 12px; }
+  .mk-wiring-simulation-heading h2 { max-width: none; }
+  .mk-wiring-connection strong, .mk-wiring-connection span { font-size: 11px; }
+  .mk-wiring-safety span { font-size: 11px; }
+  .mk-wiring-artifact-parts { padding-top: 10px; }
+  .mk-wiring-artifact-parts article { min-height: 90px; }
+  .mk-wiring-artifact-parts article strong { font-size: 9px; }
+  .mk-code-locked { grid-template-rows: minmax(50px,.22fr) minmax(0,.78fr); }
+  .mk-code-editor-ghost { overflow: hidden; padding: 14px 28px; }
+  .mk-code-locked-copy { justify-content: start; }
+  .mk-project-overview-visual figcaption { position: static; margin: 6px; }
+  .mk-project-overview-visual { display: flex; flex-direction: column; }
+  .mk-project-overview-visual > :first-child { min-height: 0; flex: 1; }
+  .mk-project-preview-unavailable { overflow: hidden; }
+  .mk-generation-workshop-body { grid-template-rows: minmax(40px,.16fr) minmax(0,.84fr); }
+  .mk-generation-workshop-status .mk-loader-copy > p, .mk-generation-brief p { font-size: 11px; }
+  .mk-generation-workshop-status .mk-generation-checkpoints li strong { font-size: 11px; }
+  .mk-generation-workshop-status .mk-progress-actions { position: sticky; bottom: 0; padding: 5px 0; background: var(--studio-white); }
+}
+
+@media (max-width: 760px) and (max-height: 700px) {
+  .mk-wiring-simulation { grid-template-rows: 32px minmax(0,1fr); }
+  .mk-wiring-simulation-heading { padding: 5px 10px; }
+  .mk-wiring-simulation-heading > div > span { display: none; }
+  .mk-wiring-simulation-heading h2 { margin: 0; font-size: 12px; }
+  .mk-wiring-artifact-parts { padding: 4px; gap: 4px; }
+  .mk-wiring-artifact-parts article { min-height: 52px; padding: 5px 3px; }
+  .mk-wiring-artifact-parts .mk-detail-part-thumb,
+  .mk-wiring-artifact-parts .mk-wiring-part-placeholder { display: none; }
+  .mk-wiring-artifact-parts article strong { font-size: 9px; }
+}
+
+@media (max-height: 550px) {
+  .mk-code-locked { grid-template-columns: minmax(0,.6fr) minmax(0,1.4fr); grid-template-rows: minmax(0,1fr); }
+  .mk-code-locked-copy { justify-content: start; padding: 16px 22px; }
+  .mk-code-locked-copy h1 { font-size: 26px; }
+  .mk-code-lock-mark { display: none; }
+  .mk-code-locked-copy > button { background: var(--studio-white); min-height: 44px; margin-top: 12px; }
+  .mk-code-locked-copy > p { font-size: 12px; line-height: 1.4; }
+  .mk-code-locked-copy > span:last-child { font-size: 10px; margin-top: 8px; }
+  .mk-project-overview-primary { grid-template-rows: minmax(0,1fr); }
+  .mk-project-overview-visual { display: none; }
+  .mk-project-overview-header { height: 100%; }
+  .mk-project-trust, .mk-project-readiness { display: none; }
+  .mk-project-wiring { grid-template-rows: 48px minmax(0,1fr) 48px; gap: 4px; }
+  .mk-wiring-progress { height: 48px; }
+  .mk-wiring-step-heading { max-height: 35%; padding: 7px 10px; }
+  .mk-wiring-step-heading h2 { font-size: 17px; }
+  .mk-generation-workshop-status { padding: 12px 18px; }
+}
+
+@media (max-height: 550px) and (min-width: 761px) {
+  .mk-app-shell { grid-template-rows: 48px 44px minmax(0,1fr); }
+  .mk-workspace-topbar { height: 48px; }
+  .mk-topbar-navigation .mk-project-nav > button { min-height: 48px; }
+  .mk-workspace-context { height: 44px; padding: 2px 10px; }
+  .mk-context-title small, .mk-context-idea small { display: none; }
+  .mk-context-back { min-height: 38px; }
+  .mk-wiring-simulation { grid-template-rows: 34px minmax(0,1fr); }
+  .mk-wiring-simulation-heading { display: block; padding: 5px 10px; }
+  .mk-wiring-simulation-heading > div > span, .mk-wiring-simulation-heading p { display: none; }
+  .mk-wiring-simulation-heading h2 { margin: 0; font-size: 13px; }
+  .mk-wiring-artifact-parts { padding: 4px 10px; gap: 12px; }
+  .mk-wiring-artifact-parts article { min-height: 48px; padding: 5px; }
+  .mk-wiring-artifact-parts .mk-detail-part-thumb { display: none; }
+  .mk-wiring-artifact-parts article strong { font-size: 10px; }
+  .mk-wiring-artifact-lines { min-height: 28px; }
+  .mk-wiring-safety { margin: 0 8px 5px; padding: 5px; }
+}

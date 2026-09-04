@@ -2,9 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowIcon, FolderSkeleton, ProfileChip, WorkspaceIcon } from "../workspace-ui";
+import { ArrowIcon, BuildFailurePanel, FolderSkeleton, LockedCodePanel, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "../workspace-ui";
 import { buildLibrary } from "./build-library";
 import { ProjectOverview } from "../project-overview";
+import { projectDisplayIdentity } from "../project-identity.mjs";
+import { ProjectWiringGuide } from "../project-wiring-guide";
+import { projectWiringDeclaredReady, projectWiringReady } from "../project-wiring-data.mjs";
 
 type BuildPart = {
   id?: string;
@@ -21,6 +24,7 @@ type BuildPart = {
 type BuildProject = {
   id: string;
   title: string;
+  idea?: string;
   summary: string;
   behavior?: string;
   image: {
@@ -34,7 +38,31 @@ type BuildProject = {
     note: string;
   };
   status?: string;
+  artifactStates?: {
+    wiring?: { state?: string; reason?: string };
+  };
+  artifacts?: {
+    assembly?: {
+      state?: string;
+      guideSteps?: Array<{
+        id: string;
+        title: string;
+        beginnerInstruction?: string;
+        safetyNote?: string;
+        activeWires?: string[];
+      }>;
+      wires?: Array<{
+        id: string;
+        label?: string;
+        signal?: string;
+        color?: string;
+        from?: { label?: string; partId?: string; nodeName?: string };
+        to?: { label?: string; partId?: string; nodeName?: string };
+      }>;
+    };
+  };
 };
+
 
 type AuthUser = {
   email: string;
@@ -97,28 +125,31 @@ export default function BuildAppPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [accountUnavailable, setAccountUnavailable] = useState(false);
   const [accountBuilds, setAccountBuilds] = useState<BuildProject[]>([]);
   const [publicBuilds, setPublicBuilds] = useState<BuildProject[]>([]);
   const [sharedProject, setSharedProject] = useState<BuildProject | null>(null);
-  const [selectedBuildId, setSelectedBuildId] = useState(() => (
-    typeof window === "undefined" ? "" : new URL(window.location.href).searchParams.get("build") || ""
-  ));
+  const [selectedBuildId, setSelectedBuildId] = useState("");
   const [quota, setQuota] = useState<BuildQuota>(DEFAULT_BUILD_QUOTA);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [surface, setSurface] = useState<ProjectSurface>("overview");
+  const [wiringLoading, setWiringLoading] = useState(false);
+  const [wiringError, setWiringError] = useState("");
+  const [hydratedBuild, setHydratedBuild] = useState<BuildProject | null>(null);
   const freeBuildLimit = quota.limit;
   const buildsRemaining = quota.remaining;
 
   const builds = buildLibrary(accountBuilds, publicBuilds, Boolean(user));
 
   const activeBuild = useMemo(() => {
-    const selected = builds.find((build) => build.id === selectedBuildId)
+    if (hydratedBuild && hydratedBuild.id === selectedBuildId) return hydratedBuild;
+    if (selectedBuildId) return builds.find((build) => build.id === selectedBuildId)
       || publicBuilds.find((build) => build.id === selectedBuildId)
-      || (sharedProject?.id === selectedBuildId ? sharedProject : null);
-    return selected || builds[0] || publicBuilds[0] || null;
-  }, [builds, publicBuilds, selectedBuildId, sharedProject]);
-
-  useEffect(() => {
-    setSharedProject(sharedProjectFromSession());
-  }, []);
+      || (sharedProject?.id === selectedBuildId ? sharedProject : null)
+      || null;
+    return builds[0] || publicBuilds[0] || null;
+  }, [builds, publicBuilds, selectedBuildId, sharedProject, hydratedBuild]);
+  const activeIdentity = activeBuild ? projectDisplayIdentity(activeBuild) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +157,9 @@ export default function BuildAppPage() {
     async function loadBuilds() {
       setLoading(true);
       setLoadError("");
+      setAccountUnavailable(false);
+      setAccountBuilds([]);
+      setPublicBuilds([]);
       try {
         const [accountResult, publicResult] = await Promise.allSettled([
           fetch(apiUrl("/api/account/builds"), {
@@ -145,12 +179,17 @@ export default function BuildAppPage() {
             setUser(account.user);
             setAccountBuilds(Array.isArray(account.builds) ? account.builds : []);
             setQuota(normalizeQuota(account.quota));
+            setAccountUnavailable(false);
             loadedAnyBuilds = Array.isArray(account.builds) && account.builds.length > 0;
           }
         } else if (accountResult.status === "fulfilled" && accountResult.value.status === 401) {
           setUser(null);
           setAccountBuilds([]);
           setQuota(DEFAULT_BUILD_QUOTA);
+          setAccountUnavailable(false);
+        } else {
+          setAccountUnavailable(true);
+          setLoadError("Your projects could not be loaded. Try again to reconnect to your account.");
         }
 
         if (publicResult.status === "fulfilled" && publicResult.value.ok) {
@@ -163,10 +202,14 @@ export default function BuildAppPage() {
           }
         }
         if (!loadedAnyBuilds && accountResult.status === "rejected" && publicResult.status === "rejected") {
+          setAccountUnavailable(true);
           setLoadError("Makeable could not load this project folder.");
         }
       } catch {
-        if (!cancelled) setLoadError("Makeable could not load this project folder.");
+        if (!cancelled) {
+          setAccountUnavailable(true);
+          setLoadError("Makeable could not load this project folder.");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -176,135 +219,142 @@ export default function BuildAppPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     const restoreBuildFromUrl = () => {
+      setSurface("overview");
+      setWiringError("");
       setSelectedBuildId(new URL(window.location.href).searchParams.get("build") || "");
     };
+    setSharedProject(sharedProjectFromSession());
+    restoreBuildFromUrl();
     window.addEventListener("popstate", restoreBuildFromUrl);
     return () => window.removeEventListener("popstate", restoreBuildFromUrl);
   }, []);
 
   const selectBuild = useCallback((build: BuildProject) => {
     if (build.id === selectedBuildId) return;
+    setSurface("overview");
+    setWiringError("");
     setSelectedBuildId(build.id);
     const url = new URL(window.location.href);
     url.searchParams.set("build", build.id);
     window.history.pushState({ makeableBuild: build.id }, "", `${url.pathname}${url.search}${url.hash}`);
   }, [selectedBuildId]);
 
+  useEffect(() => {
+    if (!activeBuild || !projectWiringDeclaredReady(activeBuild) || projectWiringReady(activeBuild)) return;
+    const requestedId = activeBuild.id;
+    const controller = new AbortController();
+    setWiringLoading(true);
+    setWiringError("");
+    void (async () => { try {
+      const response = await fetch(apiUrl(`/api/builds/${encodeURIComponent(requestedId)}`), {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        credentials: "include",
+        signal: controller.signal,
+      });
+      const payload = await response.json() as { build?: BuildProject; error?: string };
+      if (!response.ok || !payload.build || payload.build.id !== requestedId || !projectWiringReady(payload.build)) {
+        throw new Error(payload.error || "The exact saved wiring guide is not available.");
+      }
+      if (!controller.signal.aborted) setHydratedBuild(payload.build);
+    } catch {
+      if (!controller.signal.aborted) setWiringError("The saved wiring guide is unavailable. Your project is unchanged. Refresh to try again.");
+    } finally {
+      if (!controller.signal.aborted) setWiringLoading(false);
+    } })();
+    return () => { controller.abort(); setWiringLoading(false); };
+  }, [activeBuild]);
+
+  const openWiring = useCallback(() => {
+    if (activeBuild && projectWiringReady(activeBuild)) setSurface("wiring");
+  }, [activeBuild]);
+
   const goHome = useCallback(() => {
     router.push("/");
   }, [router]);
 
+  const openProjects = useCallback(() => {
+    setSurface("overview");
+    setWiringError("");
+    setSelectedBuildId("");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("build");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
   return (
     <main className="mk-app-shell">
-      <header className="mk-app-header">
-        <ProfileChip user={user} remaining={buildsRemaining} limit={freeBuildLimit} />
-      </header>
+      <WorkspaceTopBar
+        user={user}
+        remaining={buildsRemaining}
+        limit={freeBuildLimit}
+        accountLoading={loading}
+        accountUnavailable={accountUnavailable}
+        onHome={goHome}
+        surface={surface}
+        wiringAvailable={Boolean(activeBuild && projectWiringReady(activeBuild))}
+        wiringLoading={wiringLoading}
+        onSelectSurface={(nextSurface) => nextSurface === "wiring" ? void openWiring() : setSurface(nextSurface)}
+        projects={builds.map((build) => ({ id: build.id, title: projectDisplayIdentity(build).title }))}
+        selectedProjectId={activeBuild?.id}
+        projectsLabel={user ? "All projects" : "Community projects"}
+        onSelectProject={(id) => {
+          const selected = builds.find((build) => build.id === id);
+          if (selected) selectBuild(selected);
+        }}
+      />
 
-      <aside className="mk-project-sidebar" aria-label="Project folder">
-        <button className="mk-logo-link mk-sidebar-logo" type="button" onClick={goHome} aria-label="Makeable home">
-          <img src="/makeable-logo-tight.webp" alt="Makeable" />
-        </button>
-        <button className="mk-sidebar-back" type="button" onClick={goHome}>
-          <ArrowIcon direction="left" /> Back to home
-        </button>
-        <div className="mk-sidebar-project">
-          <span>Project folder</span>
-          <strong>{activeBuild?.title || "My builds"}</strong>
-        </div>
-        <button type="button" aria-current="true" onClick={() => activeBuild && selectBuild(activeBuild)}>
-          <WorkspaceIcon kind="overview" /> Overview
-        </button>
-        <button type="button" disabled><WorkspaceIcon kind="parts" /> Parts</button>
-        <button type="button" disabled><WorkspaceIcon kind="enclosure" /> Enclosure</button>
-        <button type="button" disabled><WorkspaceIcon kind="wiring" /> Wiring</button>
-        <button type="button" disabled><WorkspaceIcon kind="code" /> Code</button>
-        <div className="mk-library-list">
-          <span>{user ? "Your builds" : "Community builds"}</span>
-          {builds.length ? builds.map((build) => (
-            <button
-              type="button"
-              key={build.id}
-              onClick={() => selectBuild(build)}
-              aria-current={activeBuild?.id === build.id ? "true" : undefined}
-            >
-              {build.title}
-            </button>
-          )) : <small>No saved builds yet.</small>}
-        </div>
-      </aside>
+      <WorkspaceContextBar
+        title={activeIdentity?.title || (loading ? "Opening your project" : "My builds")}
+        idea={activeBuild?.idea || activeBuild?.summary}
+        label={loading ? "Opening" : activeBuild ? "Project" : "Library"}
+        onHome={goHome}
+        action={activeBuild && surface === "overview" && projectWiringReady(activeBuild) ? (
+          <button className="mk-context-primary" type="button" onClick={() => void openWiring()} disabled={wiringLoading}>
+            {wiringLoading ? "Opening guide…" : <>Open wiring <ArrowIcon /></>}
+          </button>
+        ) : undefined}
+      />
 
       <section className="mk-workspace-main" aria-labelledby="workspace-title">
         {loading ? (
           <FolderSkeleton />
+        ) : selectedBuildId && !activeBuild ? (
+          <BuildFailurePanel
+            title="We could not safely open this project"
+            technicalMessage="The exact project was not found. Makeable did not substitute a different build."
+            buildId={selectedBuildId}
+            retryLabel="Try again"
+            onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+            onEdit={() => router.push("/#make")}
+            onBack={openProjects}
+          />
         ) : activeBuild ? (
-          <BuildWorkspaceResult build={activeBuild} />
+          surface === "code"
+            ? <LockedCodePanel onBack={() => setSurface("overview")} />
+            : surface === "wiring" && projectWiringReady(activeBuild)
+              ? <ProjectWiringGuide key={activeBuild.id} build={activeBuild} />
+              : <BuildWorkspaceResult build={activeBuild} />
         ) : (
           <div className="mk-empty-library">
-            <h1 id="workspace-title">My builds</h1>
+            <h1 id="workspace-title">{accountUnavailable ? "Your projects are temporarily unavailable" : "My builds"}</h1>
             <p>{loadError || "No build was found for this link yet. Sign in from the homepage to save new builds here."}</p>
+            {accountUnavailable && <button className="mk-button mk-button-dark" type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>}
             <button className="mk-button mk-button-dark" type="button" onClick={goHome}>Back to main page</button>
           </div>
         )}
 
-        {!loading && activeBuild && (
-          <div className="mk-coming-banner">
-            <span className="mk-banner-mark" aria-hidden="true"><WorkspaceIcon kind="info" /></span>
-            <div>
-              <strong>More project areas are coming soon</strong>
-              <span>Parts, enclosure files, wiring, code, and the step-by-step guide will appear in these tabs as the build is completed.</span>
-            </div>
-          </div>
-        )}
+        {wiringError && <p className="mk-wiring-load-error" role="alert">{wiringError}</p>}
       </section>
 
-      <button className="mk-back-home" type="button" onClick={goHome}>
-        <ArrowIcon direction="left" /> Back to home
-      </button>
     </main>
   );
 }
 
 function BuildWorkspaceResult({ build }: { build: BuildProject }) {
   return <ProjectOverview build={build} />;
-}
-
-function partCategoryLabel(part: BuildPart) {
-  return {
-    controller: "Controller",
-    display: "Display",
-    sensor: "Sensor",
-    input: "Input",
-    output: "Output",
-    connector: "Connector",
-    power: "Power",
-    storage: "Storage",
-    time: "Time",
-  }[part.category || ""] || part.category || "Part";
-}
-
-function partPlainLabel(part: BuildPart) {
-  const text = `${part.category || ""} ${part.subtype || ""} ${part.name || ""}`.toLowerCase();
-  if (part.category === "controller") return "The brain";
-  if (part.category === "display" || /oled|lcd|display|screen/.test(text)) return "The display";
-  if (/vl53|time.of.flight|\btof\b|distance|ultrasonic|hc.?sr04/.test(text)) return "Distance sensor";
-  if (/temperature|humidity|bme280|bme680|bmp280/.test(text)) return "Climate sensor";
-  if (/soil|water|moisture/.test(text)) return "Plant sensor";
-  if (/air quality|pressure|gas|voc|co2/.test(text)) return "Air sensor";
-  if (/ambient light|color sensor|bh1750|tcs34725/.test(text)) return "Light sensor";
-  if (/radar|presence|motion|pir|reed|imu|accelerometer/.test(text)) return "Motion sensor";
-  if (/button|touch|encoder|knob|input/.test(text)) return "User control";
-  if (/sensor/.test(text)) return "Sensor";
-  if (/buzzer|speaker|piezo/.test(text)) return "Sound feedback";
-  if (/led|rgb|output|light/.test(text)) return "Status light";
-  if (/connector|qwiic|usb/.test(text)) return "Connector";
-  return "Verified module";
-}
-
-function partPurpose(part: BuildPart) {
-  if (part.why) return part.why;
-  return `${partPlainLabel(part)} selected for this build's main interaction.`;
 }

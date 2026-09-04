@@ -17,9 +17,20 @@ import {
   makeableDistinctId,
   makeableReferringDomain,
 } from "./analytics";
-import { advanceBuildProgress, estimateBuildProgress } from "./generation-progress";
-import { ProjectOverview } from "./project-overview";
-import { ArrowIcon, GenerationWorkspace, ProfileAvatar, ProfileChip, WorkspaceIcon } from "./workspace-ui";
+import { advanceBuildProgress } from "./generation-progress";
+import {
+  PartThumbnail,
+  ProjectImage,
+  ProjectOverview,
+  partDisplayName,
+  partPlainLabel as presentPartLabel,
+  partPurpose as presentPartPurpose,
+} from "./project-overview";
+import { projectDisplayIdentity, withProjectDisplayIdentity } from "./project-identity.mjs";
+import { RetailerBrand } from "./retailer-brand";
+import { ProjectWiringGuide } from "./project-wiring-guide";
+import { projectWiringReady } from "./project-wiring-data.mjs";
+import { ArrowIcon, BuildClarificationPanel, GenerationWorkspace, LockedCodePanel, ProfileAvatar, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "./workspace-ui";
 
 declare global {
   interface Window {
@@ -55,6 +66,9 @@ type BuildPart = {
   price?: number | null;
   priceLabel?: string;
   packQty?: number;
+  quantity?: number;
+  packageQuantity?: number;
+  includedComponents?: string[];
   asin?: string;
   url?: string;
   voltage?: string;
@@ -85,6 +99,8 @@ const COMMUNITY_PART_ESTIMATES: Record<string, number> = {
   connector: 6.99,
 };
 
+const ACTIVE_BUILD_JOB_STORAGE_KEY = "makeable:active-build-job:v1";
+
 type BuildImage = {
   url: string;
   source?: string;
@@ -114,6 +130,29 @@ type BuildProject = {
   makerName?: string;
   makerHandle?: string;
   makerPicture?: string;
+  artifactStates?: {
+    wiring?: { state?: string; reason?: string };
+  };
+  artifacts?: {
+    assembly?: {
+      state?: string;
+      guideSteps?: Array<{
+        id: string;
+        title: string;
+        beginnerInstruction?: string;
+        safetyNote?: string;
+        activeWires?: string[];
+      }>;
+      wires?: Array<{
+        id: string;
+        label?: string;
+        signal?: string;
+        color?: string;
+        from?: { label?: string; partId?: string; nodeName?: string };
+        to?: { label?: string; partId?: string; nodeName?: string };
+      }>;
+    };
+  };
 };
 
 type AuthUser = {
@@ -160,12 +199,25 @@ type BuildJob = {
 type StartBuildJobResponse = {
   job?: BuildJob | null;
   activeJob?: BuildJob | null;
-  dispatch?: {
-    path: string;
-    timestamp: string;
-    signature: string;
-  } | null;
+  clarification?: BuildClarification | null;
   error?: string;
+};
+
+type ActiveBuildJobResponse = {
+  job?: BuildJob | null;
+  error?: string;
+};
+
+type BuildClarification = {
+  status: "needs_clarification";
+  reason: string;
+  question: string;
+  options: Array<{
+    id: string;
+    label: string;
+    description: string;
+    refinedIdea: string;
+  }>;
 };
 
 type BuildJobStatusResponse = {
@@ -181,7 +233,7 @@ type ClaimBuildJobResponse = {
 };
 
 type LoginIntent = "generate" | "account";
-type WorkspaceMode = "loading" | "result" | "library";
+type WorkspaceMode = "loading" | "clarification" | "result" | "library";
 
 type HeroBuild = {
   id: string;
@@ -206,6 +258,10 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_MAKEABLE_API_ORIGIN
 
 function apiUrl(path: string) {
   return `${API_ORIGIN}${path}`;
+}
+
+function newBuildRequestId() {
+  return `req_${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
 }
 
 const DEFAULT_BUILD_QUOTA: BuildQuota = {
@@ -293,8 +349,8 @@ const starterBuilds = heroBuilds;
 const generationStages: GenerationStage[] = [
   {
     at: 0,
-    label: "Sketching the enclosure",
-    detail: "Fitting the idea into one compact printable shell.",
+    label: "Understanding your brief",
+    detail: "Turning your idea into a clear hardware plan.",
   },
   {
     at: 24,
@@ -303,13 +359,13 @@ const generationStages: GenerationStage[] = [
   },
   {
     at: 48,
-    label: "Checking printability",
-    detail: "Reserving room for ports, sensors, screens, and service access.",
+    label: "Preparing the assembly",
+    detail: "Checking how the selected parts and connections work together.",
   },
   {
     at: 70,
-    label: "Rendering the build",
-    detail: "Turning the plan into a clean product preview.",
+    label: "Preparing the preview",
+    detail: "Turning the saved plan into a clear product view.",
   },
   {
     at: 88,
@@ -332,21 +388,21 @@ const jobCheckpointStages: Record<BuildJobState, GenerationStage & { progress: n
   },
   planning: {
     at: 24,
-    progress: 24,
-    label: "Sketching the enclosure",
-    detail: "Fitting the idea into one compact printable shell.",
+    progress: 8,
+    label: "Understanding your brief",
+    detail: "Turning your idea into a clear hardware plan.",
   },
   fitting_parts: {
     at: 48,
-    progress: 48,
+    progress: 24,
     label: "Matching real parts",
     detail: "Picking verified pre-soldered modules from the catalog.",
   },
   rendering: {
     at: 70,
-    progress: 74,
-    label: "Rendering the build",
-    detail: "Turning the plan into a clean product preview.",
+    progress: 48,
+    label: "Preparing the preview",
+    detail: "Turning the saved plan into a clear product view.",
   },
   ready: {
     at: 92,
@@ -381,12 +437,8 @@ function generationStageForJob(jobState: BuildJobState | "", progress: number) {
   return jobState ? jobCheckpointStages[jobState] : generationStageFor(progress);
 }
 
-function progressForJob(job: BuildJob | null) {
-  return job ? estimateBuildProgress(job) : 8;
-}
-
 function isActiveBuildJob(job: BuildJob | null) {
-  return Boolean(job && !["failed", "cancelled"].includes(job.state) && !job.buildId);
+  return Boolean(job && !["failed", "cancelled"].includes(job.state) && !job.claimedAt);
 }
 
 function normalizeQuota(value: BuildQuota | undefined | null): BuildQuota {
@@ -511,6 +563,7 @@ export default function Home() {
   const [generationBusy, setGenerationBusy] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationError, setGenerationError] = useState("");
+  const [buildClarification, setBuildClarification] = useState<BuildClarification | null>(null);
   const [generatedBuilds, setGeneratedBuilds] = useState<BuildProject[]>([]);
   const [detailBuild, setDetailBuild] = useState<BuildProject | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("loading");
@@ -520,6 +573,8 @@ export default function Home() {
   const [quota, setQuota] = useState<BuildQuota>(DEFAULT_BUILD_QUOTA);
   const [currentJob, setCurrentJob] = useState<BuildJob | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
+  const [authUnavailable, setAuthUnavailable] = useState(false);
   const [publicConfig, setPublicConfig] = useState<PublicConfig>({});
   const [googleReady, setGoogleReady] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -547,13 +602,32 @@ export default function Home() {
   const authUserRef = useRef<AuthUser | null>(null);
   const currentJobRef = useRef<BuildJob | null>(null);
 
+  useEffect(() => {
+    const preview = new URL(window.location.href).searchParams.get("preview");
+    if (!["localhost", "127.0.0.1"].includes(window.location.hostname)) return;
+    if (preview === "generation") {
+      const previewIdea = "A smart indoor air quality monitor with a small display and quiet alerts";
+      setIdea(previewIdea);
+      setWorkspaceMode("loading");
+      setWorkspaceBuild(null);
+      setGenerationProgress(38);
+      setGenerationBusy(true);
+      setWorkspaceOpen(true);
+    }
+    if (preview === "project") {
+      setWorkspaceMode("result");
+      setWorkspaceBuild(withProjectDisplayIdentity(seedCommunityBuilds[0]));
+      setWorkspaceOpen(true);
+    }
+  }, []);
+
   const activeHero = heroBuilds.find((build) => build.id === activeHeroId) || heroBuilds[0];
   const activeGenerationStage = generationStageForJob(currentJob?.state || "", generationProgress);
   const freeBuildLimit = quota.limit;
   const buildsRemaining = quota.remaining;
   const resumableJob = isActiveBuildJob(currentJob) ? currentJob : null;
   const communityBuilds = useMemo(
-    () => [...generatedBuilds, ...seedCommunityBuilds],
+    () => [...generatedBuilds, ...seedCommunityBuilds].map(withProjectDisplayIdentity),
     [generatedBuilds],
   );
 
@@ -563,6 +637,11 @@ export default function Home() {
 
   useEffect(() => {
     currentJobRef.current = currentJob;
+    if (isActiveBuildJob(currentJob)) {
+      window.sessionStorage.setItem(ACTIVE_BUILD_JOB_STORAGE_KEY, currentJob.id);
+    } else if (currentJob) {
+      window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
+    }
   }, [currentJob]);
 
   useEffect(() => {
@@ -651,6 +730,7 @@ export default function Home() {
   useDialogFocusTrap(preorderOpen, preorderDialogRef, () => setPreorderOpen(false), preorderBusy);
 
   const fetchAccount = useCallback(async (openLibrary = false) => {
+    setAuthUnavailable(false);
     try {
       const response = await fetch(apiUrl("/api/account/builds"), {
         headers: { Accept: "application/json" },
@@ -661,15 +741,20 @@ export default function Home() {
         setAuthUser(null);
         setAccountBuilds([]);
         setQuota(DEFAULT_BUILD_QUOTA);
+        setAuthUnavailable(false);
         return null;
       }
-      if (!response.ok) return null;
+      if (!response.ok) {
+        setAuthUnavailable(true);
+        return null;
+      }
       const result = await readJsonResponse<AccountBuildsResponse>(response);
       if (result.analyticsId) identifyMakeableAccount(result.analyticsId);
       authUserRef.current = result.user;
       setAuthUser(result.user);
       setAccountBuilds(result.builds || []);
       setQuota(normalizeQuota(result.quota));
+      setAuthUnavailable(false);
       if (openLibrary) {
         setWorkspaceOpen(true);
         setWorkspaceMode("library");
@@ -678,7 +763,10 @@ export default function Home() {
       }
       return result;
     } catch {
+      setAuthUnavailable(true);
       return null;
+    } finally {
+      setAuthResolved(true);
     }
   }, []);
 
@@ -712,8 +800,12 @@ export default function Home() {
     const build = buildResult ? withCreatorSnapshot(buildResult, authUserRef.current) : null;
     const buildId = build?.id || result.job?.buildId || "";
     if (!build || !buildId) throw new Error("Makeable finished the job but did not return a build id.");
+    if ((result.job && result.job.id !== jobId) || (result.job?.buildId && result.job.buildId !== build.id)) {
+      throw new Error("The saved project did not match this build job. Your existing projects were left untouched.");
+    }
 
-    if (result.job) setCurrentJob(result.job);
+    if (result.job) setCurrentJob({ ...result.job, claimedAt: result.job.claimedAt || new Date().toISOString() });
+    window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
     if (result.quota) setQuota(normalizeQuota(result.quota));
     setGenerationProgress(100);
     setWorkspaceBuild(build);
@@ -733,6 +825,7 @@ export default function Home() {
     setWorkspaceOpen(true);
     setWorkspaceMode("loading");
     setWorkspaceBuild(null);
+    setBuildClarification(null);
     setGenerationBusy(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -747,6 +840,8 @@ export default function Home() {
         throw new Error(result.error || "Makeable could not check this build job.");
       }
       const job = result.job;
+      if (job.id !== jobId) throw new Error("The returned build job did not match your request. Your existing projects were left untouched.");
+      currentJobRef.current = job;
       setCurrentJob(job);
       setGenerationProgress((visibleProgress) => advanceBuildProgress(visibleProgress, job));
       setGenerationError("");
@@ -793,6 +888,13 @@ export default function Home() {
     }
   }, [runBuildJobPoll]);
 
+  useEffect(() => {
+    if (!authResolved || currentJobRef.current || jobFlowActiveRef.current) return;
+    const savedJobId = window.sessionStorage.getItem(ACTIVE_BUILD_JOB_STORAGE_KEY) || "";
+    if (!savedJobId) return;
+    void resumeBuildJob(savedJobId);
+  }, [authResolved, resumeBuildJob]);
+
   const cancelCurrentBuildJob = useCallback(async () => {
     const jobId = currentJobRef.current?.id || "";
     generationAbortRef.current?.abort();
@@ -814,6 +916,7 @@ export default function Home() {
       if (!response.ok) throw new Error(result.error || "Makeable could not cancel this build job.");
       setCurrentJob(null);
       currentJobRef.current = null;
+      window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
       pendingClaimJobIdRef.current = "";
       pendingIdeaRef.current = "";
       setGenerationProgress(0);
@@ -835,42 +938,68 @@ export default function Home() {
     setWorkspaceOpen(true);
     setWorkspaceMode("loading");
     setWorkspaceBuild(null);
+    setBuildClarification(null);
     setCurrentJob(null);
+    currentJobRef.current = null;
+    window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
     setGenerationBusy(true);
     setGenerationProgress(5);
     setGenerationError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
     try {
-      const response = await fetch(apiUrl("/api/build-jobs"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          idea: nextIdea,
-          posthogDistinctId: makeableDistinctId(),
-        }),
-        signal: requestController.signal,
-      });
-      const result = await readJsonResponse<StartBuildJobResponse>(response);
-      const job = result.job || result.activeJob || null;
-      if (!response.ok && !job) throw new Error(result.error || "Makeable could not start this build job.");
-      if (!job) throw new Error("Makeable did not return a build job id.");
-      if (result.dispatch) {
-        const dispatchResponse = await fetch(apiUrl(result.dispatch.path), {
+      // One idempotency key belongs to one click/clarification choice. Reuse it
+      // only for recovery and transport retries; parallel tabs get distinct jobs.
+      const requestId = newBuildRequestId();
+      const startBuild = () => fetch(apiUrl("/api/build-jobs"), {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Makeable-Background-Timestamp": result.dispatch.timestamp,
-            "X-Makeable-Background-Signature": result.dispatch.signature,
-          },
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
           credentials: "include",
-          body: JSON.stringify({ jobId: job.id }),
+          body: JSON.stringify({
+            idea: nextIdea,
+            requestId,
+            posthogDistinctId: makeableDistinctId(),
+          }),
           signal: requestController.signal,
         });
-        if (!dispatchResponse.ok && dispatchResponse.status !== 202) {
-          throw new Error("Makeable could not send this build to the workshop. Try again.");
+      let response = await startBuild();
+      let result = await readJsonResponse<StartBuildJobResponse>(response);
+      if (response.ok && !result.job && !result.activeJob && !result.clarification) {
+        captureMakeableEvent("makeable build start response recovery", { recovery_step: "active_job" });
+        setGenerationProgress((visibleProgress) => Math.max(visibleProgress, 8));
+        const activeResponse = await fetch(
+          apiUrl(`/api/build-jobs/active?requestId=${encodeURIComponent(requestId)}`),
+          {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          credentials: "include",
+          signal: requestController.signal,
+          },
+        );
+        const activeResult = await readJsonResponse<ActiveBuildJobResponse>(activeResponse);
+        if (activeResponse.ok && activeResult.job) {
+          result = { job: activeResult.job };
+          response = activeResponse;
+        } else {
+          captureMakeableEvent("makeable build start response recovery", { recovery_step: "retry_start" });
+          response = await startBuild();
+          result = await readJsonResponse<StartBuildJobResponse>(response);
         }
       }
+      if (result.clarification?.status === "needs_clarification") {
+        setGenerationBusy(false);
+        setGenerationProgress(0);
+        setGenerationError("");
+        setBuildClarification(result.clarification);
+        setWorkspaceMode("clarification");
+        captureMakeableEvent("makeable build clarification shown", {
+          option_count: result.clarification.options.length,
+        });
+        return;
+      }
+      const job = result.job || result.activeJob || null;
+      if (!response.ok && !job) throw new Error(result.error || "Makeable could not start this build job.");
+      if (!job) throw new Error("Makeable could not reconnect to the workshop. Your idea is safe—please try again.");
+      currentJobRef.current = job;
       setCurrentJob(job);
       setGenerationProgress((visibleProgress) => advanceBuildProgress(visibleProgress, job));
       captureMakeableEvent("makeable build job started", {
@@ -1070,6 +1199,7 @@ export default function Home() {
 
   function submitBuild(event?: FormEvent) {
     event?.preventDefault();
+    if (jobFlowActiveRef.current || generationBusy) return;
     const trimmed = idea.trim();
     if (!trimmed) {
       setGenerationError("Describe what you want to build first.");
@@ -1085,12 +1215,13 @@ export default function Home() {
     captureMakeableEvent("makeable build idea submitted", { placement: "composer" });
     if (!authUser) {
       openLogin("generate");
+      return;
     }
-    generateBuildForIdea(trimmed);
+    void generateBuildForIdea(trimmed);
   }
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       submitBuild();
     }
@@ -1189,7 +1320,7 @@ export default function Home() {
       <section ref={loginDialogRef} className="mk-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title" tabIndex={-1}>
         <button type="button" className="mk-modal-close" aria-label="Close login" onClick={closeLogin} disabled={authBusy}>x</button>
         <h2 id="login-title">Log in with Google</h2>
-        <p>{loginIntent === "generate" ? "Your build is already being prepared. Sign in to save it to your project folder and the community gallery." : "Sign in to see the builds you made."}</p>
+        <p>{loginIntent === "generate" ? currentJob ? "Your build is saved. Sign in to continue to your project folder." : "Your idea is ready. Sign in to start the build and save it to your project folder." : "Sign in to see the builds you made."}</p>
         <div className="mk-google-button" ref={googleButtonRef} aria-live="polite">
           {!googleReady && <span>Loading Google...</span>}
         </div>
@@ -1203,15 +1334,23 @@ export default function Home() {
     return (
       <>
         <BuildWorkspace
+          key={`${workspaceMode}:${workspaceBuild?.id || "none"}`}
           mode={workspaceMode}
           user={authUser}
           build={workspaceBuild}
           builds={accountBuilds}
           freeBuildLimit={freeBuildLimit}
           buildsRemaining={buildsRemaining}
-          progress={generationProgress}
+          authLoading={!authResolved}
+          authUnavailable={authUnavailable}
+          generationBusy={generationBusy}
+          jobId={currentJob?.id || ""}
+          startedAt={currentJob?.createdAt}
+          prompt={currentJob?.idea || idea}
+          progress={currentJob ? jobCheckpointStages[currentJob.state].progress : 0}
           stage={activeGenerationStage}
           error={generationError}
+          clarification={buildClarification}
           onBack={() => {
             generationAbortRef.current?.abort();
             setGenerationBusy(false);
@@ -1220,8 +1359,8 @@ export default function Home() {
             window.setTimeout(() => document.getElementById("top")?.scrollIntoView({ behavior: "smooth" }), 0);
           }}
           onSelectBuild={(build) => {
-            setWorkspaceBuild(build);
-            setWorkspaceMode("result");
+            generationAbortRef.current?.abort();
+            window.location.assign(`/app?build=${encodeURIComponent(build.id)}`);
           }}
           onCreateAnother={() => {
             setWorkspaceOpen(false);
@@ -1229,11 +1368,32 @@ export default function Home() {
           }}
           onDismiss={() => {
             generationAbortRef.current?.abort();
-            setGenerationBusy(false);
-            setWorkspaceOpen(false);
-            setGenerationError("");
+            window.location.assign("/app");
           }}
           onCancel={cancelCurrentBuildJob}
+          onRetry={() => {
+            if (isActiveBuildJob(currentJob)) {
+              void resumeBuildJob(currentJob!.id);
+              return;
+            }
+            const retryIdea = (currentJob?.idea || pendingIdeaRef.current || idea).trim();
+            if (retryIdea) void generateBuildForIdea(retryIdea);
+          }}
+          onChooseClarification={(refinedIdea) => {
+            setIdea(refinedIdea);
+            pendingIdeaRef.current = refinedIdea;
+            setBuildClarification(null);
+            void generateBuildForIdea(refinedIdea);
+          }}
+          onEdit={() => {
+            generationAbortRef.current?.abort();
+            setGenerationBusy(false);
+            const retryIdea = (currentJob?.idea || pendingIdeaRef.current || idea).trim();
+            if (retryIdea) setIdea(retryIdea);
+            setWorkspaceOpen(false);
+            setGenerationError("");
+            window.setTimeout(() => document.getElementById("make")?.scrollIntoView({ behavior: "smooth" }), 0);
+          }}
         />
         {loginModal}
       </>
@@ -1261,7 +1421,7 @@ export default function Home() {
             <a href="#community">Community</a>
           </div>
           <button className="mk-nav-cta" type="button" onClick={openBuildLibrary}>
-            {authUser ? <><span>My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
+            {!authResolved ? "Checking…" : authUser ? <><span>My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
           </button>
         </nav>
         <div
@@ -1370,7 +1530,7 @@ export default function Home() {
         <div className="mk-community-grid" ref={communityGridRef} onScroll={updateCommunityIndex}>
           {communityBuilds.map((build) => (
             <button className="mk-community-card" type="button" key={build.id} onClick={() => openProject(build)}>
-              <img src={build.image.url} alt={`${build.title} product render`} />
+              <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
               <CreatorBadge build={build} />
               <span>{build.title}</span>
               <small>{build.image.source === "seed" ? "Makeable example" : build.status || "Concept"}</small>
@@ -1499,14 +1659,24 @@ function BuildWorkspace({
   builds,
   freeBuildLimit,
   buildsRemaining,
+  authLoading,
+  authUnavailable,
+  generationBusy,
+  jobId,
+  startedAt,
+  prompt,
   progress,
   stage,
   error,
+  clarification,
   onBack,
   onSelectBuild,
   onCreateAnother,
   onDismiss,
   onCancel,
+  onRetry,
+  onChooseClarification,
+  onEdit,
 }: {
   mode: WorkspaceMode;
   user: AuthUser | null;
@@ -1514,55 +1684,75 @@ function BuildWorkspace({
   builds: BuildProject[];
   freeBuildLimit: number;
   buildsRemaining: number;
+  authLoading: boolean;
+  authUnavailable: boolean;
+  generationBusy: boolean;
+  jobId: string;
+  startedAt?: string;
+  prompt: string;
   progress: number;
   stage: GenerationStage;
   error: string;
+  clarification: BuildClarification | null;
   onBack: () => void;
   onSelectBuild: (build: BuildProject) => void;
   onCreateAnother: () => void;
   onDismiss: () => void;
   onCancel: () => void;
+  onRetry: () => void;
+  onChooseClarification: (refinedIdea: string) => void;
+  onEdit: () => void;
 }) {
   const isLoading = mode === "loading";
+  const isClarifying = mode === "clarification" && Boolean(clarification);
   const isLibrary = mode === "library" && !build;
+  const activeIdentity = build ? projectDisplayIdentity(build) : null;
+  const [surface, setSurface] = useState<ProjectSurface>("overview");
+  const wiringReady = Boolean(build && projectWiringReady(build));
 
   return (
     <main className="mk-app-shell">
-      <header className="mk-app-header">
-        <ProfileChip user={user} remaining={buildsRemaining} limit={freeBuildLimit} />
-      </header>
+      <WorkspaceTopBar
+        user={user}
+        remaining={buildsRemaining}
+        limit={freeBuildLimit}
+        accountLoading={authLoading}
+        accountUnavailable={authUnavailable}
+        showBalance={!isLoading}
+        onHome={onBack}
+        building={isLoading || isClarifying}
+        progress={isLoading ? progress : 0}
+        surface={surface}
+        wiringAvailable={wiringReady}
+        onSelectSurface={setSurface}
+        projects={builds.map((item) => ({ id: item.id, title: projectDisplayIdentity(item).title }))}
+        selectedProjectId={build?.id}
+        onSelectProject={(id) => {
+          const selected = builds.find((item) => item.id === id);
+          if (selected) {
+            setSurface("overview");
+            onSelectBuild(selected);
+          }
+        }}
+      />
 
-      <aside className="mk-project-sidebar" aria-label="Project folder">
-        <button className="mk-logo-link mk-sidebar-logo" type="button" onClick={onBack} aria-label="Makeable home">
-          <img src="/makeable-logo-tight.webp" alt="Makeable" />
-        </button>
-        <button className="mk-sidebar-back" type="button" onClick={onBack}>
-          <ArrowIcon direction="left" /> Back to home
-        </button>
-        <div className="mk-sidebar-project">
-          <span>Project folder</span>
-          <strong>{build?.title || (isLoading ? "Generating build" : "My builds")}</strong>
-        </div>
-        <button type="button" aria-current={mode === "library" ? "true" : undefined} onClick={() => build && onSelectBuild(build)}>
-          <WorkspaceIcon kind="overview" /> Overview
-        </button>
-        <button type="button" disabled><WorkspaceIcon kind="parts" /> Parts</button>
-        <button type="button" disabled><WorkspaceIcon kind="enclosure" /> Enclosure</button>
-        <button type="button" disabled><WorkspaceIcon kind="wiring" /> Wiring</button>
-        <button type="button" disabled><WorkspaceIcon kind="code" /> Code</button>
-        <div className="mk-library-list">
-          <span>Your builds</span>
-          {builds.length ? builds.map((item) => (
-            <button type="button" key={item.id} onClick={() => onSelectBuild(item)} aria-current={build?.id === item.id ? "true" : undefined}>
-              {item.title}
-            </button>
-          )) : <small>No saved builds yet.</small>}
-        </div>
-      </aside>
+      <WorkspaceContextBar
+        title={isLoading ? "Building your project" : activeIdentity?.title || (isClarifying ? "Choose a direction" : "My builds")}
+        idea={isLoading || isClarifying ? prompt : build?.idea || build?.summary}
+        label={isLoading ? "In the workshop" : isClarifying ? "Clarification" : build ? "Project" : "Library"}
+        onHome={onBack}
+        action={build && surface === "overview" && wiringReady ? (
+          <button className="mk-context-primary" type="button" onClick={() => setSurface("wiring")}>
+            Open wiring <ArrowIcon />
+          </button>
+        ) : undefined}
+      />
 
       <section className="mk-workspace-main" aria-labelledby="workspace-title">
         {isLoading ? (
-          <GenerationWorkspace stage={stage} progress={progress} error={error} onDismiss={onDismiss} onCancel={onCancel} />
+          <GenerationWorkspace stage={stage} progress={progress} error={error} busy={generationBusy} buildId={jobId} startedAt={startedAt} prompt={prompt} onDismiss={onDismiss} onCancel={onCancel} onRetry={onRetry} onEdit={onEdit} />
+        ) : isClarifying && clarification ? (
+          <BuildClarificationPanel clarification={clarification} prompt={prompt} onChoose={onChooseClarification} onEdit={onEdit} />
         ) : isLibrary ? (
           <div className="mk-empty-library">
             <h1 id="workspace-title">My builds</h1>
@@ -1570,22 +1760,14 @@ function BuildWorkspace({
             <button className="mk-button mk-button-dark" type="button" onClick={onCreateAnother}>Create a build</button>
           </div>
         ) : build ? (
-          <BuildWorkspaceResult build={build} />
+          surface === "code"
+            ? <LockedCodePanel onBack={() => setSurface("overview")} />
+            : surface === "wiring" && wiringReady
+              ? <ProjectWiringGuide build={build} />
+              : <BuildWorkspaceResult build={build} />
         ) : null}
-        {!isLoading && (
-          <div className="mk-coming-banner">
-            <span className="mk-banner-mark" aria-hidden="true"><WorkspaceIcon kind="info" /></span>
-            <div>
-              <strong>More project areas are coming soon</strong>
-              <span>Parts, enclosure files, wiring, code, and the step-by-step guide will appear in these tabs as the build is completed.</span>
-            </div>
-          </div>
-        )}
       </section>
 
-      <button className="mk-back-home" type="button" onClick={onBack}>
-        <ArrowIcon direction="left" /> Back to home
-      </button>
     </main>
   );
 }
@@ -1605,7 +1787,7 @@ function BuildDetail({ build, onClose, onMake }: { build: BuildProject; onClose:
       <section ref={dialogRef} className="mk-build-detail" role="dialog" aria-modal="true" aria-labelledby="detail-title" tabIndex={-1}>
         <button type="button" className="mk-modal-close" aria-label="Close build details" onClick={onClose}>x</button>
         <div className="mk-detail-visual">
-          <img src={build.image.url} alt={`${build.title} product render`} />
+          <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
           <div>
             <small>{build.status || "Concept"}</small>
             <strong>{build.title}</strong>
@@ -1629,7 +1811,7 @@ function BuildDetail({ build, onClose, onMake }: { build: BuildProject; onClose:
               Make this build <span aria-hidden="true">→</span>
             </button>
           </header>
-          <PartsList parts={build.parts} previewImage={build.image.url} />
+          <PartsList build={build} />
           <footer className="mk-detail-footer">
             <div>
               <span className="mk-detail-trust-mark" aria-label="Makeable"><i aria-hidden="true" /></span>
@@ -1677,7 +1859,7 @@ function FullGallery({
           {builds.map((build) => (
             <button type="button" key={build.id} onClick={() => onSelect(build)}>
               <div>
-                <img src={build.image.url} alt={`${build.title} product render`} />
+                <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
                 <CreatorBadge build={build} />
               </div>
               <span>{build.title}</span>
@@ -1751,7 +1933,8 @@ function creatorHandle(name: string) {
   return `@${slug || "makeablemaker"}`;
 }
 
-function PartsList({ parts, previewImage }: { parts: BuildPart[]; previewImage: string }) {
+function PartsList({ build }: { build: BuildProject }) {
+  const parts = build.parts;
   const listingIds = useMemo(
     () => [...new Set(parts.map((part) => part.listingId).filter((value): value is string => Boolean(value)))],
     [parts],
@@ -1788,10 +1971,11 @@ function PartsList({ parts, previewImage }: { parts: BuildPart[]; previewImage: 
     <section
       className="mk-detail-parts"
       aria-labelledby="detail-parts-title"
-      aria-description="Beginner-friendly: every module has its pins already soldered."
+      aria-describedby="detail-parts-description"
     >
+      <p className="mk-sr-only" id="detail-parts-description">Beginner-friendly: every module has its pins already soldered.</p>
       <div className="mk-detail-parts-head">
-        <h3 id="detail-parts-title">Part</h3>
+        <h3 id="detail-parts-title">Parts</h3>
         <span>Compare retailer prices</span>
       </div>
       <div className="mk-detail-part-list">
@@ -1803,13 +1987,17 @@ function PartsList({ parts, previewImage }: { parts: BuildPart[]; previewImage: 
           const aliexpressPrice = retailerPartPrice(part, "aliexpress");
           return (
             <article className="mk-detail-part-card" key={`${part.id || part.asin || part.name}`}>
-              <span className={`mk-detail-part-thumb ${partThumbnailClass(part.category)}`} aria-hidden="true" />
+              <PartThumbnail part={part} />
               <div className="mk-detail-part-copy">
-                <strong>{`${index + 1}. ${part.role || partPlainLabel(part)}`}</strong>
-                <span>{part.name}</span>
+                <div className="mk-part-title-row">
+                  <strong>{`${index + 1}. ${presentPartLabel(part, build)}`}</strong>
+                  <span className="mk-detail-part-quantity">Qty {part.quantity || 1}</span>
+                </div>
+                <span>{partDisplayName(part)}</span>
+                {partPackageNote(part) && <span className="mk-part-package-note">{partPackageNote(part)}</span>}
                 <details className="mk-detail-part-why">
                   <summary>Why we picked this <i aria-hidden="true">i</i></summary>
-                  <p>{partPurpose(part)}</p>
+                  <p>{presentPartPurpose(part, build)}</p>
                 </details>
               </div>
               <div className="mk-detail-part-retailers" aria-label={`${part.name} retailer options`}>
@@ -1833,19 +2021,15 @@ function PartsList({ parts, previewImage }: { parts: BuildPart[]; previewImage: 
 }
 
 function RetailerWordmark({ retailer }: { retailer: "amazon" | "aliexpress" }) {
-  return retailer === "amazon"
-    ? <span className="mk-retailer-wordmark mk-retailer-wordmark-amazon">amazon</span>
-    : <span className="mk-retailer-wordmark mk-retailer-wordmark-aliexpress">AliExpress</span>;
+  return <RetailerBrand retailer={retailer} />;
 }
 
-function partThumbnailClass(category?: string) {
-  const normalized = category?.toLowerCase();
-  if (normalized === "sensor") return "mk-detail-part-thumb-sensor";
-  if (normalized === "display") return "mk-detail-part-thumb-display";
-  if (normalized === "output") return "mk-detail-part-thumb-output";
-  if (normalized === "input") return "mk-detail-part-thumb-input";
-  if (normalized === "connector") return "mk-detail-part-thumb-connector";
-  return "mk-detail-part-thumb-controller";
+function partPackageNote(part: BuildPart) {
+  const notes = [];
+  const packageQuantity = Number(part.packageQuantity || part.packQty || 1);
+  if (packageQuantity > 1) notes.push(`${packageQuantity} included in the pack`);
+  if (part.includedComponents?.length) notes.push(`Includes ${part.includedComponents.join(" and ")}`);
+  return notes.join(" · ");
 }
 
 function retailerPartPrice(part: BuildPart, retailer: "amazon" | "aliexpress", quote?: RetailPriceQuote) {
@@ -1862,43 +2046,6 @@ function retailerSearchUrl(marketplace: "amazon" | "aliexpress", partName: strin
   return marketplace === "amazon"
     ? `https://www.amazon.com/s?k=${query}`
     : `https://www.aliexpress.us/w/wholesale-${query}.html`;
-}
-
-function partCategoryLabel(part: BuildPart) {
-  return {
-    controller: "Controller",
-    display: "Display",
-    sensor: "Sensor",
-    input: "Input",
-    output: "Output",
-    connector: "Connector",
-    power: "Power",
-    storage: "Storage",
-    time: "Time",
-  }[part.category || ""] || part.category || "Part";
-}
-
-function partPlainLabel(part: BuildPart) {
-  const text = `${part.category || ""} ${part.subtype || ""} ${part.name || ""}`.toLowerCase();
-  if (part.category === "controller") return "The brain";
-  if (part.category === "display" || /oled|lcd|display|screen/.test(text)) return "The display";
-  if (/vl53|time.of.flight|\btof\b|distance|ultrasonic|hc.?sr04/.test(text)) return "Distance sensor";
-  if (/temperature|humidity|bme280|bme680|bmp280/.test(text)) return "Climate sensor";
-  if (/soil|water|moisture/.test(text)) return "Plant sensor";
-  if (/air quality|pressure|gas|voc|co2/.test(text)) return "Air sensor";
-  if (/ambient light|color sensor|bh1750|tcs34725/.test(text)) return "Light sensor";
-  if (/radar|presence|motion|pir|reed|imu|accelerometer/.test(text)) return "Motion sensor";
-  if (/button|touch|encoder|knob|input/.test(text)) return "User control";
-  if (/sensor/.test(text)) return "Sensor";
-  if (/buzzer|speaker|piezo/.test(text)) return "Sound feedback";
-  if (/led|rgb|output|light/.test(text)) return "Status light";
-  if (/connector|qwiic|usb/.test(text)) return "Connector";
-  return "Verified module";
-}
-
-function partPurpose(part: BuildPart) {
-  if (part.why) return part.why;
-  return `${partPlainLabel(part)} selected for this build's main interaction.`;
 }
 
 function useDialogFocusTrap(

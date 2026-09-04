@@ -700,6 +700,20 @@ a {
   object-fit: cover;
 }
 
+.mk-community-card > .mk-build-image-fallback {
+  display: grid;
+  width: calc(100% + 5.6rem);
+  margin: 0 -4.35rem 1.1rem -1.25rem;
+  aspect-ratio: 1.58 / 1;
+  place-items: center;
+  background: linear-gradient(145deg, #eee8df, #ddd4c8);
+  color: #776f66;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .mk-community-card > span {
   display: block;
   color: var(--ink);
@@ -2298,11 +2312,23 @@ a {
   pointer-events: none;
 }
 
-.mk-detail-visual > img {
+.mk-detail-visual > img,
+.mk-detail-visual > .mk-build-image-fallback {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center 28%;
+}
+.mk-detail-visual > .mk-build-image-fallback,
+.mk-full-gallery-grid > button > div > .mk-build-image-fallback {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #eee8df, #ddd4c8);
+  color: #776f66;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .mk-detail-visual > div {
@@ -2810,9 +2836,15 @@ a {
   line-height: 1;
 }
 
-.mk-retailer-wordmark { position: relative; font-size: 1.1rem; font-weight: 900; letter-spacing: -0.06em; }
-.mk-retailer-wordmark-amazon::after { position: absolute; right: 0.08rem; bottom: -0.22rem; width: 1.85rem; height: 0.34rem; border-bottom: 2px solid #f6a21a; border-radius: 50%; content: ""; transform: rotate(4deg); }
-.mk-retailer-wordmark-aliexpress { color: #f24842; letter-spacing: -0.075em; }
+.mk-retailer-wordmark { display: inline-flex; min-height: 1.45rem; align-items: center; justify-content: center; color: #17213b; font-family: Arial, Helvetica, sans-serif; font-size: 1rem; font-weight: 800; letter-spacing: -0.045em; line-height: 1; }
+.mk-retailer-wordmark-amazon { position: relative; flex-direction: column; gap: 0; padding-top: 0.1rem; }
+.mk-retailer-wordmark-amazon > svg { width: 2.9rem; height: 0.48rem; margin-top: -0.06rem; overflow: visible; fill: none; stroke: #ff9900; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.45; }
+.mk-retailer-wordmark-aliexpress { gap: 0.24rem; color: #e43225; letter-spacing: -0.055em; }
+.mk-retailer-wordmark-aliexpress > svg { width: 1.08rem; height: 1.08rem; fill: #ff472f; stroke: white; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.25; }
+.mk-part-title-row { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 0.55rem; }
+.mk-part-title-row > strong { min-width: 0; }
+.mk-detail-part-quantity { flex: 0 0 auto; padding: 0.18rem 0.42rem; border: 1px solid rgba(255, 100, 96, 0.34); border-radius: 999px; background: rgba(255, 100, 96, 0.08); color: #b63f3b; font-family: var(--font-ui); font-size: 0.61rem; font-weight: 800; letter-spacing: 0.01em; white-space: nowrap; }
+.mk-part-package-note { color: #8a645d !important; font-size: 0.64rem !important; font-weight: 700; line-height: 1.2 !important; }
 .mk-detail-retailer-aliexpress { border-color: rgba(255, 103, 98, 0.3) !important; }
 .mk-detail-retailer-aliexpress > span:not(.mk-retailer-wordmark) { border-color: rgba(255, 103, 98, 0.62) !important; color: #e14c49 !important; }
 
@@ -2905,12 +2937,14 @@ a {
   position: relative;
 }
 
-.mk-full-gallery-grid > button > div > img {
+.mk-full-gallery-grid > button > div > img,
+.mk-full-gallery-grid > button > div > .mk-build-image-fallback {
   display: block;
   width: 100%;
   aspect-ratio: 1.58 / 1;
   object-fit: cover;
 }
+.mk-full-gallery-grid > button > div > .mk-build-image-fallback { display: grid; }
 
 .mk-full-gallery-grid > button > span,
 .mk-full-gallery-grid > button > p,
