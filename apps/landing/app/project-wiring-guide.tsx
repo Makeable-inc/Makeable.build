@@ -130,6 +130,13 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
       const offset = (index - (connections.length - 1) / 2) * Math.min(14, Math.min(from.height, to.height) / (connections.length + 1));
       const fromY = from.y + from.height / 2 + offset;
       const toY = to.y + to.height / 2 + offset;
+      if (Math.abs(from.x - to.x) < 2) {
+        const leftSide = from.x < diagram.width / 2;
+        const fromX = from.x + (leftSide ? 0 : from.width);
+        const toX = to.x + (leftSide ? 0 : to.width);
+        const lane = leftSide ? Math.max(6, fromX - 18 - index * 3) : Math.min(diagram.width - 6, fromX + 18 + index * 3);
+        return [{ id: connection.id, color: connection.color || "#ff6470", path: `M ${fromX} ${fromY} C ${lane} ${fromY}, ${lane} ${toY}, ${toX} ${toY}` }];
+      }
       const midX = (startX + endX) / 2;
       return [{ id: connection.id, color: connection.color || "#ff6470", path: `M ${startX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${endX} ${toY}` }];
     });
@@ -169,7 +176,7 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
             <p>Saved guide · No credit used</p>
           </div>
           <div className="mk-wiring-artifact-visual">
-            <div className="mk-wiring-artifact-parts" ref={diagramRef} tabIndex={0} role="region" aria-label="Assembly parts and connections">
+            <div className="mk-wiring-artifact-parts" data-connected={connections.length > 0} ref={diagramRef} tabIndex={0} role="region" aria-label="Assembly parts and connections">
               {connections.length > 0 && (
                 <svg className="mk-wiring-connection-map" style={{width: diagram.width, height: diagram.height}} viewBox={`0 0 ${diagram.width} ${diagram.height}`} aria-hidden="true">
                   {connectionPaths.map((connection) => <path key={connection.id} d={connection.path} style={{ stroke: connection.color }} />)}
@@ -239,10 +246,9 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
 }
 
 function wiringPartsForStep(build: WiringProject, step: WiringStep | undefined, connections: WiringConnection[]) {
-  const requestedIds = new Set([
-    ...(step?.visibleParts || []),
-    ...connections.flatMap((connection) => [connection.from?.partId, connection.to?.partId]),
-  ].filter((value): value is string => Boolean(value)));
+  const connectedIds = connections.flatMap((connection) => [connection.from?.partId, connection.to?.partId]);
+  const requestedIds = new Set((connectedIds.length ? connectedIds : step?.visibleParts || [])
+    .filter((value): value is string => Boolean(value)));
   const assemblyParts = build.artifacts?.assembly?.parts || [];
   const selected = requestedIds.size
     ? assemblyParts.filter((part) => requestedIds.has(part.id))

@@ -1715,6 +1715,7 @@
 .mk-wiring-simulation-heading { border: 0; padding-left: 0; padding-right: 0; }
 .mk-wiring-simulation-heading h2 { font-size: 20px; }
 .mk-wiring-artifact-parts { background: #f1f0ec; }
+.mk-wiring-artifact-parts[data-connected="true"] { grid-template-columns: repeat(2,minmax(0,220px)); gap: 48px; padding: 28px; }
 .mk-wiring-artifact-parts article { position: relative; z-index: 1; border: 0; border-radius: 0; background: #f1f0ec; box-shadow: none; }
 .mk-wiring-artifact-parts .mk-detail-part-thumb { border: 0; border-radius: 0; background: transparent; }
 .mk-wiring-step-heading { padding-top: 18px; }
@@ -1743,4 +1744,5 @@
   .mk-code-locked-copy { padding: 24px; }
   .mk-wiring-simulation-heading h2 { font-size: 16px; }
   .mk-wiring-simulation-heading p { font-size: 11px; }
+  .mk-wiring-artifact-parts[data-connected="true"] { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 28px; padding: 14px 24px; }
 }
