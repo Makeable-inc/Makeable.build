@@ -11,16 +11,10 @@ type SafeUser = {
 type Stage = {
   label: string;
   detail: string;
+  checkpoint?: number;
 };
 
 export type ProjectSurface = "overview" | "wiring" | "code";
-
-const checkpointLabels = [
-  "Brief",
-  "Parts",
-  "Assembly",
-  "Package",
-];
 
 export function ArrowIcon({ direction = "right" }: { direction?: "left" | "right" }) {
   return (
@@ -66,13 +60,13 @@ export function ProjectNavigation({
   return (
     <nav className="mk-project-nav" aria-label="Project areas">
       <button type="button" aria-current={surface === "overview" ? "true" : undefined} onClick={() => onSelect("overview")}>
-        <WorkspaceIcon kind="overview" /> Overview
+        Overview
       </button>
       <button type="button" disabled={!wiringAvailable || wiringLoading} aria-current={surface === "wiring" ? "true" : undefined} onClick={() => onSelect("wiring")}>
-        <WorkspaceIcon kind="wiring" /> {wiringLoading ? "Loading wiring" : "Wiring"}
+        {wiringLoading ? "Loading wiring" : "Wiring"}
       </button>
       <button type="button" aria-current={surface === "code" ? "true" : undefined} onClick={() => onSelect("code")}>
-        <WorkspaceIcon kind="code" /> Code <span className="mk-nav-lock">Locked</span>
+        <WorkspaceIcon kind="code" /> Code
       </button>
     </nav>
   );
@@ -96,10 +90,9 @@ export function WorkspaceTopBar({
   wiringLoading = false,
   onSelectSurface,
   building = false,
-  progress = 0,
   projects = [],
   selectedProjectId,
-  projectsLabel = "All projects",
+  projectsLabel = "My projects",
   onSelectProject,
 }: {
   user: SafeUser | null;
@@ -142,14 +135,7 @@ export function WorkspaceTopBar({
       </button>
 
       <div className="mk-topbar-navigation">
-        {building ? (
-          <ol className="mk-build-stage-list" aria-label="Build stages">
-            <li data-state={progress >= 24 ? "done" : "current"}><span>{progress >= 24 ? "✓" : "1"}</span><strong>Brief</strong></li>
-            <li data-state={progress >= 48 ? "done" : progress >= 24 ? "current" : "upcoming"}><span>{progress >= 48 ? "✓" : "2"}</span><strong>Parts</strong></li>
-            <li data-state={progress >= 74 ? "done" : progress >= 48 ? "current" : "upcoming"}><span>{progress >= 74 ? "✓" : "3"}</span><strong>Assembly</strong></li>
-            <li data-state={progress >= 96 ? "done" : progress >= 74 ? "current" : "upcoming"}><span>{progress >= 96 ? "✓" : "4"}</span><strong>Package</strong></li>
-          </ol>
-        ) : (
+        {building ? null : (
           <ProjectNavigation
             surface={surface}
             wiringAvailable={wiringAvailable}
@@ -162,7 +148,7 @@ export function WorkspaceTopBar({
       <div className="mk-topbar-utilities">
         {!building && (
           <details className="mk-build-switcher" ref={switcherRef}>
-            <summary>{projectsLabel} <span>{projects.length}</span></summary>
+            <summary>{projectsLabel === "All projects" ? "My projects" : projectsLabel}</summary>
             <div>
               {projects.length ? projects.map((project) => (
                 <button
@@ -195,9 +181,6 @@ export function WorkspaceTopBar({
 
 export function WorkspaceContextBar({
   title,
-  idea,
-  label = "Project",
-  onHome,
   action,
 }: {
   title: string;
@@ -208,14 +191,9 @@ export function WorkspaceContextBar({
 }) {
   return (
     <section className="mk-workspace-context" aria-label="Current project">
-      <button className="mk-context-back" type="button" onClick={onHome} aria-label="Back to Makeable home">
-        <ArrowIcon direction="left" /> <span>Home</span>
-      </button>
       <div className="mk-context-title">
-        <small>{label}</small>
         <strong title={title}>{title}</strong>
       </div>
-      {idea && <div className="mk-context-idea"><small>Original idea</small><p>{idea}</p></div>}
       {action && <div className="mk-context-action">{action}</div>}
     </section>
   );
@@ -259,8 +237,8 @@ export function BuildFailurePanel({
   technicalMessage,
   buildId,
   prompt,
-  retryLabel = "Try this build again",
-  backLabel = "Return to projects",
+  retryLabel = "Try again",
+  backLabel = "My projects",
   onRetry,
   onEdit,
   onBack,
@@ -275,31 +253,34 @@ export function BuildFailurePanel({
   onEdit?: () => void;
   onBack: () => void;
 }) {
-  const friendlyMessage = /not found|exact project/i.test(technicalMessage)
-    ? "We could not safely open this project, so we left the rest of your projects untouched."
-    : "Something interrupted this build before it finished. Your idea is safe, and you can try it again without starting over.";
+  const planMismatch = /unrequested capabilities|unrelated functional parts|missing requested capabilities/i.test(technicalMessage);
+  const interruptedConnection = /Connection interrupted while checking/i.test(technicalMessage);
+  const friendlyMessage = interruptedConnection
+    ? "Your build may still be running. Reconnect to check it without starting again."
+    : planMismatch
+    ? "The selected parts didn’t match your idea. Your idea is saved for another try."
+    : /not found|exact project/i.test(technicalMessage)
+    ? "We couldn’t open this project. Your other projects are unchanged."
+    : "The build stopped, but your idea is saved. You can try again or make a change.";
   return (
     <section className="mk-build-failure" aria-labelledby="workspace-title" role="alert">
       <div className="mk-build-failure-body">
-      <small>Build safely stopped</small>
-      <h1 id="workspace-title">{title}</h1>
+      <h1 id="workspace-title">{interruptedConnection ? "Let’s reconnect." : planMismatch ? "This build didn’t finish." : title}</h1>
       <p>{friendlyMessage}</p>
-      {(buildId || prompt) && <dl>
-        {buildId && <div><dt>Build ID</dt><dd>{buildId}</dd></div>}
-        {prompt && <div><dt>Your idea</dt><dd>{prompt}</dd></div>}
-      </dl>}
-      <details className="mk-failure-details">
-        <summary>View failure details</summary>
-        <p>{technicalMessage}</p>
-      </details>
+      {prompt && <div className="mk-generation-original"><span>Your idea</span><p>{prompt}</p></div>}
       </div>
       <footer className="mk-build-failure-footer">
       <div className="mk-progress-actions mk-failure-actions">
-        <button className="mk-button mk-button-dark" type="button" onClick={onRetry}>{retryLabel}</button>
+        <button className="mk-button mk-button-dark" type="button" onClick={onRetry}>{interruptedConnection ? "Reconnect" : retryLabel}</button>
         {onEdit && <button className="mk-button" type="button" onClick={onEdit}>Edit my idea</button>}
         <button className="mk-button mk-button-quiet" type="button" onClick={onBack}>{backLabel}</button>
       </div>
-      <p className="mk-failure-credit">No completed replacement was saved.</p>
+      <p className="mk-failure-credit">{interruptedConnection ? "The final status is not confirmed yet. Your other projects are unchanged." : "No completed replacement was saved."}</p>
+      <details className="mk-failure-details">
+        <summary>Build details</summary>
+        {buildId && <dl><div><dt>Build ID</dt><dd>{buildId}</dd></div></dl>}
+        <p>{technicalMessage}</p>
+      </details>
       </footer>
     </section>
   );
@@ -339,7 +320,6 @@ export function BuildClarificationPanel({
   return (
     <section className="mk-build-clarification" aria-labelledby="workspace-title">
       <div className="mk-clarification-heading">
-        <small>One quick choice</small>
         <h1 id="workspace-title">One detail before we build</h1>
         <p>{clarification.question}</p>
       </div>
@@ -438,9 +418,7 @@ export function FolderSkeleton() {
       </div>
       <section className="mk-skeleton-brief">
         <div className="mk-loader-copy" role="status" aria-live="polite">
-          <span>Opening project</span>
-          <strong id="workspace-title">Loading your build</strong>
-          <p>Bringing in the preview and matched parts.</p>
+          <strong id="workspace-title">Opening your project…</strong>
         </div>
         <div className="mk-skeleton-lines" aria-hidden="true">
           <span />
@@ -455,7 +433,6 @@ export function FolderSkeleton() {
 
 export function GenerationWorkspace({
   stage,
-  progress,
   error,
   busy,
   buildId,
@@ -478,15 +455,15 @@ export function GenerationWorkspace({
   onRetry: () => void;
   onEdit: () => void;
 }) {
-  const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
-  const checkpointIndex = safeProgress >= 92 ? 3 : safeProgress >= 48 ? 2 : safeProgress >= 24 ? 1 : 0;
+  const checkpointIndex = stage.checkpoint ?? 0;
   const waitingForSignIn = /sign in with google/i.test(error);
   const terminalFailure = Boolean(error && !busy && !waitingForSignIn);
-  const localStart = useRef(Date.now());
+  const localStart = useRef(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     if (!busy) return undefined;
+    if (!localStart.current) localStart.current = Date.now();
     const timestamp = Date.parse(startedAt || "");
     const start = Number.isFinite(timestamp) ? timestamp : localStart.current;
     const tick = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
@@ -498,86 +475,36 @@ export function GenerationWorkspace({
   const elapsedLabel = `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
 
   if (terminalFailure) return (
-    <div className="mk-workspace-grid mk-terminal-failure-layout" aria-busy="false">
-      <div className="mk-terminal-failure-visual" aria-hidden="true"><span>!</span><small>Build paused safely</small></div>
+    <div className="mk-recovery-layout" aria-busy="false">
       <BuildFailurePanel technicalMessage={error} buildId={buildId} prompt={prompt} onRetry={onRetry} onEdit={onEdit} onBack={onDismiss} />
     </div>
   );
 
   return (
-    <div className="mk-generation-workshop" aria-busy={busy}>
-      <header className="mk-generation-workshop-header">
-        <div>
-          <span>Makeable workshop</span>
-          <h1 id="workspace-title">Building your project</h1>
+    <div className="mk-generation-workshop mk-generation-editorial" aria-busy={busy}>
+      <section className="mk-generation-story">
+        <div role="status" aria-live="polite" aria-atomic="true">
+          <h1 id="workspace-title">{stage.label}</h1>
         </div>
-        <p><span aria-hidden="true">{buildId ? "✓" : "…"}</span> {buildId ? "Saved — safe to close this tab" : "Saving your request"}</p>
-      </header>
-
-      <div className="mk-generation-workshop-body">
-        <div className="mk-generation-drawing" aria-hidden="true">
-          <div className="mk-product-blueprint">
-            <span className="mk-blueprint-shell" />
-            <span className="mk-blueprint-screen" />
-            <span className="mk-blueprint-port" />
-            <span className="mk-blueprint-scan" />
-          </div>
-          <span className="mk-drawing-callout mk-drawing-callout-one">Build layout</span>
-          <span className="mk-drawing-callout mk-drawing-callout-two">Part compatibility</span>
-          <small>Technical preview develops as the build progresses</small>
+        {prompt && <div className="mk-generation-original"><p>{prompt}</p></div>}
+      </section>
+      <section className="mk-generation-activity" aria-label="Build generation progress">
+        <ol className="mk-generation-stage-rows" aria-label="Generation steps">
+          {["Plan your build", "Choose parts", "Prepare assembly", "Finish up"].map((label, index) => (
+            <li key={label} aria-current={index === checkpointIndex ? "step" : undefined} data-state={index < checkpointIndex ? "done" : index === checkpointIndex ? "current" : "upcoming"}>
+              <span aria-hidden="true">{index < checkpointIndex ? "✓" : index + 1}</span><strong>{label}</strong>
+            </li>
+          ))}
+        </ol>
+        <div className="mk-generation-clock"><strong>{elapsedLabel} elapsed</strong>{elapsedSeconds >= 90 && <p>Still working on it.</p>}</div>
+        <div className="mk-progress-actions">
+          <button className="mk-progress-dismiss" type="button" onClick={onDismiss}>My projects</button>
+          <button className="mk-progress-cancel" type="button" onClick={onCancel}>Cancel build</button>
         </div>
-
-        <section className="mk-generation-workshop-status">
-          <div className="mk-loader-copy" role="status" aria-live="polite" aria-atomic="true">
-            <span>In progress</span>
-            <strong>{stage.label}</strong>
-            <p>{stage.detail}</p>
-          </div>
-
-          <div className="mk-generation-time">
-            <p><strong>{elapsedLabel}</strong><span>elapsed</span></p>
-            <small>Most projects take 3–6 minutes</small>
-          </div>
-
-          <div
-            className="mk-generation-segments"
-            role="progressbar"
-            aria-label="Build generation progress"
-            aria-valuemin={0}
-            aria-valuemax={4}
-            aria-valuenow={checkpointIndex + 1}
-            aria-valuetext={`${stage.label}. Stage ${checkpointIndex + 1} of ${checkpointLabels.length}.`}
-          >
-            {checkpointLabels.map((label, index) => (
-              <span key={label} data-state={index < checkpointIndex ? "done" : index === checkpointIndex ? "current" : "upcoming"} />
-            ))}
-          </div>
-
-          <ol className="mk-generation-checkpoints" aria-label="Generation steps">
-            {checkpointLabels.map((label, index) => (
-              <li
-                key={label}
-                data-state={index < checkpointIndex ? "done" : index === checkpointIndex ? "current" : "upcoming"}
-              >
-                <span aria-hidden="true">{index < checkpointIndex ? "✓" : index === checkpointIndex ? "•" : ""}</span>
-                <div><strong>{label}</strong><small>{index === checkpointIndex ? stage.detail : index < checkpointIndex ? "Complete" : "Waiting"}</small></div>
-              </li>
-            ))}
-          </ol>
-
-          {prompt && <div className="mk-generation-brief">
-            <span>Your brief</span>
-            <p>“{prompt}”</p>
-          </div>}
-
-          <div className="mk-progress-actions">
-            <button className="mk-progress-dismiss" type="button" onClick={onDismiss}>View my projects</button>
-            <button className="mk-progress-cancel" type="button" onClick={onCancel}>Cancel build</button>
-          </div>
-          <p className="mk-generation-leave-note">{buildId ? "We’ll keep working if you leave." : "Keep this tab open while we save your request."}</p>
-          {waitingForSignIn && <p className="mk-form-notice" role="status">{error}</p>}
-        </section>
-      </div>
+        <p className="mk-generation-leave-note">{buildId ? "You can leave this tab. We’ll keep working." : "Stay here while we save your idea."}</p>
+        {buildId && <details className="mk-generation-job-details"><summary>Build details</summary><small className="mk-generation-job-id">Build ID · {buildId}</small></details>}
+        {waitingForSignIn && <p className="mk-form-notice" role="status">{error}</p>}
+      </section>
     </div>
   );
 }
@@ -585,16 +512,12 @@ export function GenerationWorkspace({
 export function LockedCodePanel({ onBack }: { onBack: () => void }) {
   return (
     <section className="mk-code-locked" aria-labelledby="workspace-title">
-      <div className="mk-code-editor-ghost" aria-hidden="true">
-        <span /><span /><span /><span /><span /><span />
-      </div>
       <div className="mk-code-locked-copy">
         <span className="mk-code-lock-mark" aria-hidden="true"><WorkspaceIcon kind="code" /></span>
-        <small>Coming soon</small>
-        <h1 id="workspace-title">Firmware is the next part of your project</h1>
-        <p>Your saved project will stay ready while we finish guided code generation.</p>
+        <h1 id="workspace-title">Coming soon</h1>
+        <p>Firmware generation is next.</p>
+        <p>Your project is saved. No credit is used here.</p>
         <button type="button" onClick={onBack}><ArrowIcon direction="left" /> Back to overview</button>
-        <span>Code generation won’t use another credit until it is available.</span>
       </div>
     </section>
   );

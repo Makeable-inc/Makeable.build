@@ -383,25 +383,25 @@ const jobCheckpointStages: Record<BuildJobState, GenerationStage & { progress: n
   queued: {
     at: 0,
     progress: 8,
-    label: "Queued in the workshop",
+    label: "Your build is queued.",
     detail: "Your idea is in line and the build job has been created.",
   },
   planning: {
     at: 24,
     progress: 8,
-    label: "Understanding your brief",
+    label: "Planning your build.",
     detail: "Turning your idea into a clear hardware plan.",
   },
   fitting_parts: {
     at: 48,
     progress: 24,
-    label: "Matching real parts",
+    label: "Finding your parts.",
     detail: "Picking verified pre-soldered modules from the catalog.",
   },
   rendering: {
     at: 70,
     progress: 48,
-    label: "Preparing the preview",
+    label: "Bringing it together.",
     detail: "Turning the saved plan into a clear product view.",
   },
   ready: {
@@ -434,7 +434,8 @@ function generationStageFor(progress: number): GenerationStage {
 }
 
 function generationStageForJob(jobState: BuildJobState | "", progress: number) {
-  return jobState ? jobCheckpointStages[jobState] : generationStageFor(progress);
+  const checkpoints = { queued: 0, planning: 0, fitting_parts: 1, rendering: 2, ready: 3, failed: 0, cancelled: 0 };
+  return jobState ? { ...jobCheckpointStages[jobState], checkpoint: checkpoints[jobState] } : generationStageFor(progress);
 }
 
 function isActiveBuildJob(job: BuildJob | null) {
@@ -637,7 +638,7 @@ export default function Home() {
 
   useEffect(() => {
     currentJobRef.current = currentJob;
-    if (isActiveBuildJob(currentJob)) {
+    if (currentJob && !currentJob.claimedAt && currentJob.state !== "cancelled") {
       window.sessionStorage.setItem(ACTIVE_BUILD_JOB_STORAGE_KEY, currentJob.id);
     } else if (currentJob) {
       window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
@@ -829,12 +830,25 @@ export default function Home() {
     setGenerationBusy(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
 
+    let interruptedChecks = 0;
     while (!signal.aborted) {
-      const response = await fetch(apiUrl(`/api/build-jobs/${encodeURIComponent(jobId)}`), {
+      let response: Response;
+      try {
+        response = await fetch(apiUrl(`/api/build-jobs/${encodeURIComponent(jobId)}`), {
         headers: { Accept: "application/json" },
         credentials: "include",
         signal,
-      });
+        });
+        if (response.status >= 500 || response.status === 429) throw new Error("Temporary status check interruption");
+        interruptedChecks = 0;
+      } catch (error) {
+        if (signal.aborted) throw error;
+        if (++interruptedChecks <= 3) {
+          await abortableDelay(1600 * interruptedChecks, signal);
+          continue;
+        }
+        throw new Error("Connection interrupted while checking this build. The build may still be running. Try again to reconnect to the same job.");
+      }
       const result = await readJsonResponse<BuildJobStatusResponse>(response);
       if (!response.ok || !result.job) {
         throw new Error(result.error || "Makeable could not check this build job.");
@@ -1387,6 +1401,7 @@ export default function Home() {
           }}
           onEdit={() => {
             generationAbortRef.current?.abort();
+            window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
             setGenerationBusy(false);
             const retryIdea = (currentJob?.idea || pendingIdeaRef.current || idea).trim();
             if (retryIdea) setIdea(retryIdea);
@@ -1711,7 +1726,7 @@ function BuildWorkspace({
   const wiringReady = Boolean(build && projectWiringReady(build));
 
   return (
-    <main className="mk-app-shell">
+    <main className="mk-app-shell" data-flow={isLoading || isClarifying ? "generation" : "project"}>
       <WorkspaceTopBar
         user={user}
         remaining={buildsRemaining}
@@ -1736,7 +1751,7 @@ function BuildWorkspace({
         }}
       />
 
-      <WorkspaceContextBar
+      {!isLoading && !isClarifying && <WorkspaceContextBar
         title={isLoading ? "Building your project" : activeIdentity?.title || (isClarifying ? "Choose a direction" : "My builds")}
         idea={isLoading || isClarifying ? prompt : build?.idea || build?.summary}
         label={isLoading ? "In the workshop" : isClarifying ? "Clarification" : build ? "Project" : "Library"}
@@ -1746,7 +1761,7 @@ function BuildWorkspace({
             Open wiring <ArrowIcon />
           </button>
         ) : undefined}
-      />
+      />}
 
       <section className="mk-workspace-main" aria-labelledby="workspace-title">
         {isLoading ? (

@@ -37,7 +37,8 @@ export function partPlainLabel(part, build) {
   if (/button|touch|input/.test(text)) return "User control";
   if (/sensor/.test(text) || part?.category === "sensor") return "Sensor";
   if (/buzzer|speaker|piezo/.test(text)) return "Sound feedback";
-  if (/led|rgb|output|light/.test(text)) return "Status light";
+  if (/vibration/.test(text)) return "Vibration motor";
+  if (/\bled\b|rgb|light/.test(text)) return "Status light";
   if (/servo|motor|actuator|wheel drive/.test(text) || part?.category === "actuator") return "Drive motor";
   if (/connector|qwiic|usb/.test(text)) return "Connector";
   if (/breadboard/.test(text)) return "Breadboard";
@@ -57,6 +58,7 @@ export function projectPartPurpose(part, build) {
   const project = build ? `“${projectDisplayIdentity(build).title}”` : "this project";
   const reason = {
     "The brain": "runs the control logic and coordinates the connected parts",
+    "Vibration motor": "provides physical vibration feedback for the project",
     "The display": "makes readings, controls, and project status visible",
     "Climate sensor": "measures the temperature, humidity, or air-pressure values the project uses",
     "Temperature sensor": "measures surface temperature without requiring physical contact",

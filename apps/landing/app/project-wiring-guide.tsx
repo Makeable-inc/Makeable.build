@@ -33,6 +33,7 @@ type WiringStep = {
 
 type AssemblyPart = {
   id: string;
+  assetId?: string;
   label?: string;
   catalogPartId?: string;
   role?: string;
@@ -78,10 +79,16 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
     const nav = progressRef.current;
     const current = nav?.querySelector<HTMLElement>('[aria-current="step"]');
     if (!nav || !current) return;
-    const frame = nav.getBoundingClientRect();
-    const button = current.getBoundingClientRect();
-    if (button.left < frame.left) nav.scrollLeft -= frame.left - button.left + 8;
-    else if (button.right > frame.right) nav.scrollLeft += button.right - frame.right + 8;
+    const keepCurrentVisible = () => {
+      const frame = nav.getBoundingClientRect();
+      const button = current.getBoundingClientRect();
+      if (button.left < frame.left) nav.scrollLeft -= frame.left - button.left + 8;
+      else if (button.right > frame.right) nav.scrollLeft += button.right - frame.right + 8;
+    };
+    keepCurrentVisible();
+    const observer = new ResizeObserver(keepCurrentVisible);
+    observer.observe(nav);
+    return () => observer.disconnect();
   }, [boundedIndex]);
   const connections = useMemo(
     () => wiringConnectionsForStep(build, activeStep) as WiringConnection[],
@@ -157,10 +164,9 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
         <section className="mk-wiring-simulation" aria-labelledby="wiring-simulation-title">
           <div className="mk-wiring-simulation-heading">
             <div>
-              <span>Saved assembly view</span>
-              <h2 id="wiring-simulation-title">Parts used in this step</h2>
+              <h2 id="wiring-simulation-title">Your assembly</h2>
             </div>
-            <p>Drawn from this project’s saved wiring artifact.</p>
+            <p>Saved guide · No credit used</p>
           </div>
           <div className="mk-wiring-artifact-visual">
             <div className="mk-wiring-artifact-parts" ref={diagramRef} tabIndex={0} role="region" aria-label="Assembly parts and connections">
@@ -171,8 +177,8 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
               )}
               {visibleParts.map(({ assemblyPart, catalogPart }) => (
                 <article key={assemblyPart.id} data-part-id={assemblyPart.id}>
-                  {catalogPart ? <PartThumbnail part={catalogPart} /> : <span className="mk-wiring-part-placeholder" aria-hidden="true" />}
-                  <div><small>{assemblyPart.role || "part"}</small><strong>{assemblyPart.label || catalogPart?.name || assemblyPart.id}</strong></div>
+                  <PartThumbnail part={catalogPart || { id: assemblyPart.assetId || assemblyPart.catalogPartId || assemblyPart.id, name: assemblyPart.label || assemblyPart.id }} />
+                  <div><strong>{assemblyPart.label || catalogPart?.name || assemblyPart.id}</strong></div>
                 </article>
               ))}
             </div>
@@ -206,7 +212,7 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
             )) : wirelessLinks.length ? wirelessLinks.map((link) => (
               <div className="mk-wiring-preparation" key={link.id}>
                 <strong>{link.protocol || "ESP-NOW"} wireless link</strong>
-                <span>{link.fromNodeId || "First device"} ↔ {link.toNodeId || "Second device"}. This dashed radio link is not a physical wire.</span>
+                <span>{link.fromNodeId || "First device"} ↔ {link.toNodeId || "Second device"}. No physical wire needed.</span>
               </div>
             )) : (
               <div className="mk-wiring-preparation">
