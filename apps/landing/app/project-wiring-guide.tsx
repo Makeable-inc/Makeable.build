@@ -73,6 +73,16 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
 
   const boundedIndex = Math.min(activeIndex, Math.max(0, steps.length - 1));
   const activeStep = steps[boundedIndex];
+  const progressRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = progressRef.current;
+    const current = nav?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!nav || !current) return;
+    const frame = nav.getBoundingClientRect();
+    const button = current.getBoundingClientRect();
+    if (button.left < frame.left) nav.scrollLeft -= frame.left - button.left + 8;
+    else if (button.right > frame.right) nav.scrollLeft += button.right - frame.right + 8;
+  }, [boundedIndex]);
   const connections = useMemo(
     () => wiringConnectionsForStep(build, activeStep) as WiringConnection[],
     [activeStep, build],
@@ -92,9 +102,9 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
       if (!frame.width || !frame.height) return;
       const parts = Object.fromEntries(Array.from(container.querySelectorAll<HTMLElement>("article[data-part-id]")).map((part) => {
         const box = part.getBoundingClientRect();
-        return [part.dataset.partId!, {x: box.x - frame.x, y: box.y - frame.y, width: box.width, height: box.height}];
+        return [part.dataset.partId!, {x: box.x - frame.x + container.scrollLeft, y: box.y - frame.y + container.scrollTop, width: box.width, height: box.height}];
       }));
-      setDiagram({width: frame.width, height: frame.height, parts});
+      setDiagram({width: container.scrollWidth, height: container.scrollHeight, parts});
     };
     const observer = new ResizeObserver(measure);
     observer.observe(container);
@@ -123,7 +133,7 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
       <h1 id="workspace-title" className="mk-visually-hidden">Wire {identity.title}</h1>
 
       <div className="mk-wiring-toolbar">
-        <nav className="mk-wiring-progress" aria-label="Wiring steps">
+        <nav ref={progressRef} className="mk-wiring-progress" aria-label="Wiring steps">
           {steps.map((step, index) => (
             <button
               type="button"
@@ -153,9 +163,9 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
             <p>Drawn from this project’s saved wiring artifact.</p>
           </div>
           <div className="mk-wiring-artifact-visual">
-            <div className="mk-wiring-artifact-parts" ref={diagramRef}>
+            <div className="mk-wiring-artifact-parts" ref={diagramRef} tabIndex={0} role="region" aria-label="Assembly parts and connections">
               {connections.length > 0 && (
-                <svg className="mk-wiring-connection-map" viewBox={`0 0 ${diagram.width} ${diagram.height}`} aria-hidden="true">
+                <svg className="mk-wiring-connection-map" style={{width: diagram.width, height: diagram.height}} viewBox={`0 0 ${diagram.width} ${diagram.height}`} aria-hidden="true">
                   {connectionPaths.map((connection) => <path key={connection.id} d={connection.path} style={{ stroke: connection.color }} />)}
                 </svg>
               )}

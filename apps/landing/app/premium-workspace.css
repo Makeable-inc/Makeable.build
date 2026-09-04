@@ -1006,10 +1006,12 @@
   display: grid;
   height: 64px;
   min-width: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
   gap: 5px;
   padding: 7px;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid var(--studio-line);
   border-radius: 10px;
   background: var(--studio-white);
@@ -1033,11 +1035,13 @@
   display: grid;
   min-height: 0;
   grid-template-columns: repeat(3, minmax(0, 220px));
+  grid-auto-rows: max-content;
+  align-content: safe center;
   align-items: center;
   justify-content: space-around;
   gap: 22px;
   padding: 24px 28px;
-  overflow: hidden;
+  overflow: auto;
 }
 .mk-wiring-connection-map { position: absolute; inset: 18% 3%; z-index: 0; width: 94%; height: 64%; overflow: visible; }
 .mk-wiring-connection-map path { fill: none; stroke-width: 5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
@@ -1451,6 +1455,8 @@
   .mk-wiring-pane-toggle { position: static; flex-shrink: 0; }
   .mk-wiring-toolbar { display: flex; gap: 6px; }
   .mk-wiring-progress { flex: 1; min-width: 0; overflow: auto; }
+  .mk-wiring-progress { grid-auto-columns: minmax(42px, 1fr); }
+  .mk-wiring-artifact-parts:has(article:nth-of-type(4)) { grid-template-columns: repeat(2, minmax(0,1fr)); align-content: start; }
   .mk-wiring-progress button { min-width: 38px; flex-shrink: 0; }
   .mk-wiring-pane-toggle button { min-width: 46px; padding: 0 5px; }
   .mk-wiring-step-heading { padding: 10px 12px; }
