@@ -16,26 +16,26 @@
 .mk-overview-frame .mk-project-parts-head { min-height: 42px; align-items: center; margin-bottom: 20px; gap: 12px; }
 .mk-overview-frame .mk-project-parts-head h2 { font-size: 28px; }
 .mk-overview-frame .mk-project-parts-head > span { font-size: 14px; text-align: right; }
-.mk-overview-frame .mk-project-part-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; gap: 16px; padding: 3px; }
-.mk-overview-frame .mk-project-part-card { display: grid; grid-template-columns: 66px minmax(0,1fr); align-content: start; gap: 16px; padding: 18px; border: 1px solid #dedbd5; border-radius: 12px; background: #fff; min-height: 0; }
-.mk-overview-frame .mk-detail-part-thumb { width: 66px; height: 66px; }
+.mk-overview-frame .mk-project-part-list { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: auto; scrollbar-gutter: stable; }
+/* Rows grow with their content. Never squeeze the merchant links into a fixed grid track. */
+.mk-overview-frame .mk-project-part-card { display: grid; flex: 0 0 auto; grid-template-columns: 56px minmax(0,1fr) minmax(224px,.9fr); align-items: center; gap: 16px; padding: 16px 0; border: 0; border-bottom: 1px solid #dedbd5; border-radius: 0; background: transparent; min-height: auto; height: auto; }
+.mk-overview-frame .mk-detail-part-thumb { width: 56px; height: 56px; }
 .mk-overview-frame .mk-part-title-row { display: flex; flex-direction: column; align-items: start; gap: 6px; }
 .mk-overview-frame .mk-project-part-copy strong { font-size: 18px; line-height: 1.25; }
 .mk-overview-frame .mk-project-part-copy .mk-detail-part-quantity { display: block; font-size: 14px; border: 0; border-radius: 0; background: none; color: #59544f; padding: 0; font-weight: 400; }
 .mk-overview-frame .mk-detail-part-why { position: relative; }
 .mk-overview-frame .mk-detail-part-why summary { min-height: 36px; display: flex; align-items: center; cursor: pointer; font-size: 14px; }
 .mk-overview-frame .mk-detail-part-why p { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
-.mk-overview-frame .mk-project-part-retailers { grid-column: 1/-1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 0; }
-.mk-app-shell .mk-overview-frame .mk-project-retailer { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 16px 8px; min-height: 140px; border: 1px solid #dedbd5; border-radius: 9px; background: #fffdfb; color: #101316; text-align: center; }
-.mk-overview-frame .mk-project-retailer:hover { border-color: #938a81; background: #fff5eb; }
+.mk-overview-frame .mk-project-part-retailers { grid-column: auto; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0; margin: 0; }
+.mk-app-shell .mk-overview-frame .mk-project-retailer { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; padding: 6px 8px; min-height: 100px; border: 0; border-left: 1px solid #dedbd5; border-radius: 0; background: transparent; color: #101316; text-align: center; line-height: 1.25; }
+.mk-app-shell .mk-overview-frame .mk-project-retailer:hover { background: #fff0e8; }
 .mk-app-shell .mk-overview-frame .mk-retailer-wordmark { font-size: 16px; }
-.mk-app-shell .mk-overview-frame .mk-project-retailer > .mk-offer-price { display: block; font-size: 22px; letter-spacing: -.02em; }
+.mk-app-shell .mk-overview-frame .mk-project-retailer > .mk-offer-price { display: block; font-size: 20px; line-height: 1.2; letter-spacing: -.02em; white-space: nowrap; }
 .mk-overview-frame .mk-offer-status { font-size: 12px; color: #59544f; }
 .mk-app-shell .mk-overview-frame .mk-retailer-action { font-size: 13px; margin-top: 6px; white-space: nowrap; }
 .mk-overview-frame .mk-project-buying-note, .mk-overview-frame .mk-project-warnings { grid-column: 1/-1; }
 .mk-parts-pagination { display: none; }
-.mk-overview-actions { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-top: 1px solid #e0dbd3; padding: 12px 32px; }
-.mk-overview-actions > span { color: #59544f; font-size: 14px; }
+.mk-overview-actions { display: flex; justify-content: flex-end; align-items: center; width: 100%; max-width: 1720px; margin: 0 auto; gap: 20px; border-top: 1px solid #e0dbd3; padding: 12px 32px; }
 .mk-overview-actions button, .mk-app-shell .mk-wiring-step-controls button:last-child { min-height: 48px; border: 0; border-radius: 8px; background: #ff6f62; color: #101316; padding: 12px 24px; font-size: 17px; font-weight: 600; cursor: pointer; }
 .mk-overview-actions button { min-width: 240px; display: flex; align-items: center; justify-content: center; gap: 14px; }
 .mk-overview-actions button span { margin-left: 14px; }
@@ -62,13 +62,14 @@
 .mk-step-part .mk-detail-part-thumb { width: 64px; height: 64px; background: transparent; border: 0; }
 .mk-step-part strong { font-size: 16px; font-weight: 500; }
 @media (min-width: 761px) and (max-width: 1100px) {
-  .mk-overview-frame .mk-project-overview { gap: 22px; padding: 22px; grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr); }
-  .mk-overview-frame .mk-project-part-card { padding: 12px; grid-template-columns: 44px minmax(0,1fr); gap: 10px; }
+  .mk-overview-frame .mk-project-overview { gap: 22px; padding: 22px; grid-template-columns: minmax(0,.65fr) minmax(0,1.35fr); }
+  .mk-overview-frame .mk-project-part-card { padding: 14px 0; grid-template-columns: 44px minmax(0,1fr) 240px; gap: 10px; }
   .mk-overview-frame .mk-detail-part-thumb { width: 44px; height: 44px; }
-  .mk-overview-frame .mk-project-part-retailers { gap: 6px; }
+  .mk-overview-frame .mk-project-part-retailers { gap: 0; }
   .mk-overview-frame .mk-project-part-copy strong { font-size: 16px; }
-  .mk-overview-frame .mk-offer-price { font-size: 18px; }
-  .mk-app-shell .mk-overview-frame .mk-retailer-wordmark { font-size: 13px; }
+  .mk-app-shell .mk-overview-frame .mk-project-retailer > .mk-offer-price { font-size: 18px; }
+  .mk-app-shell .mk-overview-frame .mk-retailer-wordmark { font-size: 14px; }
+  .mk-overview-actions { padding-inline: 22px; }
 }
 @media (max-width: 760px) {
   .mk-app-shell:has(.mk-overview-frame) { grid-template-rows: 108px minmax(0,1fr); }
@@ -87,17 +88,18 @@
   .mk-parts-pagination button { width: 44px; min-height: 44px; display: grid; place-items: center; border: 1px solid #dedbd5; border-radius: 6px; font-size: 24px; background: transparent; }
   .mk-parts-pagination button:disabled { opacity: .35; }
   .mk-overview-frame .mk-project-part-list { display: block; overflow: auto; }
-  .mk-overview-frame .mk-project-part-card { padding: 14px; gap: 12px; grid-template-columns: 60px minmax(0,1fr); }
+  .mk-overview-frame .mk-project-part-card { padding: 12px 0; gap: 12px; grid-template-columns: 60px minmax(0,1fr); }
+  .mk-overview-frame .mk-project-part-retailers { grid-column: 1/-1; }
   .mk-overview-frame .mk-project-buying-note, .mk-overview-frame .mk-project-warnings { margin-top: 12px; }
   .mk-overview-frame .mk-project-part-card[data-mobile-current="false"] { display: none; }
   .mk-overview-frame .mk-project-part-copy strong { font-size: 17px; }
   .mk-overview-frame .mk-detail-part-thumb { width: 60px; height: 60px; }
   .mk-overview-frame .mk-detail-part-why { display: block; }
   .mk-overview-frame .mk-detail-part-why summary { min-height: 32px; }
-  .mk-app-shell .mk-overview-frame .mk-project-retailer { min-height: 115px; padding: 10px; gap: 5px; }
+  .mk-app-shell .mk-overview-frame .mk-project-retailer { min-height: 100px; padding: 8px; gap: 4px; }
+  .mk-app-shell .mk-overview-frame .mk-project-retailer:first-child { border-left: 0; }
   .mk-app-shell .mk-overview-frame .mk-project-retailer > .mk-offer-price { font-size: 20px; }
   .mk-overview-actions { padding: 8px 16px; }
-  .mk-overview-actions > span { display: none; }
   .mk-overview-actions button { width: 100%; min-height: 48px; }
   .mk-app-shell .mk-project-wiring { grid-template-rows: auto auto minmax(0,1fr) 60px; gap: 8px; }
   .mk-app-shell .mk-wiring-toolbar { display: flex; flex-direction: column; gap: 8px; }
@@ -115,4 +117,18 @@
   .mk-app-shell .mk-wiring-step-heading h2 { display: none; }
   .mk-app-shell .mk-wiring-step-heading p { font-size: 16px; }
   .mk-app-shell .mk-wiring-step-controls button { font-size: 15px; min-height: 48px; }
+}
+@media (max-width: 760px) and (max-height: 720px) {
+  .mk-overview-frame .mk-project-overview { padding: 12px 16px; gap: 12px; grid-template-rows: minmax(0,.45fr) minmax(0,1fr); }
+  .mk-overview-frame .mk-project-overview-primary { grid-template-columns: 88px minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); }
+  .mk-project-overview-primary > h1 { grid-column: 1/-1; }
+  .mk-overview-frame .mk-project-overview-header { max-height: none; height: 100%; }
+  .mk-overview-frame .mk-project-part-card { padding: 8px 0; gap: 8px; }
+  .mk-overview-frame .mk-part-title-row { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+}
+@media (max-width: 760px) and (max-height: 620px) {
+  .mk-overview-frame .mk-project-parts-head { margin-bottom: 4px; }
+  .mk-overview-frame .mk-project-part-card { padding-block: 4px; }
+  .mk-app-shell .mk-overview-frame .mk-project-retailer { min-height: 92px; padding-block: 4px; gap: 3px; }
+  .mk-app-shell .mk-overview-frame .mk-retailer-action { margin-top: 2px; }
 }

@@ -93,7 +93,6 @@ export function ProjectOverview({ build, onOpenWiring, wiringLoading = false }: 
       </section>
     </div>
     <footer className="mk-overview-actions">
-      <span>Prices are estimates. Check pack size before buying.</span>
       {onOpenWiring && projectWiringReady(build) && <button type="button" onClick={onOpenWiring} disabled={wiringLoading}>{wiringLoading ? "Opening guide…" : "Open wiring"} <ArrowIcon /></button>}
     </footer>
     </div>
@@ -154,7 +153,7 @@ function ProjectPartsList({ build, parts }: { build: ProjectOverviewBuild; parts
           <button type="button" aria-label="Next part" disabled={currentPart >= parts.length - 1} onClick={() => setPartIndex(currentPart + 1)}><ArrowIcon /></button>
         </nav>
       </div>
-      <div className="mk-project-part-list" tabIndex={0} role="region" aria-label="Complete parts list — scroll for more parts">
+      <div className="mk-project-part-list" data-parts-layout="rows" tabIndex={0} role="region" aria-label="Complete parts list — scroll for more parts">
         {parts.map((part, index) => {
           const quote = part.listingId ? quotes[part.listingId] : undefined;
           const amazon = projectRetailerLink(part, "amazon", quote?.destinationUrl);

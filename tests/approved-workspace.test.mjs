@@ -5,6 +5,16 @@ import vm from 'node:vm';
 import {compactStepNumbers,wiringCopy,wiringEndpointLabel} from '../apps/circuit-lab/wiring-presentation.mjs';
 import {retailerPrice} from '../apps/landing/app/project-retailer-links.mjs';
 
+test('parts use content-sized rows with flat retailer columns and no footer disclaimer',async()=>{
+ const source=await readFile(new URL('../apps/landing/app/project-overview.tsx',import.meta.url),'utf8');
+ const css=await readFile(new URL('../apps/landing/app/approved-workspace.css',import.meta.url),'utf8');
+ assert.match(source,/data-parts-layout="rows"/);
+ assert.doesNotMatch(source,/Prices are estimates\. Check pack size before buying\./);
+ assert.match(css,/\.mk-overview-frame \.mk-project-part-list \{ display: flex; flex-direction: column;/);
+ assert.match(css,/\.mk-overview-frame \.mk-project-part-card \{[^}]*flex: 0 0 auto;[^}]*height: auto;/);
+ assert.match(css,/\.mk-app-shell \.mk-overview-frame \.mk-project-retailer \{[^}]*border-radius: 0;/);
+});
+
 test('compact stepper always includes current and endpoints without a scrolling label strip',()=>{
  assert.deepEqual(compactStepNumbers(9,0),[0,1,2,'gap',8]);
  assert.deepEqual(compactStepNumbers(9,4),[0,'gap',3,4,5,'gap',8]);
