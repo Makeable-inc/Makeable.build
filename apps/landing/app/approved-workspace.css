@@ -132,3 +132,8 @@
   .mk-app-shell .mk-overview-frame .mk-project-retailer { min-height: 92px; padding-block: 4px; gap: 3px; }
   .mk-app-shell .mk-overview-frame .mk-retailer-action { margin-top: 2px; }
 }
+@media (max-width: 360px) {
+  .mk-app-shell:has(.mk-overview-frame) .mk-topbar-logo { width: 100px; }
+  .mk-app-shell:has(.mk-overview-frame) .mk-topbar-utilities { gap: 8px; }
+  .mk-app-shell:has(.mk-overview-frame) .mk-build-switcher > summary { font-size: 12px; }
+}
