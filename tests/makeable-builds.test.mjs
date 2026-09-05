@@ -32,9 +32,9 @@ test("verified parts catalog exposes the full pre-soldered source library", () =
   const stats = catalogStats();
   const catalog = verifiedPartsCatalog();
 
-  assert.equal(stats.total, 81);
-  assert.equal(stats.presolderedVerified, 81);
-  assert.equal(catalog.length, 81);
+  assert.equal(stats.total, 123);
+  assert.equal(stats.presolderedVerified, 123);
+  assert.equal(catalog.length, 123);
   assert.ok(catalog.every((part) => part.presoldered));
   assert.ok(catalog.filter((part) => part.modelSelectable).every((part) => /^\d{4}-\d{2}-\d{2}$/.test(part.checkedDate)));
   assert.ok(catalog.some((part) => part.name.includes("Seeed Studio XIAO ESP32C3")));
@@ -163,7 +163,8 @@ test("deterministic display selection follows the interface instead of defaultin
     assert.equal(dashboard.body.parts.filter((part) => part.category === "controller").length, 1);
 
     const timer = await build("a retro kitchen countdown timer with a 16x2 character LCD");
-    assert.ok(timer.body.parts.some((part) => /16x2|LC1602/i.test(`${part.name} ${part.subtype}`)));
+    assert.ok(timer.body.parts.some((part) => /16x2|LCD?1602/i.test(`${part.name} ${part.subtype}`)));
+    assert.ok(!timer.body.parts.some((part) => part.id === "b0g5ndckp7-40"), "quarantined legacy LCD must stay excluded");
     assert.ok(!timer.body.parts.some((part) => /0\.91-inch/i.test(part.name)));
 
     const companion = await build("a friendly desk companion with a color animated face");
@@ -477,7 +478,7 @@ test("image prompt stays inside a printable enclosure and avoids literal pets or
     );
 
     assert.equal(result.status, 201);
-    assert.equal(imagePayload.quality, "medium");
+    assert.equal(imagePayload.quality, "low");
     assert.match(imagePayload.prompt, /physically credible project-documentation photograph/i);
     assert.match(imagePayload.prompt, /User intent:/i);
     assert.match(imagePayload.prompt, /without turning every idea into the same box/i);
@@ -486,7 +487,7 @@ test("image prompt stays inside a printable enclosure and avoids literal pets or
     assert.match(imagePayload.prompt, /no physical mascot/i);
     assert.match(imagePayload.prompt, /only as a simple low-resolution pixel graphic inside the selected display/i);
     assert.match(imagePayload.prompt, /zero screws, zero bolts/i);
-    assert.match(imagePayload.prompt, /seamless medium cool-gray sweep/i);
+    assert.match(imagePayload.prompt, /seamless white-to-light-gray cyclorama/i);
     assert.match(imagePayload.prompt, /No wooden table/i);
     assert.match(imagePayload.prompt, /USB-C cutout belongs on the unseen rear or underside/i);
     assert.match(imagePayload.prompt, /must not be visible anywhere in the final hero photograph/i);
@@ -598,7 +599,7 @@ test("render brief separates retro Macintosh, exposed mechanisms, and translucen
     behavior: "Shows status on the selected display.",
     parts: [controller, display, cable],
   });
-  assert.match(translucent.designBrief.visibilityStrategy, /translucent PETG service panel/i);
+  assert.match(translucent.designBrief.visibilityStrategy, /translucent PETG (?:rear\/service shell|service panel)/i);
   assert.match(translucent.prompt, /reveals only exact selected dimension-verified parts/i);
   assert.match(translucent.prompt, /never a dome or decorative bubble/i);
 });
@@ -618,7 +619,7 @@ test("plant renders use one compact soil stake and fail closed without a verifie
   assert.match(plant.prompt, /Plant\/soil fail-closed contract/i);
   assert.match(plant.prompt, /one compact above-soil environmental stake/i);
   assert.match(plant.prompt, /do not show a sensing blade, separate probe, external cable/i);
-  assert.match(plant.prompt, /seamless medium cool-gray sweep/i);
+  assert.match(plant.prompt, /seamless white-to-light-gray cyclorama/i);
   assert.match(plant.designBrief.signatureSilhouette, /compact upright above-soil environmental stake/i);
   assert.doesNotMatch(plant.designBrief.signatureSilhouette, /leaf-like arch/i);
 });
@@ -647,6 +648,9 @@ test("Netlify AI Gateway routing is honored without a direct-OpenAI service tier
         store,
         fetchFn: async (url, options) => {
           requests.push({ url: String(url), body: JSON.parse(String(options?.body || "{}")) });
+          if (requests.at(-1).body.tools?.some((tool) => tool.type === "image_generation")) {
+            return Response.json({ output: [{ type: "image_generation_call", result: "aGVsbG8=" }] });
+          }
           if (String(url).endsWith("/v1/responses")) {
             return new Response(JSON.stringify({
               output_text: JSON.stringify({
@@ -670,9 +674,11 @@ test("Netlify AI Gateway routing is honored without a direct-OpenAI service tier
     assert.equal(result.status, 201);
     assert.deepEqual(requests.map((request) => request.url), [
       "https://makeable.example/.netlify/ai/openai/v1/responses",
-      "https://makeable.example/.netlify/ai/openai/v1/images/generations",
+      "https://makeable.example/.netlify/ai/openai/v1/responses",
     ]);
     assert.equal(Object.hasOwn(requests[0].body, "service_tier"), false);
+    assert.equal(Object.hasOwn(requests[1].body, "service_tier"), false);
+    assert.equal(requests[1].body.tools[0].type, "image_generation");
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
