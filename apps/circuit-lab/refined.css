@@ -1,0 +1,104 @@
+/* Presentation only. The renderer and compiler-owned geometry stay in app.js. */
+:root { --paper: #fffaf1; --card: #fffaf1; --ink: #101316; --muted: #59544f; --line: #ddd8cf; --line-soft: #e8e3db; --accent: #ff625f; --radius-lg: 8px; --radius-md: 6px; --radius-sm: 4px; --shadow: none; }
+body, body.guide-mode { background: var(--paper); }
+button, textarea { font-family: var(--ui); }
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.topbar, .guide-mode .topbar { height: 64px; min-height: 64px; padding: 0 24px; background: #020b17; backdrop-filter: none; border: 0; }
+.brand { min-width: 0; }
+.brand img { width: 132px; height: auto; object-fit: contain; filter: brightness(0) invert(1); }
+.brand em, .guide-mode .brand em { margin-left: 18px; padding-left: 20px; border-color: #46505b; color: #fffaf1; font-size: 16px; font-weight: 500; max-width: 65vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runtime-badges, .workflow-promise, .result-heading .eyebrow, .build-miniature, .guide-header .eyebrow { display: none; }
+.prompt-card, .workspace, .guide-panel, .detail-card, .api-drawer { border: 0; box-shadow: none; background: transparent; }
+.prompt-card { padding: 0; }
+.prompt-card::before, .canvas::before, .canvas::after { display: none; }
+label { font-size: 16px; }
+textarea { border-radius: 6px; font-size: 17px; background: white; }
+.example-prompts > span { display: none; }
+.example-prompts button { min-height: 40px; border-radius: 4px; font-size: 13px; }
+.input-meta, .composer-footnote { font-size: 12px; letter-spacing: 0; text-transform: none; }
+#generate { border-radius: 4px; background: var(--ink); box-shadow: none; font-size: 16px; text-transform: none; letter-spacing: 0; }
+#generate:hover { background: #333; box-shadow: none; }
+.workspace, .guide-mode .workspace { border-radius: 0; box-shadow: none; grid-template-rows: 52px minmax(0,1fr) 32px; }
+.canvas-toolbar, .guide-mode .canvas-toolbar { padding: 0 12px; background: #fafaf8; }
+.tool-group { flex-wrap: nowrap; gap: 4px; }
+.icon-button, .guide-mode .icon-button { height: 44px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; color: var(--muted); background: transparent; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.icon-button.active, .guide-mode .icon-button.active { border-color: var(--ink); color: var(--ink); background: transparent; box-shadow: none; }
+.icon-button:hover { background: #f0efeb; }
+.canvas-footer, .guide-mode .canvas-footer { padding: 0 14px; background: #fafaf8; border: 0; font-size: 12px; }
+.canvas-status { display: none; }
+.viewer-error .loader-ring, .viewer-error .loading-pulse { display: none; }
+.viewer-error { pointer-events: auto; }
+#reload-saved-viewer { min-height: 44px; margin-top: 20px; padding: 10px 18px; border: 1px solid var(--ink); border-radius: 4px; background: transparent; font-size: 15px; cursor: pointer; }
+.guide-mode[data-viewer-state="unavailable"] .guide-panel,
+.guide-mode[data-viewer-state="unavailable"] .guide-current-step { display: none !important; }
+.guide-mode[data-viewer-state="unavailable"] .hero-grid { grid-template-columns: minmax(0,1fr) !important; }
+.guide-mode:not(.embedded-guide-mode)[data-viewer-state="unavailable"] .result-stage { grid-template-rows: minmax(0,1fr) 54px !important; }
+.guide-panel, .guide-mode .guide-panel { padding: 8px 0 0 24px; border-radius: 0; box-shadow: none; overflow: auto; }
+.guide-header { justify-content: flex-start; }
+.guide-header strong { font: 600 14px var(--ui); }
+.active-step { min-height: 0; flex-shrink: 0; padding: 14px 0 18px; }
+.step-kicker { display: none; }
+.active-step h3 { margin: 0 0 12px; font-size: clamp(24px,2.3vw,34px); line-height: 1.1; }
+.active-step p { font-size: 16px; line-height: 1.5; }
+.step-connections { flex: 1; min-height: 0; overflow: auto; display: block; }
+.step-connection { border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; background: transparent; padding: 14px 0; }
+.step-connection strong { font-size: 14px; }
+.step-connection small { font-size: 13px; line-height: 1.5; }
+.step-connection i { width: 4px; height: 100%; border-radius: 2px; box-shadow: none; }
+.step-safety { flex-shrink: 0; margin-top: 12px; padding: 0 0 0 12px; border: 0; border-left: 2px solid #a65a2e; border-radius: 0; background: transparent; color: var(--muted); font-size: 14px; }
+.step-safety::before { display: none; }
+.step-controls { margin-top: 0; padding-top: 10px; }
+.step-controls button { height: 44px; border-radius: 4px; font-size: 14px; }
+.step-controls #step-next { background: var(--ink); border-color: var(--ink); }
+.step-progress { max-width: 220px; justify-self: center; width: 100%; height: 2px; }
+.step-progress i { background: var(--ink); }
+.guide-view-toggle { display: none; }
+.guide-current-step { display: none; }
+.detail-card { border-top: 1px solid var(--line); }
+.part-row, .net-row { border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; background: transparent; }
+.part-row strong, .net-row strong { font-size: 14px; }
+.part-row small, .net-row small code, .gates li { font-size: 12px; }
+.part-role, .part-row code, .section-title .eyebrow { display: none; }
+.api-drawer { border-top: 1px solid var(--line); }
+
+/* Saved guides remain a single workspace, including on small screens. */
+body.guide-mode { height: 100dvh; min-height: 0; overflow: hidden; }
+.guide-mode .shell { height: calc(100dvh - 64px); }
+.guide-mode .result-stage { height: 100%; padding: 20px 24px 16px; display: grid; grid-template-rows: minmax(0,1fr) 54px; gap: 12px; }
+.guide-mode .hero-grid { min-height: 0; grid-template-columns: minmax(0,1fr) minmax(300px,360px); gap: 0; overflow: hidden; }
+.guide-mode .workspace, .guide-mode .guide-panel { min-height: 0; height: 100%; }
+.guide-mode .assembly-progress { display: none; }
+.guide-mode .step-controls { width: 100%; }
+.embedded-guide-mode .shell { height: 100dvh; }
+.embedded-guide-mode .result-stage { padding: 0; display: block; }
+.embedded-guide-mode .hero-grid { height: 100%; display: block; }
+.embedded-guide-mode .workspace { height: 100%; }
+.embedded-guide-mode .step-controls { display: none; }
+
+@media (max-width: 920px) {
+  .guide-mode:not(.embedded-guide-mode) .hero-grid { grid-template-columns: minmax(0,1fr) minmax(280px,.75fr); }
+  .guide-mode .guide-panel { padding-left: 16px; }
+  .canvas-footer #scene-summary { display: none; }
+  .icon-button, .guide-mode .icon-button { padding: 0 9px; font-size: 13px; }
+}
+@media (max-width: 650px) {
+  .topbar, .guide-mode .topbar { padding: 0 16px; }
+  .brand img { width: 108px; }
+  .guide-mode:not(.embedded-guide-mode) .guide-view-toggle { display: flex; gap: 4px; }
+  .guide-view-toggle button { min-height: 44px; padding: 0 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #bcc0c5; font-size: 13px; }
+  .guide-view-toggle button[aria-pressed="true"] { color: white; border-color: white; }
+  .guide-mode .result-stage { padding: 12px 12px 10px; gap: 8px; }
+  .guide-mode:not(.embedded-guide-mode):not([data-guide-pane="details"]) .result-stage { grid-template-rows: auto minmax(0,1fr) 54px; }
+  .guide-mode:not(.embedded-guide-mode):not([data-guide-pane="details"]) .guide-current-step { display: block; padding: 4px 0 8px; }
+  .guide-current-step strong { font-size: 17px; }
+  .guide-current-step p { font-size: 13px; line-height: 1.45; margin: 8px 0 0; color: var(--muted); }
+  .guide-mode:not(.embedded-guide-mode) .hero-grid { grid-template-columns: minmax(0,1fr); }
+  .guide-mode .guide-panel { padding: 0 8px; }
+  .guide-mode:not([data-guide-pane="details"]) .guide-panel { display: none; }
+  .guide-mode[data-guide-pane="details"] .workspace { display: none; }
+  .guide-mode .workspace { min-height: 0; grid-template-rows: 52px minmax(0,1fr) 30px; }
+  .guide-mode .canvas-toolbar { padding: 0 6px; }
+  .guide-mode .canvas-footer { font-size: 11px; padding: 0 10px; }
+  .embedded-guide-mode .result-stage { padding: 0; }
+  .active-step p { font-size: 16px; }
+}

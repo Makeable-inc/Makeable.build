@@ -165,6 +165,22 @@ test("the localhost wiring fixture is a usable production-contract artifact", as
   assert.ok(localWiringBuildFixture.artifacts.assembly.guideSteps.every((step) => Array.isArray(step.activeWires)));
 });
 
+test("Wiring embeds the original AWS GLB renderer instead of drawing replacement thumbnails", async () => {
+  const guide = await readFile(wiringGuidePath, "utf8");
+  const viewer = await readFile(new URL("../apps/landing/app/saved-wiring-viewer.tsx", import.meta.url), "utf8");
+  assert.match(guide, /<SavedWiringViewer key=\{build.id\} buildId=\{build.id\} stepIndex=\{boundedIndex\}/);
+  assert.doesNotMatch(guide, /PartThumbnail|connectionPaths|mk-wiring-connection-map|wiringPartsForStep/);
+  assert.match(viewer, /\/circuit-studio\/\?mode=guide&embed=1&sourceBuildId=\$\{encodeURIComponent\(buildId\)\}/);
+  assert.match(viewer, /type: "makeable:wiring-step", buildId, stepIndex/);
+  assert.match(viewer, /window.location.origin/);
+  assert.match(viewer, /onLoad=\{syncStep\}/);
+  assert.match(viewer, /makeable:wiring-status/);
+  assert.match(viewer, /event.source !== frame.current\?\.contentWindow/);
+  assert.match(viewer, /event.data.buildId !== buildId/);
+  assert.match(viewer, /Reload 3D view/);
+  assert.doesNotMatch(viewer, /fetch\(|POST|production-simulations\/latest/);
+});
+
 test("safe recovery preserves identity and exposes every supported exit", async () => {
   const [app, workspace] = await Promise.all([
     readFile(appPath, "utf8"),

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PartThumbnail, type ProjectPart } from "./project-overview";
+import { type ProjectPart } from "./project-overview";
+import { SavedWiringViewer } from "./saved-wiring-viewer";
 import { projectDisplayIdentity } from "./project-identity.mjs";
 import { projectWiringSteps, wiringConnectionsForStep } from "./project-wiring-data.mjs";
 
@@ -98,49 +99,6 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
     const activeLinkIds = new Set(activeStep?.wirelessLinkIds || []);
     return (build.artifacts?.assembly?.wirelessLinks || []).filter((link) => activeLinkIds.has(link.id));
   }, [activeStep, build]);
-  const visibleParts = useMemo(() => wiringPartsForStep(build, activeStep, connections), [activeStep, build, connections]);
-  const diagramRef = useRef<HTMLDivElement>(null);
-  const [diagram, setDiagram] = useState<{width: number; height: number; parts: Record<string, {x: number; y: number; width: number; height: number}>}>({width: 1, height: 1, parts: {}});
-  useEffect(() => {
-    const container = diagramRef.current;
-    if (!container) return;
-    const measure = () => {
-      const frame = container.getBoundingClientRect();
-      if (!frame.width || !frame.height) return;
-      const parts = Object.fromEntries(Array.from(container.querySelectorAll<HTMLElement>("article[data-part-id]")).map((part) => {
-        const box = part.getBoundingClientRect();
-        return [part.dataset.partId!, {x: box.x - frame.x + container.scrollLeft, y: box.y - frame.y + container.scrollTop, width: box.width, height: box.height}];
-      }));
-      setDiagram({width: container.scrollWidth, height: container.scrollHeight, parts});
-    };
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    container.querySelectorAll("article").forEach((part) => observer.observe(part));
-    measure();
-    return () => observer.disconnect();
-  }, [visibleParts, mobilePane]);
-  const connectionPaths = useMemo(() => {
-    return connections.flatMap((connection, index) => {
-      const from = diagram.parts[connection.from?.partId || ""];
-      const to = diagram.parts[connection.to?.partId || ""];
-      if (!from || !to) return [];
-      const forward = to.x >= from.x;
-      const startX = from.x + (forward ? from.width : 0);
-      const endX = to.x + (forward ? 0 : to.width);
-      const offset = (index - (connections.length - 1) / 2) * Math.min(14, Math.min(from.height, to.height) / (connections.length + 1));
-      const fromY = from.y + from.height / 2 + offset;
-      const toY = to.y + to.height / 2 + offset;
-      if (Math.abs(from.x - to.x) < 2) {
-        const leftSide = from.x < diagram.width / 2;
-        const fromX = from.x + (leftSide ? 0 : from.width);
-        const toX = to.x + (leftSide ? 0 : to.width);
-        const lane = leftSide ? Math.max(6, fromX - 18 - index * 3) : Math.min(diagram.width - 6, fromX + 18 + index * 3);
-        return [{ id: connection.id, color: connection.color || "#ff6470", path: `M ${fromX} ${fromY} C ${lane} ${fromY}, ${lane} ${toY}, ${toX} ${toY}` }];
-      }
-      const midX = (startX + endX) / 2;
-      return [{ id: connection.id, color: connection.color || "#ff6470", path: `M ${startX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${endX} ${toY}` }];
-    });
-  }, [connections, diagram]);
 
   return (
     <section className="mk-project-wiring" aria-labelledby="workspace-title" data-mobile-pane={mobilePane}>
@@ -175,28 +133,7 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
             </div>
             <p>Saved guide · No credit used</p>
           </div>
-          <div className="mk-wiring-artifact-visual">
-            <div className="mk-wiring-artifact-parts" data-connected={connections.length > 0} ref={diagramRef} tabIndex={0} role="region" aria-label="Assembly parts and connections">
-              {connections.length > 0 && (
-                <svg className="mk-wiring-connection-map" style={{width: diagram.width, height: diagram.height}} viewBox={`0 0 ${diagram.width} ${diagram.height}`} aria-hidden="true">
-                  {connectionPaths.map((connection) => <path key={connection.id} d={connection.path} style={{ stroke: connection.color }} />)}
-                </svg>
-              )}
-              {visibleParts.map(({ assemblyPart, catalogPart }) => (
-                <article key={assemblyPart.id} data-part-id={assemblyPart.id}>
-                  <PartThumbnail part={catalogPart || { id: assemblyPart.assetId || assemblyPart.catalogPartId || assemblyPart.id, name: assemblyPart.label || assemblyPart.id }} />
-                  <div><strong>{assemblyPart.label || catalogPart?.name || assemblyPart.id}</strong></div>
-                </article>
-              ))}
-            </div>
-            <div className="mk-wiring-artifact-lines" aria-label="Active saved connections">
-              {connections.length ? connections.map((connection) => (
-                <span key={connection.id}><i style={{ backgroundColor: connection.color || "#ff6470" }} /><strong>{connection.label || connection.signal || "Connection"}</strong></span>
-              )) : wirelessLinks.length ? wirelessLinks.map((link) => (
-                <span key={link.id} data-wireless="true"><i /><strong>{link.protocol || "Wireless"}</strong></span>
-              )) : <span className="mk-wiring-no-connection"><strong>No wire is needed in this step.</strong></span>}
-            </div>
-          </div>
+          <SavedWiringViewer key={build.id} buildId={build.id} stepIndex={boundedIndex} />
         </section>
 
         {activeStep && <article className="mk-wiring-step-card">
@@ -243,19 +180,4 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
       </footer>
     </section>
   );
-}
-
-function wiringPartsForStep(build: WiringProject, step: WiringStep | undefined, connections: WiringConnection[]) {
-  const connectedIds = connections.flatMap((connection) => [connection.from?.partId, connection.to?.partId]);
-  const requestedIds = new Set((connectedIds.length ? connectedIds : step?.visibleParts || [])
-    .filter((value): value is string => Boolean(value)));
-  const assemblyParts = build.artifacts?.assembly?.parts || [];
-  const selected = requestedIds.size
-    ? assemblyParts.filter((part) => requestedIds.has(part.id))
-    : assemblyParts.slice(0, 3);
-
-  return selected.map((assemblyPart) => ({
-    assemblyPart,
-    catalogPart: build.parts.find((part) => part.id === assemblyPart.catalogPartId || part.id === assemblyPart.id),
-  }));
 }

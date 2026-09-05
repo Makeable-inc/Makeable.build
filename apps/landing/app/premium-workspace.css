@@ -1714,6 +1714,12 @@
 .mk-wiring-simulation, .mk-wiring-step-card { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .mk-wiring-simulation-heading { border: 0; padding-left: 0; padding-right: 0; }
 .mk-wiring-simulation-heading h2 { font-size: 20px; }
+.mk-saved-wiring-viewer { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #fafaf8; }
+.mk-saved-wiring-viewer iframe { display: block; width: 100%; height: 100%; border: 0; }
+.mk-wiring-viewer-status { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: #fafaf8; text-align: center; }
+.mk-wiring-viewer-status h3 { margin: 0; font-size: 22px; }
+.mk-wiring-viewer-status p { margin: 0; font-size: 16px; }
+.mk-wiring-viewer-status button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--studio-ink); background: transparent; color: var(--studio-ink); font: inherit; cursor: pointer; }
 .mk-wiring-artifact-parts { background: #f1f0ec; }
 .mk-wiring-artifact-parts[data-connected="true"] { grid-template-columns: repeat(2,minmax(0,220px)); gap: 48px; padding: 28px; }
 .mk-wiring-artifact-parts article { position: relative; z-index: 1; border: 0; border-radius: 0; background: #f1f0ec; box-shadow: none; }
