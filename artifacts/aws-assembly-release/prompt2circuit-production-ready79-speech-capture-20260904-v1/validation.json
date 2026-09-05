@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "MakeablePrompt2CircuitReleaseValidationV1",
+  "revision": "prompt2circuit-production-ready79-speech-capture-20260904-v1",
+  "generatedAt": "2026-09-05T04:28:42.620Z",
+  "status": "ready",
+  "assertions": {
+    "exactAssetHashes": true,
+    "exactPinNodes": true,
+    "pinoutCapabilityAllocation": true,
+    "connectorFamilyGenderOrderPitch": true,
+    "carrierAndQuickConnectorPolicy": true,
+    "powerVoltageAndCommonGroundPolicy": true,
+    "collisionFreeContinuousRoutes": true,
+    "noLoopsOrSelfIntersections": true,
+    "minimumBendRadius": true,
+    "oneShotCircuitOnlyPipeline": true,
+    "nonReadyProfilesExcluded": true
+  },
+  "importantBoundary": "Ready means the deterministic compiler can select and assemble legal combinations and will fail closed on incompatible combinations; it does not mean every arbitrary combination of ready parts is electrically feasible."
+}

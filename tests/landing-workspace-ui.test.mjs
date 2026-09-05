@@ -19,15 +19,14 @@ test("generation wait explains durable staged progress without quota noise", asy
   ]);
 
   assert.doesNotMatch(home, /Maker Cat is|mk-generation-sprite/);
-  assert.match(workspace, /Building your project/);
-  assert.match(workspace, /safe to close this tab/);
+  assert.match(workspace, /<h1 id="workspace-title">\{stage.label\}<\/h1>/);
+  assert.match(workspace, /buildId \? "You can leave this tab. We’ll keep working."/);
   assert.match(workspace, /Build generation progress/);
-  assert.match(workspace, /Your brief/);
-  assert.match(workspace, /We’ll keep working if you leave/);
-  assert.match(workspace, /Brief/);
-  assert.match(workspace, /Parts/);
-  assert.match(workspace, /Assembly/);
-  assert.match(workspace, /Package/);
+  assert.match(workspace, /mk-generation-original"><p>\{prompt\}<\/p>/);
+  assert.match(workspace, /Plan your build/);
+  assert.match(workspace, /Choose parts/);
+  assert.match(workspace, /Prepare assembly/);
+  assert.match(workspace, /Finish up/);
   assert.doesNotMatch(workspace, /daily limit\|free build\|quota\|browser or network/);
 });
 
@@ -132,16 +131,16 @@ test("the generated project journey is overview with parts, wiring, then locked 
 
   assert.match(workspace, /export type ProjectSurface = "overview" \| "wiring" \| "code"/);
   assert.match(workspace, /export function ProjectNavigation/);
-  assert.match(workspace, /<WorkspaceIcon kind="overview" \/> Overview/);
-  assert.match(workspace, /<WorkspaceIcon kind="wiring" \/>/);
+  assert.match(workspace, /onSelect\("overview"\)/);
+  assert.match(workspace, /disabled=\{!wiringAvailable \|\| wiringLoading\}/);
   assert.match(workspace, /<WorkspaceIcon kind="code" \/> Code/);
   assert.doesNotMatch(workspace.match(/export function ProjectNavigation[\s\S]*?\n\}/)?.[0] || "", /parts|enclosure/i);
-  assert.match(overview, /<h2 id="project-parts-title">Parts<\/h2>/);
+  assert.match(overview, /<h2 id="project-parts-title">Your parts<\/h2>/);
   assert.match(overview, /priceLabel/);
   assert.doesNotMatch(overview, /base \* 0\.62|retailerSearchUrl/);
   assert.match(wiringData, /projectWiringReady/);
   assert.match(wiringData, /guideSteps\.length > 0/);
-  assert.match(wiringGuide, /saved wiring artifact/);
+  assert.match(wiringGuide, /<SavedWiringViewer key=\{build.id\} buildId=\{build.id\} stepIndex=\{boundedIndex\}/);
   assert.match(wiringGuide, /mk-wiring-pane-toggle/);
   assert.match(wiringGuide, /data-mobile-pane/);
   assert.match(premiumWorkspaceCss, /grid-template-rows: 64px 76px minmax\(0, 1fr\)/);
@@ -150,8 +149,8 @@ test("the generated project journey is overview with parts, wiring, then locked 
   assert.match(premiumWorkspaceCss, /\.mk-wiring-step-controls[\s\S]*?justify-self: end/);
   assert.match(workspace, /export function LockedCodePanel/);
   assert.match(workspace, /Coming soon/);
-  assert.match(workspace, /Firmware is the next part of your project/);
-  assert.match(workspace, /Code generation won’t use another credit until it is available/);
+  assert.match(workspace, /Firmware generation is next/);
+  assert.match(workspace, /Your project is saved. No credit is used here/);
   assert.match(premiumWorkspaceCss, /\.mk-code-locked/);
   assert.match(premiumWorkspaceCss, /\.mk-code-editor-ghost/);
 });
@@ -174,9 +173,9 @@ test("safe recovery preserves identity and exposes every supported exit", async 
   assert.match(workspace, /Build ID/);
   assert.match(workspace, /Your idea/);
   assert.match(workspace, /No completed replacement was saved/);
-  assert.match(workspace, /View failure details/);
+  assert.match(workspace, /<summary>Build details<\/summary>/);
   assert.match(workspace, /Edit my idea/);
-  assert.match(workspace, /Return to projects/);
+  assert.match(workspace, /backLabel = "My projects"/);
   assert.match(app, /retryLabel="Try again"/);
   assert.match(app, /onEdit=\{\(\) => router\.push\("\/#make"\)\}/);
   assert.match(app, /Makeable did not substitute a different build/);

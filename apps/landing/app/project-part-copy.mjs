@@ -28,6 +28,7 @@ export function partPlainLabel(part, build) {
   if (/thermocouple|mcp9600/.test(text)) return "Thermocouple interface";
   if (/nfc.rfid|pn532|rfid|near.field/.test(text)) return "NFC reader";
   if (/pulse.oximeter|max3010|heart.rate/.test(text)) return "Health sensor";
+  if (/microphone|inmp.?441|i2s.+mic|audio capture/.test(text)) return "Microphone";
   if (/reed|magnetic switch/.test(text)) return /door|window|cabinet|drawer|mailbox/.test(projectText) ? "Door sensor" : "Magnetic sensor";
   if (/hall effect|magnetic sensor/.test(text)) return "Magnetic sensor";
   if (/radar|presence/.test(text)) return "Presence sensor";
@@ -37,7 +38,8 @@ export function partPlainLabel(part, build) {
   if (/button|touch|input/.test(text)) return "User control";
   if (/sensor/.test(text) || part?.category === "sensor") return "Sensor";
   if (/buzzer|speaker|piezo/.test(text)) return "Sound feedback";
-  if (/led|rgb|output|light/.test(text)) return "Status light";
+  if (/vibration/.test(text)) return "Vibration motor";
+  if (/\bled\b|rgb|light/.test(text)) return "Status light";
   if (/servo|motor|actuator|wheel drive/.test(text) || part?.category === "actuator") return "Drive motor";
   if (/connector|qwiic|usb/.test(text)) return "Connector";
   if (/breadboard/.test(text)) return "Breadboard";
@@ -57,6 +59,7 @@ export function projectPartPurpose(part, build) {
   const project = build ? `“${projectDisplayIdentity(build).title}”` : "this project";
   const reason = {
     "The brain": "runs the control logic and coordinates the connected parts",
+    "Vibration motor": "provides physical vibration feedback for the project",
     "The display": "makes readings, controls, and project status visible",
     "Climate sensor": "measures the temperature, humidity, or air-pressure values the project uses",
     "Temperature sensor": "measures surface temperature without requiring physical contact",
@@ -73,6 +76,7 @@ export function projectPartPurpose(part, build) {
     "Thermocouple interface": "reads the thermocouple temperature signal the project depends on",
     "NFC reader": "reads nearby NFC or RFID tags for the project's interaction",
     "Health sensor": "measures pulse and blood-oxygen signals for the project's sensing behavior",
+    "Microphone": "captures speech for the project's internet-connected transcription service",
     "Sensor": "provides the physical reading this project's behavior depends on",
     "Control knob": "gives the user a clear physical way to adjust settings or move through screens",
     "User control": "gives the user a direct way to start, stop, or change the project",

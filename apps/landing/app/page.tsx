@@ -101,6 +101,37 @@ const COMMUNITY_PART_ESTIMATES: Record<string, number> = {
 
 const ACTIVE_BUILD_JOB_STORAGE_KEY = "makeable:active-build-job:v1";
 
+function savedBuildJobId() {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.sessionStorage.getItem(ACTIVE_BUILD_JOB_STORAGE_KEY)
+      || window.localStorage.getItem(ACTIVE_BUILD_JOB_STORAGE_KEY)
+      || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveBuildJobId(jobId: string) {
+  if (typeof window === "undefined" || !jobId) return;
+  try {
+    window.sessionStorage.setItem(ACTIVE_BUILD_JOB_STORAGE_KEY, jobId);
+    window.localStorage.setItem(ACTIVE_BUILD_JOB_STORAGE_KEY, jobId);
+  } catch {
+    // Polling still works in the current page when browser storage is unavailable.
+  }
+}
+
+function clearSavedBuildJobId() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
+    window.localStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
+  } catch {
+    // Nothing else is required when storage is unavailable.
+  }
+}
+
 type BuildImage = {
   url: string;
   source?: string;
@@ -193,8 +224,33 @@ type BuildJob = {
   buildId?: string;
   makerName?: string;
   error?: string;
+  failure?: {
+    message?: string;
+    code?: string;
+    details?: {
+      reason?: string;
+      plannerTitle?: string;
+      plannerWarnings?: string[];
+      requestedCapabilities?: string[];
+      providedCapabilities?: string[];
+      missingCapabilities?: string[];
+      planUnrequestedCapabilities?: string[];
+      unrelatedPartIds?: string[];
+    };
+  } | null;
   result?: BuildProject | null;
 };
+
+function failedBuildMessage(job: BuildJob) {
+  const details = job.failure?.details;
+  return [
+    job.error || job.failure?.message || "Makeable could not finish this build.",
+    job.failure?.code ? `Code: ${job.failure.code}.` : "",
+    details?.reason ? `Reason: ${details.reason}.` : "",
+    details?.plannerWarnings?.length ? `Planner notes: ${details.plannerWarnings.join(" ")}` : "",
+    details?.missingCapabilities?.length ? `Missing: ${details.missingCapabilities.join(", ")}.` : "",
+  ].filter(Boolean).join(" ");
+}
 
 type StartBuildJobResponse = {
   job?: BuildJob | null;
@@ -383,25 +439,25 @@ const jobCheckpointStages: Record<BuildJobState, GenerationStage & { progress: n
   queued: {
     at: 0,
     progress: 8,
-    label: "Queued in the workshop",
+    label: "Your build is queued.",
     detail: "Your idea is in line and the build job has been created.",
   },
   planning: {
     at: 24,
     progress: 8,
-    label: "Understanding your brief",
+    label: "Planning your build.",
     detail: "Turning your idea into a clear hardware plan.",
   },
   fitting_parts: {
     at: 48,
     progress: 24,
-    label: "Matching real parts",
+    label: "Finding your parts.",
     detail: "Picking verified pre-soldered modules from the catalog.",
   },
   rendering: {
     at: 70,
     progress: 48,
-    label: "Preparing the preview",
+    label: "Bringing it together.",
     detail: "Turning the saved plan into a clear product view.",
   },
   ready: {
@@ -434,7 +490,8 @@ function generationStageFor(progress: number): GenerationStage {
 }
 
 function generationStageForJob(jobState: BuildJobState | "", progress: number) {
-  return jobState ? jobCheckpointStages[jobState] : generationStageFor(progress);
+  const checkpoints = { queued: 0, planning: 0, fitting_parts: 1, rendering: 2, ready: 3, failed: 0, cancelled: 0 };
+  return jobState ? { ...jobCheckpointStages[jobState], checkpoint: checkpoints[jobState] } : generationStageFor(progress);
 }
 
 function isActiveBuildJob(job: BuildJob | null) {
@@ -458,6 +515,28 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   } catch {
     return {} as T;
   }
+}
+
+async function loadPublicConfigWithRetry() {
+  let config: PublicConfig = {};
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const response = await fetch(apiUrl("/api/config"), {
+        headers: { Accept: "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (response.ok) config = await readJsonResponse<PublicConfig>(response);
+      if (config.googleClientId) return config;
+    } catch {
+      // Retry temporary network or configuration failures before offering recovery.
+    }
+    if (attempt < 3) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  return config;
 }
 
 function abortableDelay(ms: number, signal: AbortSignal) {
@@ -576,6 +655,8 @@ export default function Home() {
   const [authResolved, setAuthResolved] = useState(false);
   const [authUnavailable, setAuthUnavailable] = useState(false);
   const [publicConfig, setPublicConfig] = useState<PublicConfig>({});
+  const [publicConfigResolved, setPublicConfigResolved] = useState(false);
+  const [configAttempt, setConfigAttempt] = useState(0);
   const [googleReady, setGoogleReady] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginIntent, setLoginIntent] = useState<LoginIntent>("generate");
@@ -600,7 +681,9 @@ export default function Home() {
   const jobFlowActiveRef = useRef(false);
   const loginIntentRef = useRef<LoginIntent>("generate");
   const authUserRef = useRef<AuthUser | null>(null);
+  const authInFlightRef = useRef(false);
   const currentJobRef = useRef<BuildJob | null>(null);
+  const lastAutomaticResumeAtRef = useRef(0);
 
   useEffect(() => {
     const preview = new URL(window.location.href).searchParams.get("preview");
@@ -637,10 +720,10 @@ export default function Home() {
 
   useEffect(() => {
     currentJobRef.current = currentJob;
-    if (isActiveBuildJob(currentJob)) {
-      window.sessionStorage.setItem(ACTIVE_BUILD_JOB_STORAGE_KEY, currentJob.id);
+    if (currentJob && !currentJob.claimedAt && currentJob.state !== "cancelled") {
+      saveBuildJobId(currentJob.id);
     } else if (currentJob) {
-      window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
+      clearSavedBuildJobId();
     }
   }, [currentJob]);
 
@@ -805,7 +888,7 @@ export default function Home() {
     }
 
     if (result.job) setCurrentJob({ ...result.job, claimedAt: result.job.claimedAt || new Date().toISOString() });
-    window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
+    clearSavedBuildJobId();
     if (result.quota) setQuota(normalizeQuota(result.quota));
     setGenerationProgress(100);
     setWorkspaceBuild(build);
@@ -829,12 +912,25 @@ export default function Home() {
     setGenerationBusy(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
 
+    let interruptedChecks = 0;
     while (!signal.aborted) {
-      const response = await fetch(apiUrl(`/api/build-jobs/${encodeURIComponent(jobId)}`), {
+      let response: Response;
+      try {
+        response = await fetch(apiUrl(`/api/build-jobs/${encodeURIComponent(jobId)}`), {
         headers: { Accept: "application/json" },
         credentials: "include",
         signal,
-      });
+        });
+        if (response.status >= 500 || response.status === 429) throw new Error("Temporary status check interruption");
+        interruptedChecks = 0;
+      } catch (error) {
+        if (signal.aborted) throw error;
+        if (++interruptedChecks <= 3) {
+          await abortableDelay(1600 * interruptedChecks, signal);
+          continue;
+        }
+        throw new Error("Connection interrupted while checking this build. The build may still be running. Try again to reconnect to the same job.");
+      }
       const result = await readJsonResponse<BuildJobStatusResponse>(response);
       if (!response.ok || !result.job) {
         throw new Error(result.error || "Makeable could not check this build job.");
@@ -857,7 +953,7 @@ export default function Home() {
         await claimReadyBuildJob(job.id, signal);
         return "claimed";
       }
-      if (job.state === "failed") throw new Error(job.error || "Makeable could not finish this build.");
+      if (job.state === "failed") throw new Error(failedBuildMessage(job));
       if (job.state === "cancelled") throw new Error("This build job was cancelled.");
 
       await abortableDelay(job.state === "queued" ? 1200 : 1600, signal);
@@ -890,9 +986,36 @@ export default function Home() {
 
   useEffect(() => {
     if (!authResolved || currentJobRef.current || jobFlowActiveRef.current) return;
-    const savedJobId = window.sessionStorage.getItem(ACTIVE_BUILD_JOB_STORAGE_KEY) || "";
+    const savedJobId = savedBuildJobId();
     if (!savedJobId) return;
+    lastAutomaticResumeAtRef.current = Date.now();
     void resumeBuildJob(savedJobId);
+  }, [authResolved, resumeBuildJob]);
+
+  useEffect(() => {
+    if (!authResolved) return undefined;
+    const resumeSavedJob = () => {
+      if (document.visibilityState === "hidden" || navigator.onLine === false) return;
+      const job = currentJobRef.current;
+      if (job && ["ready", "failed", "cancelled"].includes(job.state)) return;
+      const jobId = job?.id || savedBuildJobId();
+      if (!jobId) return;
+      const now = Date.now();
+      if (now - lastAutomaticResumeAtRef.current < 1000) return;
+      lastAutomaticResumeAtRef.current = now;
+      void resumeBuildJob(jobId);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") resumeSavedJob();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", resumeSavedJob);
+    window.addEventListener("online", resumeSavedJob);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", resumeSavedJob);
+      window.removeEventListener("online", resumeSavedJob);
+    };
   }, [authResolved, resumeBuildJob]);
 
   const cancelCurrentBuildJob = useCallback(async () => {
@@ -916,7 +1039,7 @@ export default function Home() {
       if (!response.ok) throw new Error(result.error || "Makeable could not cancel this build job.");
       setCurrentJob(null);
       currentJobRef.current = null;
-      window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
+      clearSavedBuildJobId();
       pendingClaimJobIdRef.current = "";
       pendingIdeaRef.current = "";
       setGenerationProgress(0);
@@ -931,6 +1054,14 @@ export default function Home() {
   }, []);
 
   const generateBuildForIdea = useCallback(async (nextIdea: string) => {
+    // Every entry point (submit, retry, clarification) waits for a confirmed
+    // account. No job request is sent while the Google dialog is open.
+    if (!authUserRef.current) {
+      pendingIdeaRef.current = nextIdea;
+      openLogin("generate");
+      return;
+    }
+    if (jobFlowActiveRef.current) return;
     generationAbortRef.current?.abort();
     const requestController = new AbortController();
     generationAbortRef.current = requestController;
@@ -941,7 +1072,7 @@ export default function Home() {
     setBuildClarification(null);
     setCurrentJob(null);
     currentJobRef.current = null;
-    window.sessionStorage.removeItem(ACTIVE_BUILD_JOB_STORAGE_KEY);
+    clearSavedBuildJobId();
     setGenerationBusy(true);
     setGenerationProgress(5);
     setGenerationError("");
@@ -1017,13 +1148,15 @@ export default function Home() {
         setGenerationBusy(false);
       }
     }
-  }, [runBuildJobPoll]);
+  }, [openLogin, runBuildJobPoll]);
 
   const handleGoogleCredential = useCallback(async (response: { credential?: string }) => {
+    if (authInFlightRef.current) return;
     if (!response.credential) {
       setAuthError("Google did not return a sign-in token. Try again.");
       return;
     }
+    authInFlightRef.current = true;
     setAuthBusy(true);
     setAuthError("");
     try {
@@ -1051,10 +1184,21 @@ export default function Home() {
         new_waitlist_signup: result.created === true,
         product_id: "makeable_builder",
       });
-      authUserRef.current = result.user;
-      setAuthUser(result.user);
+      // Google acceptance alone is not enough: confirm the browser can use
+      // its new session before dismissing login or sending a build request.
+      let account = await fetchAccount(false);
+      for (let attempt = 0; !account && attempt < 2; attempt += 1) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+        account = await fetchAccount(false);
+      }
+      if (!account?.user) {
+        throw new Error("We couldn’t finish signing you in. Your idea is still here. Please try again.");
+      }
       setLoginOpen(false);
-      const account = await fetchAccount(false);
+      // Authentication has finished. A later session-expiry prompt must remain
+      // usable while the independently running build is being checked.
+      authInFlightRef.current = false;
+      setAuthBusy(false);
       if (loginIntentRef.current === "account") {
         setWorkspaceOpen(true);
         setWorkspaceMode("library");
@@ -1073,6 +1217,7 @@ export default function Home() {
       setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
       if (loginIntentRef.current === "generate") setGenerationBusy(false);
     } finally {
+      authInFlightRef.current = false;
       setAuthBusy(false);
     }
   }, [claimReadyBuildJob, fetchAccount, generateBuildForIdea, resumeBuildJob]);
@@ -1089,15 +1234,6 @@ export default function Home() {
     };
     applyHeroFromUrl();
     window.addEventListener("popstate", applyHeroFromUrl);
-
-    fetch(apiUrl("/api/config"), { headers: { Accept: "application/json" }, credentials: "include" })
-      .then((response) => response.ok ? response.json() : {})
-      .then((config: PublicConfig) => {
-        if (!cancelled) setPublicConfig(config || {});
-      })
-      .catch(() => {
-        if (!cancelled) setPublicConfig({});
-      });
 
     fetch(apiUrl("/api/builds"), { headers: { Accept: "application/json" } })
       .then((response) => response.ok ? response.json() : { builds: [] })
@@ -1117,6 +1253,23 @@ export default function Home() {
       window.clearTimeout(accountTimer);
     };
   }, [fetchAccount, selectHeroBuild]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPublicConfigResolved(false);
+    loadPublicConfigWithRetry()
+      .then((config) => {
+        if (!cancelled) setPublicConfig(config || {});
+      })
+      .catch(() => {
+        if (!cancelled) setPublicConfig({});
+      })
+      .finally(() => {
+        if (!cancelled) setPublicConfigResolved(true);
+      });
+
+    return () => { cancelled = true; };
+  }, [configAttempt]);
 
   useEffect(() => {
     if (!publicConfig.googleClientId) return undefined;
@@ -1207,11 +1360,6 @@ export default function Home() {
     }
     pendingIdeaRef.current = trimmed;
     setGenerationError("");
-    setWorkspaceOpen(true);
-    setWorkspaceMode("loading");
-    setWorkspaceBuild(null);
-    setGenerationBusy(true);
-    setGenerationProgress(5);
     captureMakeableEvent("makeable build idea submitted", { placement: "composer" });
     if (!authUser) {
       openLogin("generate");
@@ -1322,9 +1470,13 @@ export default function Home() {
         <h2 id="login-title">Log in with Google</h2>
         <p>{loginIntent === "generate" ? currentJob ? "Your build is saved. Sign in to continue to your project folder." : "Your idea is ready. Sign in to start the build and save it to your project folder." : "Sign in to see the builds you made."}</p>
         <div className="mk-google-button" ref={googleButtonRef} aria-live="polite">
-          {!googleReady && <span>Loading Google...</span>}
+          {(!publicConfigResolved || (publicConfig.googleClientId && !googleReady)) && <span>Loading Google...</span>}
         </div>
-        {!publicConfig.googleClientId && <p className="mk-form-error" role="alert">Google sign-in is not configured on this deployment.</p>}
+        {authBusy && <p role="status">Finishing sign-in…</p>}
+        {publicConfigResolved && !publicConfig.googleClientId && <>
+          <p className="mk-form-error" role="alert">We couldn’t load Google sign-in. Your idea is still here.</p>
+          <button type="button" onClick={() => { setPublicConfigResolved(false); setConfigAttempt((attempt) => attempt + 1); }}>Retry sign-in</button>
+        </>}
         {authError && <p className="mk-form-error" role="alert">{authError}</p>}
       </section>
     </div>
@@ -1387,6 +1539,7 @@ export default function Home() {
           }}
           onEdit={() => {
             generationAbortRef.current?.abort();
+            clearSavedBuildJobId();
             setGenerationBusy(false);
             const retryIdea = (currentJob?.idea || pendingIdeaRef.current || idea).trim();
             if (retryIdea) setIdea(retryIdea);
@@ -1711,7 +1864,7 @@ function BuildWorkspace({
   const wiringReady = Boolean(build && projectWiringReady(build));
 
   return (
-    <main className="mk-app-shell">
+    <main className="mk-app-shell" data-flow={isLoading || isClarifying ? "generation" : "project"}>
       <WorkspaceTopBar
         user={user}
         remaining={buildsRemaining}
@@ -1736,17 +1889,12 @@ function BuildWorkspace({
         }}
       />
 
-      <WorkspaceContextBar
+      {!isLoading && !isClarifying && <WorkspaceContextBar
         title={isLoading ? "Building your project" : activeIdentity?.title || (isClarifying ? "Choose a direction" : "My builds")}
         idea={isLoading || isClarifying ? prompt : build?.idea || build?.summary}
         label={isLoading ? "In the workshop" : isClarifying ? "Clarification" : build ? "Project" : "Library"}
         onHome={onBack}
-        action={build && surface === "overview" && wiringReady ? (
-          <button className="mk-context-primary" type="button" onClick={() => setSurface("wiring")}>
-            Open wiring <ArrowIcon />
-          </button>
-        ) : undefined}
-      />
+      />}
 
       <section className="mk-workspace-main" aria-labelledby="workspace-title">
         {isLoading ? (
@@ -1764,7 +1912,7 @@ function BuildWorkspace({
             ? <LockedCodePanel onBack={() => setSurface("overview")} />
             : surface === "wiring" && wiringReady
               ? <ProjectWiringGuide build={build} />
-              : <BuildWorkspaceResult build={build} />
+              : <ProjectOverview key={build.id} build={build} onOpenWiring={() => setSurface("wiring")} />
         ) : null}
       </section>
 

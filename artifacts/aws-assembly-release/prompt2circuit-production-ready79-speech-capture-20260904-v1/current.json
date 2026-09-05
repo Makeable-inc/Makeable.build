@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "MakeablePrompt2CircuitProductionPointerV1",
+  "revision": "prompt2circuit-production-ready79-speech-capture-20260904-v1",
+  "releaseUrl": "https://dvy6bet209exg.cloudfront.net/v1/prompt2circuit-production-v1/releases/prompt2circuit-production-ready79-speech-capture-20260904-v1/release.json",
+  "releaseSha256": "72a4776fa913ae569f6e9a29c3bf1a8be7500fb471ef8b8c49a9a8ecfd8d2707",
+  "manifestUrl": "https://dvy6bet209exg.cloudfront.net/v1/prompt2circuit-production-v1/releases/prompt2circuit-production-ready79-speech-capture-20260904-v1/manifest.json",
+  "manifestSha256": "818f45dfeed9083442f0725618c2cbbbbd9279c6cd261c2526fcde6853ab6b6a",
+  "profilesUrl": "https://dvy6bet209exg.cloudfront.net/v1/prompt2circuit-production-v1/releases/prompt2circuit-production-ready79-speech-capture-20260904-v1/profiles.json",
+  "profilesSha256": "cfc8a213936caf6c01bac34c4d92fc5f5d72b1552b8576c24c782cce9116aacd",
+  "validationUrl": "https://dvy6bet209exg.cloudfront.net/v1/prompt2circuit-production-v1/releases/prompt2circuit-production-ready79-speech-capture-20260904-v1/validation.json",
+  "validationSha256": "b93a4a9bffd72e2e75503bd7740525dc05c475f9f2b820b7cfade2cd999b22bb",
+  "readyAssetCount": 79
+}

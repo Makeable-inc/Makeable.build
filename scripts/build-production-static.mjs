@@ -27,3 +27,18 @@ for (const file of ["robots.txt", "sitemap.xml"]) {
 
 await cp(path.join(root, "pilot", "index.html"), path.join(output, "pilot-app.html"));
 await rm(path.join(output, "pilot", "index.html"));
+
+// The saved-project guide is a real GLB renderer, not an optional preview.
+// Keep its pinned runtime in every regular production build.
+const studio = path.join(output, "circuit-studio");
+await cp(path.join(root, "apps", "circuit-lab"), studio, { recursive: true });
+const three = path.join(root, "node_modules", "three");
+await mkdir(path.join(studio, "vendor"), { recursive: true });
+for (const file of ["three.module.js", "three.core.js"]) {
+  await cp(path.join(three, "build", file), path.join(studio, "vendor", file));
+}
+for (const file of ["controls/OrbitControls.js", "loaders/GLTFLoader.js", "utils/BufferGeometryUtils.js", "utils/SkeletonUtils.js"]) {
+  const target = path.join(studio, "vendor", "addons", file);
+  await mkdir(path.dirname(target), { recursive: true });
+  await cp(path.join(three, "examples", "jsm", file), target);
+}

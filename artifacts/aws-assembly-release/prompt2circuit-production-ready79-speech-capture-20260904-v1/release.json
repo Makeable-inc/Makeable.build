@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "MakeablePrompt2CircuitProductionReleaseV1",
+  "revision": "prompt2circuit-production-ready79-speech-capture-20260904-v1",
+  "generatedAt": "2026-09-05T04:28:42.620Z",
+  "manifestUrl": "https://dvy6bet209exg.cloudfront.net/v1/prompt2circuit-production-v1/releases/prompt2circuit-production-ready79-speech-capture-20260904-v1/manifest.json",
+  "manifestSha256": "818f45dfeed9083442f0725618c2cbbbbd9279c6cd261c2526fcde6853ab6b6a",
+  "profilesUrl": "https://dvy6bet209exg.cloudfront.net/v1/prompt2circuit-production-v1/releases/prompt2circuit-production-ready79-speech-capture-20260904-v1/profiles.json",
+  "profilesSha256": "cfc8a213936caf6c01bac34c4d92fc5f5d72b1552b8576c24c782cce9116aacd",
+  "validationUrl": "https://dvy6bet209exg.cloudfront.net/v1/prompt2circuit-production-v1/releases/prompt2circuit-production-ready79-speech-capture-20260904-v1/validation.json",
+  "validationSha256": "b93a4a9bffd72e2e75503bd7740525dc05c475f9f2b820b7cfade2cd999b22bb",
+  "readyAssetCount": 79,
+  "files": [
+    {
+      "path": "manifest.json",
+      "bytes": 177177,
+      "sha256": "818f45dfeed9083442f0725618c2cbbbbd9279c6cd261c2526fcde6853ab6b6a"
+    },
+    {
+      "path": "profiles.json",
+      "bytes": 1507914,
+      "sha256": "cfc8a213936caf6c01bac34c4d92fc5f5d72b1552b8576c24c782cce9116aacd"
+    },
+    {
+      "path": "connector-geometry-audit.json",
+      "bytes": 556572,
+      "sha256": "7e1beb76c333d222c50b0c0fc6a9b288e82a90f79ae49032ae73ddb98495b563"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 905,
+      "sha256": "b93a4a9bffd72e2e75503bd7740525dc05c475f9f2b820b7cfade2cd999b22bb"
+    },
+    {
+      "path": "coverage.json",
+      "bytes": 12975,
+      "sha256": "f720239868f099a9a2798922aed393adfb6c4fd0a2951bd7f70bb59b58baff3e"
+    },
+    {
+      "path": "physical-asset-queue.json",
+      "bytes": 52003,
+      "sha256": "7990c6f1f543753a744f245dc957ee24ef994a01a399ebc2546630165f8770a1"
+    },
+    {
+      "path": "red-light-worklist.md",
+      "bytes": 6624,
+      "sha256": "1252b00dfb6d181f3b8e396add06296251da74d088248930a7d823ec09d689e3"
+    },
+    {
+      "path": "assembly-red-light-worklist.md",
+      "bytes": 2593,
+      "sha256": "21e4d79b180dea7995ec172a07fbd9b02c870948a0e3663ede13645290faf354"
+    },
+    {
+      "path": "physical-asset-queue.md",
+      "bytes": 8533,
+      "sha256": "da0ec39bd188aed50c126e4b76ccd7935c37adb6c466302d013fdc304e132ef4"
+    },
+    {
+      "path": "prompt2circuit-interface-registry.xlsx",
+      "bytes": 142147,
+      "sha256": "fff69488453d21f3d1b352b269fe3643fd36d1926d2117c3ed79da8f4c42a721"
+    },
+    {
+      "path": "prompts/manifest.json",
+      "bytes": 2454,
+      "sha256": "3c5c4fbff3bb2dbc8b591c055c165368b3921826943d295950a6cc1c0c2abfd2"
+    },
+    {
+      "path": "prompts/parts-planner.md",
+      "bytes": 41040,
+      "sha256": "23a5d9d82292dd19211b2a51221d61eec66150bf7b33e6e026529a72e8f4a0ad"
+    },
+    {
+      "path": "prompts/assembly-routing.md",
+      "bytes": 40132,
+      "sha256": "75f593d7d11c1f1629f8de2857d20c80d52eac175f01af7aaac779ec80141de4"
+    },
+    {
+      "path": "assembly.md",
+      "bytes": 53800,
+      "sha256": "8eb7f4fef157cb5d6ed4936a2e6c58263b78d98639d523da650487956caf3bdb"
+    },
+    {
+      "path": "wiring.md",
+      "bytes": 53800,
+      "sha256": "8eb7f4fef157cb5d6ed4936a2e6c58263b78d98639d523da650487956caf3bdb"
+    }
+  ]
+}

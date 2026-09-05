@@ -1,3 +1,4 @@
+import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
 import { getStore } from "@netlify/blobs";
 import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -23,6 +24,10 @@ import {
   buildJobQuotaStoreNameForFunctionContext,
   buildJobStateStoreNameForFunctionContext,
   builderDisabled,
+  buildJobStateForPipelinePhase,
+  getActiveBuildJobForRequest,
+  getAccountGalleryBuild,
+  refundKnownUnusableBuildCredit,
   cancelBuildJob,
   claimSuccessfulBuildJob,
   completeBuildJob,
@@ -145,6 +150,13 @@ export default async function handler(req, context = {}) {
       return await buildJobs(req, env, context);
     }
 
+    if (localApiPath === "/api/build-jobs/active") return await activeBuildJob(req, env, context);
+    const accountBuildMatch = localApiPath.match(/^\/api\/account\/builds\/([^/]+)$/);
+    if (accountBuildMatch) return await accountBuild(req, context, accountBuildMatch[1]);
+    if (localApiPath === "/api/health") {
+      const pipeline = await loadProductionBuildPipeline();
+      return jsonResponse({ok:true,buildPipeline:"atomic-manifest-v1",catalogRevision:pipeline.catalogRevision,promptPackageRevision:pipeline.promptPackageRevision,compilerPatchRevision:pipeline.compilerPatchRevision,semanticPatchRevision:pipeline.semanticPatchRevision},200,{"Cache-Control":"no-store"});
+    }
     if (localApiPath === "/api/builds") {
       return await communityBuilds(req, env, context);
     }
@@ -297,6 +309,15 @@ const DEFAULT_OPENAI_SERVICE_TIER = "priority";
 function getEnv() {
   const keys = [
     "OPENAI_API_KEY",
+    "MAKEABLE_ATOMIC_BUILD_GENERATION_ENABLED",
+    "GEMINI_IMAGE_TIMEOUT_MS",
+    "GEMINI_IMAGE_MODEL",
+    "GOOGLE_GEMINI_BASE_URL",
+    "GEMINI_API_KEY",
+    "OPENAI_IMAGE_TOOL_TIMEOUT_MS",
+    "OPENAI_IMAGE_TOOL_MODEL",
+    "OPENAI_IMAGE_BASE_URL",
+    "OPENAI_IMAGE_API_KEY",
     "OPENAI_BASE_URL",
     "OPENAI_MODEL",
     "OPENAI_REASONING_MODEL",
@@ -844,36 +865,67 @@ async function startAnonymousBuildJob(req, env, context) {
   const body = await readLimitedJsonRequest(req, 8 * 1024);
   const stateStore = buildStateStore(context);
   const imageStore = buildImageStore(context);
-  const auth = await optionalBuilderSession(req, context);
-  if (auth.user) {
-    const quota = await accountBuildQuota(stateStore, auth.user.sub);
-    if (quota.remaining <= 0) {
-      return jsonResponse({ error: `This Google account has used its ${quota.limit} successful builds.` }, 429, {
-        "Cache-Control": "no-store",
-      });
-    }
+  const auth = await requireBuilderSession(req, context);
+  if (!auth.ok) return auth.response;
+  let pipeline;
+  try {
+    pipeline = await loadProductionBuildPipeline();
+  } catch (error) {
+    console.error("Production build pipeline could not be loaded", error);
+    return jsonResponse({ error: "The verified build pipeline is temporarily unavailable." }, 503, {
+      "Cache-Control": "no-store",
+    });
+  }
+  const clarification = await pipeline.assessIdea({ idea: body?.idea, env, fetchFn: fetch });
+  if (clarification.status === "needs_clarification") {
+    return jsonResponse({ clarification }, 200, { "Cache-Control": "no-store" });
+  }
+  await refundKnownUnusableBuildCredit(stateStore, auth.user.sub);
+  const quota = await accountBuildQuota(stateStore, auth.user.sub);
+  if (quota.remaining <= 0) {
+    return jsonResponse({ error: `This Google account has used its ${quota.limit} successful builds.` }, 429, {
+      "Cache-Control": "no-store",
+    });
   }
   const start = await createAnonymousBuildJob({
     request: req,
     stateStore,
     env,
     idea: body?.idea,
+    requestId: body?.requestId,
     user: auth.user,
+    revisionContext: {
+      catalogRevision: pipeline.catalogRevision,
+      promptPackageRevision: pipeline.promptPackageRevision,
+      requireAtomicManifest: true,
+    },
   });
   if (!start.ok) {
     const activeJob = start.activeJob || null;
-    const dispatch = activeJob?.state === BUILD_JOB_STATES.queued && shouldUseNetlifyBackground(env, context)
-      ? createBackgroundBuildDispatch(env, activeJob.id)
-      : null;
-    return jsonResponse({ error: start.error, activeJob, dispatch }, start.status, {
+    if (activeJob?.state === BUILD_JOB_STATES.queued && shouldUseNetlifyBackground(env, context)) {
+      const dispatched = await invokeBackgroundBuildJob(req, env, activeJob.id);
+      if (!dispatched.ok) {
+        await failBuildJob(stateStore, activeJob.id, new Error(dispatched.error));
+        return jsonResponse({ error: dispatched.error, activeJob: publicBuildJob(activeJob) }, 503, {
+          "Cache-Control": "no-store",
+        });
+      }
+    }
+    return jsonResponse({ error: start.error, activeJob }, start.status, {
       "Cache-Control": "no-store",
       ...(start.headers || {}),
     });
   }
-  const dispatch = shouldUseNetlifyBackground(env, context)
-    ? createBackgroundBuildDispatch(env, start.job.id)
-    : null;
-  if (!dispatch) {
+  if (shouldUseNetlifyBackground(env, context)) {
+    const dispatched = await invokeBackgroundBuildJob(req, env, start.job.id);
+    if (!dispatched.ok) {
+      await failBuildJob(stateStore, start.job.id, new Error(dispatched.error));
+      return jsonResponse({ error: dispatched.error, job: publicBuildJob(start.job) }, 503, {
+        "Cache-Control": "no-store",
+        "Set-Cookie": start.cookie,
+      });
+    }
+  } else {
     scheduleBuildExecution(context, {
       jobId: start.job.id,
       idea: start.job.idea,
@@ -885,11 +937,8 @@ async function startAnonymousBuildJob(req, env, context) {
   return jsonResponse(
     {
       job: publicBuildJob(start.job),
-      dispatch,
       limits: {
-        startsPerWindow: auth.user
-          ? BUILD_JOB_LIMITS.successfulClaimsPerAccount
-          : BUILD_JOB_LIMITS.startsPerWindow,
+        startsPerWindow: BUILD_JOB_LIMITS.successfulClaimsPerAccount,
         windowHours: 24,
       },
     },
@@ -911,6 +960,7 @@ async function accountBuilds(req, env, context) {
   const auth = await requireBuilderSession(req, context);
   if (!auth.ok) return auth.response;
   const stateStore = buildStateStore(context);
+  await refundKnownUnusableBuildCredit(stateStore, auth.user.sub);
   const profile = publicBuilderProfile(auth.user);
   const quota = await accountBuildQuota(stateStore, auth.user.sub);
   const userBuilds = await listAccountGalleryBuilds(stateStore, auth.user.sub);
@@ -1294,14 +1344,35 @@ async function runCommunityBuildJob({ jobId, idea, env, stateStore, imageStore }
         return build;
       },
     };
+    const pipeline = await loadProductionBuildPipeline();
+    const event = (name, details = {}) => {
+      console.info(JSON.stringify({
+        type: "makeable_build_event",
+        name,
+        jobId,
+        requestId: planning.identity?.requestId || "",
+        buildId: planning.identity?.buildId || "",
+        requestFingerprint: planning.identity?.requestFingerprint || "",
+        catalogRevision: planning.identity?.catalogRevision || "",
+        promptPackageRevision: planning.identity?.promptPackageRevision || "",
+        ...details,
+      }));
+    };
     const result = await createBuild(
       { idea },
       {
-        env,
+        ...pipeline.createOptions({
+          env,
+          buildIdentity: planning.identity,
+          fetchFn: fetch,
+          onPhase: (phase) => markBuildJobState(
+            stateStore,
+            jobId,
+            buildJobStateForPipelinePhase(phase),
+          ),
+          onEvent: event,
+        }),
         store: captureStore,
-        fetchFn: fetch,
-        allowAnonymous: true,
-        onPhase: (state) => markBuildJobState(stateStore, jobId, state),
       },
     );
     if (result.status !== 201) {
@@ -2387,4 +2458,74 @@ function binaryResponse(bytes, contentType, headers = {}) {
       ...headers,
     },
   });
+}
+
+async function activeBuildJob(req, env, context) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  const auth = await requireBuilderSession(req, context);
+  if (!auth.ok) return auth.response;
+  const active = await getActiveBuildJobForRequest({
+    request: req,
+    stateStore: buildStateStore(context),
+    env,
+    requestId: new URL(req.url).searchParams.get("requestId") || "",
+    user: auth.user,
+  });
+  if (!active.ok) {
+    return jsonResponse({ error: active.error }, active.status, {
+      "Cache-Control": "no-store",
+      ...(active.headers || {}),
+    });
+  }
+  return jsonResponse({ job: active.job }, 200, { "Cache-Control": "no-store" });
+}
+
+
+async function accountBuild(req, context, buildId) {
+  if (req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405, {
+      Allow: "GET",
+      "Cache-Control": "no-store",
+    });
+  }
+  const auth = await requireBuilderSession(req, context);
+  if (!auth.ok) return auth.response;
+  const build = await getAccountGalleryBuild(buildStateStore(context), buildId, auth.user.sub);
+  return build
+    ? jsonResponse({ build }, 200, { "Cache-Control": "no-store", Vary: "Cookie" })
+    : jsonResponse({ error: "Build not found" }, 404, { "Cache-Control": "no-store", Vary: "Cookie" });
+}
+
+
+export async function invokeBackgroundBuildJob(req, env, jobId, fetchFn = fetch) {
+  const dispatch = createBackgroundBuildDispatch(env, jobId);
+  try {
+    const response = await fetchFn(new URL(dispatch.path, req.url), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Makeable-Background-Timestamp": dispatch.timestamp,
+        "X-Makeable-Background-Signature": dispatch.signature,
+      },
+      body: JSON.stringify({ jobId }),
+    });
+    if (response.status !== 202) {
+      return {
+        ok: false,
+        error: `Makeable's workshop did not accept this build (HTTP ${response.status}). Please try again.`,
+      };
+    }
+    return { ok: true, status: response.status };
+  } catch (error) {
+    return {
+      ok: false,
+      error: "Makeable could not hand this build to the workshop. Your idea is safe—please try again.",
+      cause: String(error?.message || error),
+    };
+  }
 }

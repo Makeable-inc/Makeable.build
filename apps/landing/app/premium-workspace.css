@@ -1006,10 +1006,12 @@
   display: grid;
   height: 64px;
   min-width: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
   gap: 5px;
   padding: 7px;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid var(--studio-line);
   border-radius: 10px;
   background: var(--studio-white);
@@ -1033,11 +1035,13 @@
   display: grid;
   min-height: 0;
   grid-template-columns: repeat(3, minmax(0, 220px));
+  grid-auto-rows: max-content;
+  align-content: safe center;
   align-items: center;
   justify-content: space-around;
   gap: 22px;
   padding: 24px 28px;
-  overflow: hidden;
+  overflow: auto;
 }
 .mk-wiring-connection-map { position: absolute; inset: 18% 3%; z-index: 0; width: 94%; height: 64%; overflow: visible; }
 .mk-wiring-connection-map path { fill: none; stroke-width: 5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
@@ -1451,6 +1455,8 @@
   .mk-wiring-pane-toggle { position: static; flex-shrink: 0; }
   .mk-wiring-toolbar { display: flex; gap: 6px; }
   .mk-wiring-progress { flex: 1; min-width: 0; overflow: auto; }
+  .mk-wiring-progress { grid-auto-columns: minmax(42px, 1fr); }
+  .mk-wiring-artifact-parts:has(article:nth-of-type(4)) { grid-template-columns: repeat(2, minmax(0,1fr)); align-content: start; }
   .mk-wiring-progress button { min-width: 38px; flex-shrink: 0; }
   .mk-wiring-pane-toggle button { min-width: 46px; padding: 0 5px; }
   .mk-wiring-step-heading { padding: 10px 12px; }
@@ -1521,4 +1527,228 @@
   .mk-wiring-artifact-parts article strong { font-size: 10px; }
   .mk-wiring-artifact-lines { min-height: 28px; }
   .mk-wiring-safety { margin: 0 8px 5px; padding: 5px; }
+}
+
+/* Retailer choices stay named and usable at every viewport size. */
+.mk-project-part-retailers { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.mk-project-retailer { display: flex; flex-direction: row; align-items: center; justify-content: space-between; min-height: 44px; gap: 10px; padding: 8px 10px; border-color: var(--studio-line); border-radius: 6px; background: #faf9f6; text-decoration: none; }
+.mk-project-retailer:hover { background: #f0eee8; border-color: #8c877e; }
+.mk-project-retailer:focus-visible { outline: 2px solid var(--studio-ink); outline-offset: 3px; }
+.mk-project-retailer > .mk-retailer-wordmark { display: inline-flex; flex-shrink: 0; font-size: 12px; }
+.mk-project-retailer > .mk-retailer-action { display: inline; width: auto; padding: 0; border: 0; color: #59564f; font-size: 10px; }
+.mk-project-part-copy .mk-part-mobile-facts { display: block; color: #615a53; font-size: 10px; line-height: 1.5; }
+.mk-project-retailer-note { margin: 5px 0 0; color: #615a53; font-size: 11px; line-height: 1.5; }
+@media (max-width: 1100px) and (min-width: 761px) {
+  .mk-project-retailer { flex-direction: column; justify-content: center; gap: 5px; }
+}
+@media (max-width: 760px) {
+  .mk-project-part-card { grid-template-columns: 32px minmax(0,1fr); gap: 8px; padding: 10px; }
+  .mk-project-part-retailers { grid-column: 1 / -1; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .mk-project-retailer { min-height: 44px; padding: 8px; gap: 6px; }
+  .mk-project-retailer > .mk-retailer-wordmark { display: inline-flex; font-size: 11px; }
+  .mk-project-retailer > span.mk-retailer-action { display: inline; font-size: 10px; }
+}
+
+/* One workspace, one hierarchy. Shared with the homepage's rounded display type. */
+.mk-app-shell .mk-logo-link::before, .mk-app-shell .mk-logo-link::after { display: none; }
+.mk-app-shell .mk-project-retailer > .mk-retailer-wordmark { display: inline-flex; }
+.mk-app-shell .mk-project-retailer > span.mk-retailer-action { width: auto; padding: 0; border: 0; color: #59544f; }
+.mk-project-overview-content { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.mk-project-parts-head h2, .mk-project-parts-head > span { text-transform: none; letter-spacing: 0; }
+.mk-app-shell { --studio-paper: #fffaf1; --studio-white: #fffaf1; --studio-orange: #ff3aa4; --studio-muted: #59544f; }
+.mk-app-shell h1, .mk-app-shell h2, .mk-app-shell h3 { font-family: var(--font-display); }
+.mk-app-shell[data-flow="generation"] { grid-template-rows: 80px minmax(0,1fr); }
+.mk-app-shell[data-flow="generation"] > .mk-workspace-main { grid-row: 2; padding: 0; }
+.mk-app-shell[data-flow="generation"] .mk-workspace-topbar { grid-template-columns: 1fr auto; height: 80px; padding: 0 clamp(24px,5vw,72px); }
+.mk-app-shell[data-flow="generation"] .mk-topbar-navigation { display: none; }
+.mk-app-shell[data-flow="generation"] .mk-topbar-logo { width: 172px; }
+.mk-generation-editorial { display: grid; grid-template-columns: 1.15fr 1fr; grid-template-rows: auto; align-content: center; align-items: center; gap: clamp(32px,5vw,72px); width: min(100%,1280px); height: 100%; margin: 0 auto; padding: clamp(24px,4vw,56px); overflow: auto; border: 0; border-radius: 0; background: transparent; }
+.mk-generation-story { min-width: 0; }
+.mk-generation-story h1 { margin: 0 0 24px; font-size: clamp(40px,4.8vw,72px); line-height: 1.04; font-weight: 600; letter-spacing: -.025em; }
+.mk-generation-story [role="status"] > p { margin: 0; font-size: 20px; line-height: 1.5; color: #59544f; }
+.mk-generation-original { margin-top: 36px; padding-left: 22px; border-left: 2px solid #b6afa5; }
+.mk-generation-original > span { font-size: 14px; color: #59544f; }
+.mk-generation-original p { margin: 10px 0 0; font-size: 19px; line-height: 1.6; overflow-wrap: anywhere; }
+.mk-generation-activity { min-width: 0; border-left: 1px solid var(--studio-line); padding-left: clamp(24px,3vw,48px); }
+.mk-generation-stage-rows { display: grid; gap: 24px; margin: 0 0 32px; padding: 0; list-style: none; }
+.mk-generation-stage-rows li { display: flex; align-items: center; gap: 18px; font-size: 18px; }
+.mk-generation-stage-rows li > span { display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px; border: 1px solid #99948c; border-radius: 50%; font-family: var(--font-display); font-size: 22px; }
+.mk-generation-stage-rows strong { font-weight: 500; }
+.mk-generation-stage-rows [data-state="current"] > span { color: #fff; background: #e91874; border-color: #e91874; }
+.mk-generation-stage-rows [data-state="current"] strong { font-weight: 700; }
+.mk-generation-clock strong { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mk-generation-clock p { margin: 8px 0 24px; color: #59544f; font-size: 15px; line-height: 1.5; }
+.mk-generation-editorial .mk-progress-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.mk-generation-editorial .mk-progress-actions button { min-height: 48px; padding: 12px 18px; font-size: 16px; border-radius: 10px; }
+.mk-generation-editorial .mk-progress-dismiss { background: #020b17; color: white; border: 1px solid #020b17; }
+.mk-generation-editorial .mk-progress-cancel { color: #59544f; background: transparent; border: 0; }
+.mk-generation-editorial .mk-generation-leave-note { display: block; margin: 20px 0 10px; color: #59544f; font-size: 14px; line-height: 1.5; }
+.mk-generation-job-id { display: block; color: #59544f; font-size: 12px; overflow-wrap: anywhere; }
+.mk-recovery-layout { display: grid; align-items: center; height: 100%; padding: 32px; overflow: auto; }
+.mk-recovery-layout .mk-build-failure { width: min(100%,1240px); height: auto; max-height: 100%; margin: auto; padding: 24px; background: transparent; border: 0; border-radius: 0; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto; align-items: center; gap: 64px; overflow: auto; }
+.mk-recovery-layout .mk-build-failure-body { gap: 22px; overflow: visible; }
+.mk-recovery-layout .mk-build-failure h1 { max-width: 850px; font-size: clamp(36px,4.5vw,64px); line-height: 1.08; margin: 0; font-weight: 600; }
+.mk-recovery-layout .mk-build-failure p { font-size: 18px; line-height: 1.55; }
+.mk-recovery-layout .mk-build-failure dl { font-size: 16px; margin: 0; }
+.mk-recovery-layout .mk-build-failure dl > div { grid-template-columns: 100px minmax(0,1fr); gap: 20px; padding: 14px 0; }
+.mk-recovery-layout .mk-build-failure dd { overflow-wrap: anywhere; }
+.mk-recovery-layout .mk-failure-details summary { font-size: 16px; min-height: 44px; display: flex; align-items: center; }
+.mk-recovery-layout .mk-failure-details p { font-size: 14px; overflow-wrap: anywhere; }
+.mk-recovery-layout .mk-build-failure-footer { padding: 0; border: 0; }
+.mk-recovery-layout .mk-build-failure-footer h2 { font-size: 26px; margin: 0 0 12px; }
+.mk-recovery-layout .mk-build-failure-footer > p:first-of-type { font-size: 17px; margin: 0 0 24px; }
+.mk-recovery-layout .mk-build-failure-footer dl { margin-top: 28px; border-top: 1px solid var(--studio-line); }
+.mk-recovery-layout .mk-build-failure .mk-button { min-height: 48px; padding: 12px 22px; font-size: 16px; border-radius: 10px; }
+.mk-recovery-layout .mk-build-failure-footer > p { font-size: 14px; margin: 14px 0 0; }
+
+/* Readability is not traded away to fit more rows. Lists scroll within the page. */
+.mk-topbar-navigation .mk-project-nav > button { font-size: 16px; }
+.mk-context-title strong { font-size: 20px; }
+.mk-context-idea p { font-size: 14px; }
+.mk-project-overview { gap: 28px; padding: 24px; }
+.mk-project-overview-primary, .mk-project-parts { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.mk-project-overview-header { padding: 20px 0 0; gap: 14px; }
+.mk-project-overview-visual img { object-fit: contain; background: #f0efeb; }
+.mk-project-overview-header > p, .mk-project-brief p, .mk-project-behavior p { font-size: 15px; line-height: 1.5; }
+.mk-project-brief > span, .mk-project-behavior > span { font-size: 12px; }
+.mk-project-parts-head h2 { font-size: 30px; }
+.mk-project-parts-head > span { font-size: 14px; }
+.mk-project-part-card { border-width: 0 0 1px; border-radius: 0; background: transparent; padding: 18px 0; grid-template-columns: 56px minmax(0,1fr) 176px; gap: 16px; }
+.mk-project-part-copy strong { font-size: 16px; }
+.mk-project-part-copy > span { font-size: 13px; white-space: normal; }
+.mk-project-part-copy .mk-part-mobile-facts { font-size: 13px; }
+.mk-project-part-copy .mk-detail-part-quantity { display: none; }
+.mk-project-retailer > .mk-retailer-wordmark { font-size: 13px; }
+.mk-project-retailer > .mk-retailer-action { font-size: 12px; }
+.mk-detail-part-why summary, .mk-project-cost-note, .mk-project-retailer-note { font-size: 13px; }
+.mk-project-facts strong { font-size: 14px; }
+.mk-project-facts span { font-size: 12px; }
+.mk-wiring-progress button { font-size: 14px; }
+.mk-wiring-progress button span { font-size: 13px; }
+.mk-wiring-safety span { font-size: 14px; line-height: 1.5; }
+.mk-wiring-simulation-heading p { font-size: 12px; }
+.mk-wiring-step-heading h2 { font-size: 30px; }
+.mk-wiring-step-heading p, .mk-wiring-preparation p, .mk-wiring-connection p { font-size: 16px; line-height: 1.5; }
+.mk-wiring-step-heading > span, .mk-wiring-safety strong, .mk-wiring-safety p { font-size: 14px; line-height: 1.4; }
+.mk-wiring-artifact-parts article strong { font-size: 13px; line-height: 1.4; }
+.mk-wiring-artifact-parts article small, .mk-wiring-artifact-lines { font-size: 12px; }
+.mk-code-locked-copy > p { font-size: 18px; line-height: 1.5; }
+.mk-code-locked-copy > span:last-child { font-size: 14px; line-height: 1.5; }
+.mk-code-locked-copy > button { font-size: 16px; min-height: 48px; }
+@media (max-width: 1100px) and (min-width: 761px) {
+  .mk-project-part-card { grid-template-columns: 42px minmax(0,1fr); }
+  .mk-project-part-retailers { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
+  .mk-project-retailer { flex-direction: row; }
+}
+@media (max-width: 760px) {
+  .mk-app-shell[data-flow="generation"] { grid-template-rows: 64px minmax(0,1fr); }
+  .mk-app-shell[data-flow="generation"] .mk-workspace-topbar { height: 64px; padding: 0 20px; }
+  .mk-app-shell[data-flow="generation"] .mk-topbar-logo { width: 140px; }
+  .mk-generation-editorial { grid-template-columns: 1fr; grid-template-rows: auto auto; gap: 24px; padding: 24px; align-content: start; }
+  .mk-generation-story h1 { font-size: 36px; margin-bottom: 12px; }
+  .mk-generation-story [role="status"] > p { font-size: 16px; }
+  .mk-generation-original { margin-top: 20px; padding-left: 14px; }
+  .mk-generation-original p { font-size: 15px; line-height: 1.5; margin-top: 6px; max-height: 90px; overflow: auto; }
+  .mk-generation-activity { border: 0; padding: 0; }
+  .mk-generation-stage-rows { gap: 12px; margin-bottom: 20px; }
+  .mk-generation-stage-rows li { gap: 12px; font-size: 16px; }
+  .mk-generation-stage-rows li > span { width: 32px; height: 32px; flex-basis: 32px; font-size: 17px; }
+  .mk-generation-clock strong { font-size: 17px; }
+  .mk-generation-clock p { font-size: 14px; margin-bottom: 16px; }
+  .mk-generation-editorial .mk-progress-actions { gap: 4px; }
+  .mk-generation-editorial .mk-progress-actions button { padding: 10px 14px; font-size: 15px; }
+  .mk-generation-editorial .mk-generation-leave-note { margin: 12px 0 8px; font-size: 13px; }
+  .mk-recovery-layout { padding: 24px; align-items: start; }
+  .mk-recovery-layout .mk-build-failure { grid-template-columns: 1fr; grid-template-rows: auto auto; padding: 0; max-height: none; gap: 24px; }
+  .mk-recovery-layout .mk-build-failure h1 { font-size: 36px; }
+  .mk-recovery-layout .mk-build-failure p { font-size: 16px; }
+  .mk-recovery-layout .mk-build-failure dl > div { display: grid; grid-template-columns: 1fr; gap: 6px; font-size: 14px; }
+  .mk-recovery-layout .mk-build-failure .mk-button { font-size: 15px; padding: 10px 14px; }
+  .mk-project-overview { padding: 16px; gap: 16px; grid-template-rows: minmax(0,38fr) minmax(0,62fr); }
+  .mk-project-overview-primary { grid-template-columns: minmax(100px,.38fr) minmax(0,.62fr); gap: 12px; }
+  .mk-project-overview-visual { align-self: start; aspect-ratio: 1; height: auto; border-radius: 12px; }
+  .mk-project-overview-visual figcaption { display: none; }
+  .mk-project-overview-header { padding: 0; overflow: auto; }
+  .mk-project-overview-header > p, .mk-project-brief p, .mk-project-behavior p { font-size: 14px; -webkit-line-clamp: unset; }
+  .mk-project-parts-head h2 { font-size: 24px; }
+  .mk-project-parts-head > span { font-size: 12px; }
+  .mk-project-part-card { grid-template-columns: 32px minmax(0,1fr); padding: 14px 0; gap: 10px; }
+  .mk-project-part-copy strong { font-size: 15px; }
+  .mk-project-retailer > .mk-retailer-wordmark { font-size: 12px; }
+  .mk-project-retailer > span.mk-retailer-action { font-size: 11px; }
+  .mk-code-locked-copy > p { font-size: 16px; }
+  .mk-code-locked-copy > span:last-child { font-size: 13px; }
+  .mk-wiring-mobile-instruction { max-height: 150px; }
+  .mk-wiring-mobile-instruction strong { font-size: 18px; }
+  .mk-wiring-mobile-instruction span { font-size: 14px; }
+  .mk-wiring-artifact-parts article strong { font-size: 12px; }
+}
+
+/* Quiet surfaces: real content sets the hierarchy, not decorative labels. */
+.mk-workspace-context { grid-template-columns: minmax(0,1fr) auto; }
+.mk-topbar-utilities .mk-build-switcher > summary { border: 0; border-radius: 0; background: transparent; font-size: 14px; white-space: nowrap; }
+.mk-summary-toggle { display: none; }
+.mk-context-title { min-width: 0; }
+.mk-context-brief { position: relative; margin-left: auto; font-size: 14px; }
+.mk-context-brief summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.mk-context-brief p { position: absolute; z-index: 30; right: 0; top: 36px; width: min(420px,80vw); padding: 20px; border: 1px solid var(--studio-line); background: var(--studio-paper); font-size: 16px; line-height: 1.5; box-shadow: 0 8px 24px #00000012; }
+.mk-context-back { border: 0; background: transparent; }
+.mk-generation-clock { margin-bottom: 24px; }
+.mk-generation-job-details { color: var(--studio-muted); font-size: 13px; }
+.mk-generation-job-details summary { cursor: pointer; min-height: 32px; }
+.mk-generation-job-details .mk-generation-job-id { margin-top: 6px; }
+.mk-project-overview-visual { border: 0; border-radius: 0; box-shadow: none; }
+.mk-project-overview-header { display: flex; flex-direction: column; align-items: stretch; justify-content: start; }
+.mk-project-overview-header > p { margin: 0; font-size: 18px; line-height: 1.5; }
+.mk-project-overview-header .mk-project-saved-note { font-size: 14px; color: var(--studio-muted); }
+.mk-project-behavior { padding: 0; border: 0; }
+.mk-project-behavior summary, .mk-project-buying-note summary { font-size: 14px; min-height: 44px; display: flex; align-items: center; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.mk-project-part-card .mk-detail-part-thumb { border: 0; border-radius: 0; background: transparent; }
+.mk-project-retailer { border: 0; border-radius: 0; background: transparent; padding: 8px 0; }
+.mk-project-retailer:hover { background: transparent; }
+.mk-project-retailer .mk-retailer-action { text-decoration: underline; text-underline-offset: 4px; }
+.mk-project-part-copy .mk-detail-part-why summary { text-decoration: underline; text-underline-offset: 4px; color: var(--studio-muted); }
+.mk-wiring-progress { border: 0; border-radius: 0; background: transparent; padding-left: 0; padding-right: 0; }
+.mk-wiring-progress button { border-radius: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; }
+.mk-wiring-progress button[aria-current="step"] { border-color: var(--studio-ink); background: transparent; }
+.mk-wiring-simulation, .mk-wiring-step-card { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.mk-wiring-simulation-heading { border: 0; padding-left: 0; padding-right: 0; }
+.mk-wiring-simulation-heading h2 { font-size: 20px; }
+.mk-saved-wiring-viewer { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #fafaf8; }
+.mk-saved-wiring-viewer iframe { display: block; width: 100%; height: 100%; border: 0; }
+.mk-wiring-viewer-status { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: #fafaf8; text-align: center; }
+.mk-wiring-viewer-status h3 { margin: 0; font-size: 22px; }
+.mk-wiring-viewer-status p { margin: 0; font-size: 16px; }
+.mk-wiring-viewer-status button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--studio-ink); background: transparent; color: var(--studio-ink); font: inherit; cursor: pointer; }
+.mk-wiring-artifact-parts { background: #f1f0ec; }
+.mk-wiring-artifact-parts[data-connected="true"] { grid-template-columns: repeat(2,minmax(0,220px)); gap: 48px; padding: 28px; }
+.mk-wiring-artifact-parts article { position: relative; z-index: 1; border: 0; border-radius: 0; background: #f1f0ec; box-shadow: none; }
+.mk-wiring-artifact-parts .mk-detail-part-thumb { border: 0; border-radius: 0; background: transparent; }
+.mk-wiring-step-heading { padding-top: 18px; }
+.mk-wiring-step-heading > span { color: var(--studio-muted); letter-spacing: 0; text-transform: none; }
+.mk-wiring-preparation, .mk-wiring-connection { border: 0; border-radius: 0; background: transparent; padding-left: 0; }
+.mk-wiring-preparation span, .mk-wiring-connection span { font-size: 14px; line-height: 1.5; }
+.mk-wiring-safety { border: 0; border-left: 2px solid #a35d34; border-radius: 0; background: transparent; }
+.mk-wiring-step-controls { border: 0; border-top: 1px solid var(--studio-line); border-radius: 0; background: transparent; }
+.mk-code-locked { display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr; border: 0; border-radius: 0; background: transparent; }
+.mk-code-locked-copy { width: min(100%,680px); justify-self: center; align-self: center; border: 0; background: transparent; }
+.mk-code-lock-mark { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.mk-code-locked-copy > p + p { margin-top: 12px; }
+.mk-recovery-layout .mk-build-failure-footer > .mk-failure-credit { font-size: 14px; }
+@media (max-width: 760px) {
+  .mk-context-brief { display: block; flex-shrink: 0; font-size: 12px; }
+  .mk-workspace-context { grid-template-columns: minmax(0,1fr) auto; }
+  .mk-project-overview-header > p { font-size: 15px; }
+  .mk-project-overview-header > #project-summary[data-expanded="false"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; flex-shrink: 0; }
+  .mk-project-overview-header { gap: 4px; }
+  .mk-summary-toggle { display: block; align-self: start; min-height: 36px; border: 0; padding: 0; color: var(--studio-ink); background: transparent; font-size: 14px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+  .mk-project-overview-header .mk-project-saved-note { font-size: 12px; }
+  .mk-project-overview-visual { border-radius: 0; }
+  .mk-generation-story h1 { font-size: 38px; }
+  .mk-generation-original { margin-top: 24px; }
+  .mk-generation-editorial { gap: 28px; }
+  .mk-code-locked-copy { padding: 24px; }
+  .mk-wiring-simulation-heading h2 { font-size: 16px; }
+  .mk-wiring-simulation-heading p { font-size: 11px; }
+  .mk-wiring-artifact-parts[data-connected="true"] { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 28px; padding: 14px 24px; }
 }

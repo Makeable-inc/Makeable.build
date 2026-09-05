@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "makeable-production-prompt-package/v1",
+  "packageVersion": "2026-09-04.2",
+  "stages": [
+    {
+      "id": "brief_clarification",
+      "owner": "gpt-5.6-sol",
+      "executor": "openai_responses",
+      "promptPath": "brief-clarification.md",
+      "reasoningEffort": "high",
+      "serviceTier": "priority",
+      "purpose": "Turn an underspecified theme into user-selected, catalog-grounded build directions before a job or quota-bearing build identity is created.",
+      "outputContract": "code_owned_json_schema"
+    },
+    {
+      "id": "parts_plan",
+      "owner": "gpt-5.6-sol",
+      "executor": "openai_responses",
+      "promptPath": "parts-planner.md",
+      "reasoningEffort": "xhigh",
+      "serviceTier": "priority",
+      "purpose": "Select or normalize an exact catalog-constrained build plan from approved candidates.",
+      "outputContract": "code_owned_json_schema"
+    },
+    {
+      "id": "asset_resolution",
+      "owner": "registry_service",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Resolve approved immutable AWS assets and verify their manifests, hashes, interfaces, and required nodes.",
+      "outputContract": "code_owned_validator"
+    },
+    {
+      "id": "resource_partitioning",
+      "owner": "network_resource_compiler",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Exhaust legal local bus and carrier contacts, inject the minimum additional compatible ESP32-and-carrier nodes, keep Grove on XIAO expansion-base nodes, and emit a bounded secret-free ESP-NOW star contract when more than one controller is required.",
+      "outputContract": "code_owned_validator"
+    },
+    {
+      "id": "connector_geometry_audit",
+      "owner": "connector_geometry_registry",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Require each selected immutable asset to pass its declared rigid connector-family pitch, row-spacing, contact-count, and exact sale-form geometry contracts before wiring intent is requested.",
+      "outputContract": "code_owned_validator"
+    },
+    {
+      "id": "assembly_routing",
+      "owner": "gpt-5.6-sol",
+      "executor": "openai_responses",
+      "promptPath": "assembly-routing.md",
+      "reasoningEffort": "xhigh",
+      "serviceTier": "priority",
+      "purpose": "Choose bounded presentation metadata for immutable, prevalidated wire endpoints.",
+      "outputContract": "code_owned_json_schema"
+    },
+    {
+      "id": "route_geometry",
+      "owner": "assembly_geometry",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Construct connector-normal, tangent-fillet wire geometry and continuously reject segment-solid intersections, loops, self-intersections, duplicate carrier endpoints, same-net crossing waivers, keepouts, invalid endpoints, excess cable length, and measured bend radii below the conductor contract.",
+      "outputContract": "code_owned_validator"
+    },
+    {
+      "id": "browser_delivery",
+      "owner": "threejs_renderer",
+      "executor": "deterministic",
+      "promptPath": null,
+      "purpose": "Fetch and hash-verify approved CloudFront GLBs, apply accepted immutable node transforms, and render the compiler's bend-safe route samples by arc length without a client-side spline that can overshoot them.",
+      "outputContract": "machine_state_gate"
+    }
+  ]
+}

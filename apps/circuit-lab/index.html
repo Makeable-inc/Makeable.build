@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f1eb">
+  <title>Makeable — Circuit Studio</title>
+  <link rel="stylesheet" href="/circuit-studio/styles.css">
+  <link rel="stylesheet" href="/circuit-studio/refined.css">
+  <script type="importmap">
+    {"imports":{"three":"/circuit-studio/vendor/three.module.js","three/addons/":"/circuit-studio/vendor/addons/"}}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" id="surface-back" href="/" aria-label="Makeable Circuit Studio home">
+      <img src="/makeable-logo-tight.webp" alt="Makeable" width="132" height="34">
+      <em id="surface-name">Circuit Studio</em>
+    </a>
+    <div class="runtime-badges" aria-label="Live runtime status">
+      <span id="credential-bridge"><i></i>Checking API bridge</span>
+      <span id="catalog-coverage"><i></i>AWS catalog</span>
+      <span class="one-shot-badge"><i></i>One-shot API</span>
+    </div>
+    <div class="guide-view-toggle" aria-label="Assembly view">
+      <button type="button" data-guide-pane="visual" aria-pressed="true">3D view</button>
+      <button type="button" data-guide-pane="details" aria-pressed="false">Instructions</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="prompt-panel" aria-labelledby="composer-title">
+      <div class="composer-copy">
+        <h1 id="composer-title">Describe the idea.<br>See every connection.</h1>
+        <p>A parts list and a 3D guide to putting it together.</p>
+        <ol class="workflow-promise" aria-label="What Makeable creates">
+          <li><span>1</span><strong>Choose parts</strong><small>Only verified AWS models</small></li>
+          <li><span>2</span><strong>Connect safely</strong><small>Exact pin-to-pin paths</small></li>
+          <li><span>3</span><strong>Build in order</strong><small>Plain-language steps</small></li>
+        </ol>
+      </div>
+      <form id="idea-form" class="prompt-card">
+        <label for="idea">What do you want to make?</label>
+        <textarea id="idea" maxlength="2000">Build a compact indoor air-quality monitor with CO2, temperature, humidity, and ambient light</textarea>
+        <div class="example-prompts" aria-label="Example project ideas">
+          <span>Try an example</span>
+          <button type="button" data-example="Build a smart plant monitor with a screen, soil moisture, temperature, humidity, and ambient light">Plant monitor</button>
+          <button type="button" data-example="Show on a screen when someone enters a room, with a rotary knob to adjust the alert time">Room alert</button>
+          <button type="button" data-example="Build a desktop weather station with a screen, temperature, humidity, pressure, and light sensing">Weather station</button>
+        </div>
+        <div class="input-meta"><span>Verified AWS parts only</span><output id="char-count">99 / 2000</output></div>
+        <button id="generate" type="submit">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 1 1.4 5.6L17 8l-5.6 1.4L10 15l-1.4-5.6L3 8l5.6-1.4L10 1Z"/></svg>
+          Build my circuit
+        </button>
+        <p class="composer-footnote">Built from the Makeable parts catalog.</p>
+      </form>
+    </section>
+
+    <section class="result-stage" aria-live="polite">
+      <header class="result-heading">
+        <div>
+          <span class="eyebrow" id="result-eyebrow">One-shot build preview</span>
+          <h2 id="result-title">Your circuit will assemble here</h2>
+          <p id="result-summary">Enter an idea to receive a verified 3D assembly and a plain-language wiring guide.</p>
+        </div>
+        <div class="result-metrics" aria-label="Build summary">
+          <div><strong id="metric-parts">—</strong><span>parts</span></div>
+          <div><strong id="metric-wires">—</strong><span>guides</span></div>
+          <div><strong id="run-state">Ready</strong><span>compile</span></div>
+        </div>
+      </header>
+
+      <section id="part-resolution" class="part-resolution" hidden aria-live="polite" aria-labelledby="resolution-title">
+        <div class="resolution-intro">
+          <span class="eyebrow">Supported-part helper</span>
+          <div class="resolution-heading-row">
+            <div>
+              <h3 id="resolution-title">Let’s adjust one of the parts</h3>
+              <p id="resolution-message"></p>
+            </div>
+            <strong id="resolution-attempt">Attempt 1 of 3</strong>
+          </div>
+        </div>
+        <div id="unsupported-parts" class="unsupported-parts"></div>
+        <div id="resolution-controls" class="resolution-controls">
+          <label for="resolution-note">Want something more specific?</label>
+          <textarea id="resolution-note" maxlength="800" placeholder="Tell us what matters most — for example: keep the screen large, use a touch display, or prioritize low cost."></textarea>
+          <div class="resolution-actions">
+            <small>Choose a supported option for each unavailable part, or add a note. We’ll try up to three times.</small>
+            <button id="resolution-retry" type="button">Try this version <span>→</span></button>
+          </div>
+          <p id="resolution-feedback" class="resolution-feedback" hidden></p>
+        </div>
+      </section>
+
+      <div class="guide-current-step" role="status"><strong id="mobile-step-title"></strong><p id="mobile-step-safety"></p></div>
+      <div class="hero-grid">
+        <section class="workspace" aria-label="Build hero view">
+          <div class="canvas-toolbar">
+            <div class="tool-group" aria-label="Camera views">
+              <button class="icon-button active" type="button" data-view="iso" aria-pressed="true">Isometric</button>
+              <button class="icon-button" type="button" data-view="top" aria-pressed="false">Top</button>
+              <button class="icon-button" type="button" data-view="pin" aria-pressed="false">Pin close-up</button>
+              <button class="icon-button secondary-view" type="button" data-view="opposite">Reverse</button>
+              <button class="icon-button secondary-view" type="button" data-view="side">Side</button>
+              <button class="icon-button" type="button" data-view="fit" aria-pressed="false">Fit</button>
+              <button class="icon-button focus-button" id="focus-view" type="button" aria-label="Toggle focused viewer" aria-pressed="false">Expand</button>
+            </div>
+            <div class="canvas-status"><i></i><span id="canvas-status">Awaiting an API build</span></div>
+          </div>
+          <div id="canvas" class="canvas" aria-label="Interactive 3D assembly viewer">
+            <div class="interaction-tools" role="group" aria-label="Move the 3D view">
+              <button type="button" data-interaction="rotate" aria-pressed="true" title="Drag to rotate the view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5M4 16a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/></svg><span>Rotate</span></button>
+              <button type="button" data-interaction="pan" aria-pressed="false" title="Drag to move the view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6a2 2 0 0 1 4 0v6-8a2 2 0 0 1 4 0v8-6a2 2 0 0 1 4 0v9c0 4-2 7-6 7h-1c-3 0-4-2-6-5l-3-5c-1-2 1-4 3-2l1 2Z"/></svg><span>Pan</span></button>
+              <button type="button" data-interaction="zoom" aria-pressed="false" title="Drag up or down to zoom"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6m-3-3v6"/></svg><span>Zoom</span></button>
+            </div>
+            <div id="empty-state" class="empty-state">
+              <div class="empty-orbit" aria-hidden="true"><span></span><span></span><span></span><i></i></div>
+              <h3>Ready for your first idea</h3>
+              <p>Your parts and connections will appear here.</p>
+            </div>
+            <div id="loading" class="canvas-loading" hidden>
+              <span class="loader-ring"></span>
+              <strong>Preparing your circuit</strong>
+              <small id="loading-detail">Starting parts plan…</small>
+              <button id="reload-saved-viewer" type="button" hidden>Reload 3D view</button>
+              <div class="loading-pulse"><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+          <footer class="canvas-footer">
+            <span id="interaction-hint" aria-live="polite">Drag to rotate · scroll or pinch to zoom</span>
+            <span id="scene-summary">0 parts · 0 wires</span>
+          </footer>
+        </section>
+
+        <aside class="guide-panel" aria-label="Assembly guide">
+          <div class="build-miniature">
+            <span>What you are building</span>
+            <div id="build-miniature" aria-label="Complete circuit overview"></div>
+          </div>
+          <div class="guide-header">
+            <span class="eyebrow">Step-by-step wiring</span>
+            <strong><span id="active-step-number">0</span> / <span id="step-count">0</span></strong>
+          </div>
+          <div class="active-step" id="active-step">
+            <span class="step-kicker">Assembly steps</span>
+            <h3>Generated for this exact circuit</h3>
+            <p>Each step will explain what to place and which labeled terminals to connect.</p>
+          </div>
+          <div id="step-connections" class="step-connections" aria-live="polite"></div>
+          <div id="step-safety" class="step-safety" hidden></div>
+          <div id="steps" class="steps empty-copy">Your numbered instructions will appear here.</div>
+        </aside>
+      </div>
+
+      <footer class="step-controls">
+        <button id="step-back" type="button" disabled aria-label="Previous assembly step">Previous</button>
+        <div class="step-progress"><i id="step-progress"></i></div>
+        <button id="step-next" type="button" disabled aria-label="Next assembly step">Next step</button>
+      </footer>
+
+      <nav id="assembly-progress" class="assembly-progress" aria-label="Assembly progress"></nav>
+
+      <div class="details-grid">
+        <section class="detail-card parts-card">
+          <div class="section-title"><div><span class="eyebrow">What you need</span><h2>Parts checklist</h2></div><span id="part-count">0</span></div>
+          <div id="parts" class="parts empty-copy">Your verified shopping list will appear here.</div>
+        </section>
+        <section class="detail-card connections-card">
+          <div class="section-title"><div><span class="eyebrow">Where each line goes</span><h2>Connection map</h2></div><span id="wire-count">0</span></div>
+          <div class="wire-legend" aria-label="Wire color guide"><span><i class="power"></i>Power</span><span><i class="ground"></i>Ground</span><span><i class="signal"></i>Signal</span></div>
+          <div id="nets" class="nets empty-copy">Simple, color-coded pin directions will appear here.</div>
+        </section>
+        <section class="detail-card proof-card">
+          <div class="section-title"><div><span class="eyebrow">Fail-closed proof</span><h2>Machine gates</h2></div><span id="gate-count">0 / 8</span></div>
+          <ul id="gates" class="gates">
+            <li data-gate="identity"><i></i><span>Request identity locked</span><b>WAIT</b></li>
+            <li data-gate="semantic"><i></i><span>Capabilities covered</span><b>WAIT</b></li>
+            <li data-gate="catalog"><i></i><span>Catalog eligible</span><b>WAIT</b></li>
+            <li data-gate="hash"><i></i><span>AWS hashes verified</span><b>WAIT</b></li>
+            <li data-gate="endpoint"><i></i><span>Endpoints seated</span><b>WAIT</b></li>
+            <li data-gate="connector"><i></i><span>Connectors compatible</span><b>WAIT</b></li>
+            <li data-gate="collision"><i></i><span>Mesh collision free</span><b>WAIT</b></li>
+            <li data-gate="loop"><i></i><span>No loops, physical intersections, or forbidden crossings</span><b>WAIT</b></li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="api-drawer">
+        <div class="section-title"><div><span class="eyebrow">Production trace</span><h2>One request, deterministic stages</h2></div></div>
+        <ol id="trace" class="trace"></ol>
+        <button id="raw-toggle" class="raw-toggle" type="button">View machine response <span>⌄</span></button>
+        <pre id="raw-json" hidden></pre>
+      </section>
+    </section>
+  </main>
+  <script type="module" src="/circuit-studio/app.js"></script>
+</body>
+</html>

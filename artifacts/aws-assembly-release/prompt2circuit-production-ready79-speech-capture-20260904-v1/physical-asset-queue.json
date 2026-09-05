@@ -1,0 +1,1142 @@
+{
+  "schemaVersion": "MakeablePhysicalAssetQueueV1",
+  "generatedAt": "2026-09-01T22:53:09.929Z",
+  "policy": {
+    "selectionRule": "A queue item clears production only when every listed acceptance gate passes against the exact active AWS manifest hash. Marketplace text, appearance, proximity, or a prompt assertion never clears a gate.",
+    "generatedMeshPolicy": "No mesh-generation service is part of prompt-to-circuit production. New or corrected GLBs must enter through the verified catalog release process.",
+    "breadboardPolicy": "Breadboards remain permanently excluded. Missing distribution must be solved with a compatible carrier, keyed cable, crimp harness, or verified power-distribution asset."
+  },
+  "summary": {
+    "queueItems": 12,
+    "trackedNonReadyAssets": 12,
+    "trackedAssemblyEdges": 3,
+    "remainingPolicyExclusions": 0,
+    "potentiallyClearableAssets": 12,
+    "byStatus": {
+      "board_repaired_missing_verified_cable_glb": 1,
+      "local_source_derived_candidates_and_profiles_validated_aws_pending": 1,
+      "missing_corrected_glb": 4,
+      "missing_verified_glb": 4,
+      "missing_verified_glbs": 1,
+      "quarantined_pending_bench_evidence": 1
+    },
+    "byKind": {
+      "carrier_electrical_and_populated_geometry_requalification": 1,
+      "catalog_glbs_and_interface_profiles": 1,
+      "corrected_sale_form_glb": 3,
+      "corrected_sale_form_glb_and_ic_hook_pigtail_glbs": 1,
+      "corrected_sale_form_glb_and_included_factory_harness_contract": 1,
+      "mating_cable_glb": 3,
+      "regulated_power_distribution_and_mate_glbs": 1,
+      "selector_shunt_glb": 1
+    },
+    "byPriority": {
+      "P0": 7,
+      "P1": 5
+    },
+    "coverage": {
+      "nonReadyAssetCount": 12,
+      "unmappedNonReadyAssetIds": [],
+      "assemblyRedLightCount": 3,
+      "unmappedAssemblyEdges": []
+    }
+  },
+  "items": [
+    {
+      "requestId": "requalify-aitrip-c3-carrier-row-map-and-rails",
+      "title": "Requalify the AITRIP C3 carrier three-lane rows, rails, and populated orientation",
+      "kind": "carrier_electrical_and_populated_geometry_requalification",
+      "status": "quarantined_pending_bench_evidence",
+      "priority": "P0",
+      "clearsAssetIds": [
+        "aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1",
+        "catalogKey": "B0FBGFWFB1",
+        "requiredControllerAssetId": "aoicrie-4pcs-esp32-esp32-c3-mini-development-board-pre-soldered",
+        "activeSha256": "89a684174c1de207fd64a331e5a8bb894e63fcca75a2dcb4175ec44985bd5c98"
+      },
+      "sourceUrls": [
+        "https://www.amazon.com/dp/B0FBGFWFB1"
+      ],
+      "connectorContract": {
+        "controllerMount": "exact 2x8 ESP32-C3 Super Mini socket contract with USB and carrier polarity proven",
+        "gpioRowOrder": [
+          "GND_BLACK",
+          "VCC_RED",
+          "SIGNAL_YELLOW"
+        ],
+        "railNames": [
+          "VCC1",
+          "VCC2"
+        ],
+        "forbiddenProfile": "three copies of the row GPIO assigned to black, red, and yellow contacts"
+      },
+      "electricalContract": {
+        "requiredMeasurements": [
+          "VCC1 default voltage",
+          "VCC2 default voltage",
+          "black-lane ground continuity",
+          "red-lane rail continuity",
+          "yellow-lane GPIO continuity"
+        ],
+        "powerState": "controller USB-C only with external battery and carrier power disconnected",
+        "noInferenceRule": "No row or rail is allocatable from plastic color or marketplace text alone"
+      },
+      "geometryContract": {
+        "requiredNodes": "all 16 controller socket contacts plus three distinct contacts for every exposed GPIO row",
+        "populatedScene": "controller orientation, socket seating, carrier silkscreen, USB end, and every routed endpoint must agree in top and isometric views",
+        "routingRule": "black ground, red verified positive rail, and yellow signal remain order-preserving, non-crossing, and collision-free"
+      },
+      "acceptanceGates": [
+        "bench continuity identifies black, red, and yellow lane function for every row",
+        "VCC1 and VCC2 default voltages and permitted power state are measured and recorded",
+        "all 16 controller socket contacts align to the exact controller pinout and immutable GLB contact frames",
+        "populated controller orientation agrees with carrier silkscreen and power polarity",
+        "a multi-peripheral scene shows exact endpoints, stable color order, no loops, no crossings, and no mesh penetration",
+        "the regenerated profile, workbook, AWS object, and versioned manifest pass every gate before deliberate activation"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1",
+          "currentState": "partial",
+          "activeSha256": "89a684174c1de207fd64a331e5a8bb894e63fcca75a2dcb4175ec44985bd5c98",
+          "blockers": [
+            "carrier_contact_map_mismatch:three_lane_rows_are_ground_supply_signal_not_three_gpio_copies",
+            "carrier_supply_rail_unverified:vcc1_vcc2_default_voltage_and_continuity_unknown",
+            "controller_carrier_orientation_visual_mismatch:pin_labels_do_not_agree_in_populated_scene"
+          ],
+          "requiredEvidence": [],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/89a684174c1de207fd64a331e5a8bb894e63fcca75a2dcb4175ec44985bd5c98.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "add-l76k-ph2-0-mating-cable",
+      "title": "Add the complete L76K PH2.0 five-pin mating cable",
+      "kind": "mating_cable_glb",
+      "status": "board_repaired_missing_verified_cable_glb",
+      "priority": "P0",
+      "clearsAssetIds": [
+        "l76k-gnss"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "l76k-gnss",
+        "manufacturer": "Waveshare",
+        "product": "L76K GPS Module",
+        "officialInterface": "PH2.0 5PIN cable"
+      },
+      "sourceUrls": [
+        "https://www.waveshare.com/L76K-GPS-Module.htm",
+        "https://www.waveshare.com/wiki/L76K_GPS_Module",
+        "https://www.amazon.com/dp/B0FJLXZ3J9",
+        "https://www.waveshare.com/product/l76k-gps-module.htm"
+      ],
+      "connectorContract": {
+        "boardEnd": {
+          "family": "PH2.0 5PIN",
+          "contactCount": 5,
+          "orderedSignals": [
+            "VCC",
+            "GND",
+            "TX",
+            "RX",
+            "PPS"
+          ]
+        },
+        "controllerEnd": "five individually addressable terminations with an exact family, gender, and immutable contact frame",
+        "verifiedBoardSha256": "2347a21fe5726e56948e73e93222dd5cf0117048adf1c18be03e01fdfadc5738"
+      },
+      "electricalContract": {
+        "acceptedSupplyV": [
+          3.3,
+          5
+        ],
+        "preferredEsp32Supply": "3V3",
+        "logic": "3.3V UART and PPS"
+      },
+      "compilerContract": {
+        "deviceField": "exactMatingCableRequirements",
+        "cableField": "exactMatingCable",
+        "connectionMode": "deformable-exact-mating-cable",
+        "routedSignals": [
+          "VCC",
+          "GND",
+          "TX",
+          "RX",
+          "PPS"
+        ],
+        "unmatedSignals": []
+      },
+      "geometryContract": {
+        "requiredNodes": "five cable plug contacts, five opposite contacts, five conductor ownership groups, ten wire exits, one grouped keyed transform, five opposite-end transforms, and keyed engagement geometry"
+      },
+      "acceptanceGates": [
+        "the verified board SHA remains bound to the official 2.00 mm PH2.0 five-contact grid",
+        "all five cable signal contacts and both cable ends are unique and ordered from primary evidence",
+        "the exactMatingCable compiler emits five conductors and ten rigid mates",
+        "key, polarity, engagement, continuity, no-short, reach, bend, no-loop, and collision gates pass",
+        "the cable AWS object and regenerated interface profile are immutable-hash-bound and ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "l76k-gnss",
+          "currentState": "partial",
+          "activeSha256": "2347a21fe5726e56948e73e93222dd5cf0117048adf1c18be03e01fdfadc5738",
+          "blockers": [
+            "required_exact_mating_cable_contract_missing:waveshare_l76k_ph2_0_5p"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "exact_mating_cable_contract",
+              "fields": [
+                "cable or adapter assetId and SHA-256",
+                "exact plug family and gender",
+                "ordered plug contact node names",
+                "opposite-end connector/contact nodes",
+                "conductor order, usable length, diameter, and bend radius",
+                "plug transform, engagement depth, and key/polarity"
+              ],
+              "reason": "required_exact_mating_cable_contract_missing:waveshare_l76k_ph2_0_5p. A logical connector pinout is insufficient until an exact two-ended physical mate can be seated and routed."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/2347a21fe5726e56948e73e93222dd5cf0117048adf1c18be03e01fdfadc5738.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "add-grove-reference-module-set",
+      "title": "Publish exact Grove I2C, digital, and analog reference modules",
+      "kind": "catalog_glbs_and_interface_profiles",
+      "status": "local_source_derived_candidates_and_profiles_validated_aws_pending",
+      "priority": "P0",
+      "clearsAssetIds": [],
+      "clearsAssemblyEdges": [
+        "XIAO quick-connected peripheral path",
+        "Grove sensor -> carrier"
+      ],
+      "exactIdentity": {
+        "selectionRule": "Use exact Seeed Studio SKUs 101020212 (SHT31 I2C), 101020020 (PIR digital), and 101020008 (moisture analog), with the existing XIAO Expansion Base 103030356. Name Seeed Grove cable SKU 110990027 in each physical BOM but omit its decorative GLB from circuit-only output."
+      },
+      "candidateArtifacts": {
+        "root": "/Volumes/T9_Mac_Only/prompt2circuit/generated-grove-reference-assets-v1",
+        "manifest": "/Volumes/T9_Mac_Only/prompt2circuit/generated-grove-reference-assets-v1/manifest.json",
+        "validation": "/Volumes/T9_Mac_Only/prompt2circuit/generated-grove-reference-assets-v1/validation.json",
+        "state": "local_candidate_and_hash_bound_profile_validated",
+        "profileBatch": "prompt2circuit/registry/candidates/grove-reference-profiles.json",
+        "assets": [
+          {
+            "assetId": "seeed-grove-sht31-101020212",
+            "sku": "101020212",
+            "sha256": "b3982fdbf1c5ee3ff6dc220bbc1721a1d125b7e7753891729c147e8263e804e8",
+            "contactOrder": [
+              "GND",
+              "3V3",
+              "SDA",
+              "SCL"
+            ]
+          },
+          {
+            "assetId": "seeed-grove-pir-motion-101020020",
+            "sku": "101020020",
+            "sha256": "98da85e280fb6fcfaa5a8eca016aab459a82ef08877cc8e3965213ba52275c49",
+            "contactOrder": [
+              "GND",
+              "3V3",
+              "NC",
+              "SIG"
+            ]
+          },
+          {
+            "assetId": "seeed-grove-moisture-101020008",
+            "sku": "101020008",
+            "sha256": "ea16b5a1867c7c1e8a39cbe9563f836bfdf9a8759f79acd07a53eae813124bba",
+            "contactOrder": [
+              "GND",
+              "3V3",
+              "NC",
+              "AOUT"
+            ]
+          }
+        ],
+        "remaining": [
+          "publish exact GLBs and profiles into one immutable AWS catalog revision",
+          "run XIAO I2C, digital, analog, and multi-module one-shot API matrix",
+          "activate a versioned release only after authorization"
+        ]
+      },
+      "sourceUrls": [
+        "https://www.seeedstudio.com/Grove-Temperature-Humidity-Sensor-SHT31.html",
+        "https://github.com/Seeed-Studio/PIR_Motion_Sensor",
+        "https://wiki.seeedstudio.com/Grove-Moisture_Sensor/",
+        "https://wiki.seeedstudio.com/Grove_System/",
+        "https://wiki.seeedstudio.com/How_To_Choose_The_Right_Cable/"
+      ],
+      "connectorContract": {
+        "family": "grove_2.0mm_4p",
+        "sensorEndGender": "female-receptacle",
+        "baseEndGender": "female-receptacle",
+        "instructionOnlyCable": {
+          "sku": "110990027",
+          "endGender": "male-plug",
+          "straightThrough": true,
+          "contactCount": 4
+        },
+        "requiredBasePorts": {
+          "101020008": "grove-a0-d0",
+          "101020020": "grove-a0-d0",
+          "101020212": "grove-i2c-a-or-b"
+        }
+      },
+      "geometryContract": {
+        "requiredNodes": "each module body, exact Grove receptacle body, four unique ordered receptacle contacts, readable top-side labels, and immutable world-space contact frames",
+        "requiredMeasurements": [
+          "exact module outline",
+          "Grove receptacle position and orientation",
+          "2.00 mm contact pitch",
+          "component and mounting-hole placement"
+        ],
+        "routingRule": "render exact logical sensor-contact to XIAO-base-contact guides only; never render the cable body and never terminate Grove on a bare microcontroller or another carrier"
+      },
+      "acceptanceGates": [
+        "all three exact manufacturer SKUs and primary pinout sources are recorded",
+        "each module GLB matches the exact sold form and exposes one exact four-contact Grove receptacle",
+        "each profile records family, gender, contact order, voltage, and signal semantics",
+        "logicalGuideAccessoryRequirements names cable SKU 110990027 and proves straight-through ordered continuity",
+        "I2C, digital, and analog one-shot XIAO builds pass without cable-body geometry",
+        "logical guides are color-correct, open, collision-free, and terminate only on the exact module and XIAO-base contacts",
+        "all three AWS objects, profiles, workbook rows, and versioned manifest are immutable-hash-bound and ready"
+      ],
+      "trackedProfiles": [],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "compile-diyables-capacitive-included-harness",
+      "title": "Compile the included DIYables capacitive-soil harness",
+      "kind": "corrected_sale_form_glb_and_included_factory_harness_contract",
+      "status": "missing_corrected_glb",
+      "priority": "P0",
+      "clearsAssetIds": [
+        "diyables-capacitive-soil-moisture-tlc555i"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "diyables-capacitive-soil-moisture-tlc555i",
+        "catalogKey": "B0DYDN9RG4"
+      },
+      "sourceUrls": [
+        "https://diyables.io/products/capacitive-soil-moisture-sensor-module",
+        "https://www.amazon.com/dp/B0DYDN9RG4"
+      ],
+      "connectorContract": {
+        "sensorEnd": "exact shrouded three-contact plug already present in the immutable GLB",
+        "controllerEnd": "exact 2.54 mm female Dupont termination; the active GLB's 1.00 mm contact pitch is rejected",
+        "orderedSignals": [
+          "GND",
+          "VCC",
+          "AOUT"
+        ]
+      },
+      "geometryContract": {
+        "requiredNodes": "corrected 2.54 mm-pitch external termination contacts, both termination contact sets, three conductor ownership groups, and two wire exits",
+        "retainHideRerenderRule": "retain the factory harness and do not draw duplicate loose jumpers"
+      },
+      "acceptanceGates": [
+        "corrected external contact centers measure 2.54 mm pitch instead of the active GLB's 1.00 mm pitch",
+        "each baked conductor has one source and one destination contact",
+        "GND/VCC/AOUT order is source-bound",
+        "both engagement frames and usable conductor lengths are recorded",
+        "continuity, no-short, polarity, and no-duplicate-wire gates pass",
+        "hash-bound profile reaches ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "diyables-capacitive-soil-moisture-tlc555i",
+          "currentState": "pending",
+          "activeSha256": "08cd3eca63228c25600bd50d435d07cfd6a5d2b8acd632b9f7bda541651cb893",
+          "blockers": [
+            "active_glb_sale_form_mismatch:included_dupont_contact_pitch_1mm_not_2_54mm",
+            "glb_contact_nodes_missing",
+            "required_included_factory_harness_contract_missing:diyables_capacitive_soil_shrouded_to_dupont"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "corrected_immutable_glb_revision",
+              "fields": [
+                "exact catalog identity",
+                "connector-populated GLB",
+                "SHA-256",
+                "connector node names",
+                "local contact frames",
+                "active versioned manifest revision"
+              ],
+              "reason": "active_glb_sale_form_mismatch:included_dupont_contact_pitch_1mm_not_2_54mm"
+            },
+            {
+              "kind": "included_factory_harness_contract",
+              "fields": [
+                "sensor-side connector family, gender, key, and ordered contact nodes",
+                "controller-side connector family, gender, and ordered contact nodes",
+                "one source node per physical conductor",
+                "wire exits, usable length, diameter, and minimum bend radius",
+                "both rigid mate transforms and engagement depths",
+                "GLB nodes to retain, hide, or rerender",
+                "polarity, continuity, and no-short acceptance rules"
+              ],
+              "reason": "required_included_factory_harness_contract_missing:diyables_capacitive_soil_shrouded_to_dupont. The immutable GLB already contains a physical cable; its two terminations and conductors must be compiled as one harness instead of drawing duplicate free jumpers."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/08cd3eca63228c25600bd50d435d07cfd6a5d2b8acd632b9f7bda541651cb893.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "add-fs90r-power-and-mate-system",
+      "title": "Add the FS90R servo mate and regulated power-distribution system",
+      "kind": "regulated_power_distribution_and_mate_glbs",
+      "status": "missing_verified_glb",
+      "priority": "P0",
+      "clearsAssetIds": [
+        "fs90r-paired-wheel-kit",
+        "fs90r-single-servo"
+      ],
+      "clearsAssemblyEdges": [
+        "FS90R servo -> controller/carrier"
+      ],
+      "exactIdentity": {
+        "servo": "FEETECH FS90R with intact 250 mm three-conductor factory lead",
+        "mateSelectionRule": "Select and record the exact compatible keyed three-contact socket housing and terminals",
+        "supplySelectionRule": "Select a regulated 4.8-6.0 V source/distribution module rated for simultaneous worst-case current"
+      },
+      "sourceUrls": [
+        "https://www.feetechrc.com/48v-13kg-analog-continuous-rudder-machine.html",
+        "https://www.pololu.com/file/0J1867/FS90R.pdf",
+        "https://www.amazon.com/dp/B086ZGTLZB",
+        "https://www.aliexpress.us/item/3256807557711270.html"
+      ],
+      "connectorContract": {
+        "servoOrder": [
+          "GND",
+          "REGULATED_4V8_TO_6V",
+          "PWM"
+        ],
+        "factoryLeadLengthMm": 250,
+        "commonGroundRequired": true
+      },
+      "electricalContract": {
+        "supplyRangeV": [
+          4.8,
+          6
+        ],
+        "noLoadCurrentPerServoMaAt6V": 130,
+        "stallCurrentPerServoMaAt6V": 800,
+        "compilerContinuousBudgetPerServoMa": 800,
+        "compilerPeakBudgetPerServoMa": 800,
+        "minimumTwoServoBudgetMa": 1600,
+        "requiredPowerSystemFields": [
+          "upstreamPowerResolved",
+          "outputVoltageV",
+          "continuousCurrentA",
+          "peakCurrentA",
+          "commonGroundInputNodeName",
+          "distinct output power/ground node pair per servo channel"
+        ],
+        "forbiddenSources": [
+          "GPIO",
+          "3V3 sensor rail",
+          "unverified 5V label"
+        ]
+      },
+      "geometryContract": {
+        "requiredNodes": "one intact three-contact servo plug per channel, one opposite-gender mate per channel, one distinct regulated POWER/GND output pair per channel, one common-ground input, one legal PWM source per channel, and both servo/source wire exits for every conductor",
+        "routingRule": "the factory servo plug stays intact and cannot become three synthetic loose wires"
+      },
+      "acceptanceGates": [
+        "exact mate identity, gender, order, key, and engagement depth are recorded",
+        "regulated source proves upstream power, supplies the accepted voltage, exposes enough distinct output channels, and meets summed continuous plus startup/stall peak budgets",
+        "controller and servo supply share exactly one verified common-ground bond",
+        "each servo channel consumes one distinct capability-approved PWM pin and never carries power",
+        "continuity, no-short, overload, polarity, collision, and reach gates pass",
+        "all new AWS objects and profiles are hash-bound and ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "fs90r-paired-wheel-kit",
+          "currentState": "pending",
+          "activeSha256": "66f5e3e30e2ffcc8058fca2e1dec3afb871c4a4021fd5de4e02b37c7fa63771d",
+          "blockers": [
+            "glb_contact_nodes_missing",
+            "required_servo_power_and_mating_contract_missing:regulated_4v8_to_6v_common_ground_intact_3p_mate"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "immutable_glb_access",
+              "fields": [
+                "assetId",
+                "sha256",
+                "readable AWS CloudFront URL or hash-identical local GLB"
+              ],
+              "reason": "The active AWS object cannot be read in this environment and no hash-identical local copy is indexed."
+            },
+            {
+              "kind": "servo_power_and_mating_contract",
+              "fields": [
+                "intact three-pin servo plug and compatible mate asset IDs/SHA-256",
+                "ordered GND, regulated supply, and PWM contact nodes",
+                "servoLoad accepted voltage range, channel count, continuous current, and startup/stall peak current",
+                "regulated power-system identity, upstream source proof, exact output voltage, output count, continuous-current capacity, and peak-current capacity",
+                "one common-ground input contact plus one GND and one POWER output contact per servo channel",
+                "opposite-gender servo mate transform, engagement depth, key, polarity, and 2.54 mm contact order",
+                "one intact mate harness per servo channel with servo/source wire exits, usable length, diameter, and minimum bend radius",
+                "one legal PWM-capable canonical controller contact per servo channel"
+              ],
+              "reason": "required_servo_power_and_mating_contract_missing:regulated_4v8_to_6v_common_ground_intact_3p_mate. A servo cannot be powered from a GPIO or 3.3 V sensor rail, and its intact factory plug cannot be split into three synthetic loose wires."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/66f5e3e30e2ffcc8058fca2e1dec3afb871c4a4021fd5de4e02b37c7fa63771d.glb"
+        },
+        {
+          "assetId": "fs90r-single-servo",
+          "currentState": "partial",
+          "activeSha256": "84d067591e40c6d66503e6d4c6ec31f1768bdc4746ffc1444b2a2c43f65aa442",
+          "blockers": [
+            "required_servo_power_and_mating_contract_missing:regulated_4v8_to_6v_common_ground_intact_3p_mate"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "servo_power_and_mating_contract",
+              "fields": [
+                "intact three-pin servo plug and compatible mate asset IDs/SHA-256",
+                "ordered GND, regulated supply, and PWM contact nodes",
+                "servoLoad accepted voltage range, channel count, continuous current, and startup/stall peak current",
+                "regulated power-system identity, upstream source proof, exact output voltage, output count, continuous-current capacity, and peak-current capacity",
+                "one common-ground input contact plus one GND and one POWER output contact per servo channel",
+                "opposite-gender servo mate transform, engagement depth, key, polarity, and 2.54 mm contact order",
+                "one intact mate harness per servo channel with servo/source wire exits, usable length, diameter, and minimum bend radius",
+                "one legal PWM-capable canonical controller contact per servo channel"
+              ],
+              "reason": "required_servo_power_and_mating_contract_missing:regulated_4v8_to_6v_common_ground_intact_3p_mate. A servo cannot be powered from a GPIO or 3.3 V sensor rail, and its intact factory plug cannot be split into three synthetic loose wires."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/84d067591e40c6d66503e6d4c6ec31f1768bdc4746ffc1444b2a2c43f65aa442.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "correct-ina260-qwiic-sale-form",
+      "title": "Publish the exact INA260 sale form with populated Qwiic receptacles",
+      "kind": "corrected_sale_form_glb",
+      "status": "missing_corrected_glb",
+      "priority": "P1",
+      "clearsAssetIds": [
+        "adafruit-ina260-current-power-breakout-4226"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "adafruit-ina260-current-power-breakout-4226",
+        "catalogKey": "B07S8QYDF8"
+      },
+      "sourceUrls": [
+        "https://www.adafruit.com/product/4226",
+        "https://www.amazon.com/dp/B07S8QYDF8"
+      ],
+      "connectorContract": {
+        "family": "jst_sh_1.0mm_4p_qwiic",
+        "orderedSignals": [
+          "GND",
+          "3V3",
+          "SDA",
+          "SCL"
+        ]
+      },
+      "geometryContract": {
+        "requiredNodes": "each populated Qwiic receptacle body, four unique contacts per receptacle, keyed face, and wire-exit normal"
+      },
+      "acceptanceGates": [
+        "sale form matches product 4226",
+        "every receptacle contact extracts uniquely in source-backed order",
+        "Qwiic mate transform passes key and clearance checks",
+        "active AWS hash and regenerated profile reach ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "adafruit-ina260-current-power-breakout-4226",
+          "currentState": "pending",
+          "activeSha256": "1d3398f6a5b6019ec2c7ab4a608aa4ed720d84b1f82b3f04e5517ea7891709ce",
+          "blockers": [
+            "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent",
+            "glb_contact_nodes_missing"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "immutable_glb_access",
+              "fields": [
+                "assetId",
+                "sha256",
+                "readable AWS CloudFront URL or hash-identical local GLB"
+              ],
+              "reason": "The active AWS object cannot be read in this environment and no hash-identical local copy is indexed."
+            },
+            {
+              "kind": "corrected_immutable_glb_revision",
+              "fields": [
+                "exact catalog identity",
+                "connector-populated GLB",
+                "SHA-256",
+                "connector node names",
+                "local contact frames",
+                "active versioned manifest revision"
+              ],
+              "reason": "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent"
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/1d3398f6a5b6019ec2c7ab4a608aa4ed720d84b1f82b3f04e5517ea7891709ce.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "correct-mcp9600-qwiic-sale-form",
+      "title": "Publish the exact MCP9600 sale form with populated Qwiic receptacles",
+      "kind": "corrected_sale_form_glb",
+      "status": "missing_corrected_glb",
+      "priority": "P1",
+      "clearsAssetIds": [
+        "adafruit-mcp9600-thermocouple-breakout-4101"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "adafruit-mcp9600-thermocouple-breakout-4101",
+        "catalogKey": "B07SZ8YVTW"
+      },
+      "sourceUrls": [
+        "https://www.adafruit.com/product/4101",
+        "https://www.amazon.com/dp/B07SZ8YVTW"
+      ],
+      "connectorContract": {
+        "family": "jst_sh_1.0mm_4p_qwiic",
+        "orderedSignals": [
+          "GND",
+          "3V3",
+          "SDA",
+          "SCL"
+        ]
+      },
+      "geometryContract": {
+        "requiredNodes": "each populated Qwiic receptacle body, four unique contacts per receptacle, keyed face, and wire-exit normal"
+      },
+      "acceptanceGates": [
+        "sale form matches product 4101",
+        "every receptacle contact extracts uniquely in source-backed order",
+        "Qwiic mate transform passes key and clearance checks",
+        "active AWS hash and regenerated profile reach ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "adafruit-mcp9600-thermocouple-breakout-4101",
+          "currentState": "pending",
+          "activeSha256": "533251c6b9c8fbb574107b3d82835f34b9e9e7a86c7c63f4d9499ac3154340f1",
+          "blockers": [
+            "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent",
+            "glb_contact_nodes_missing"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "immutable_glb_access",
+              "fields": [
+                "assetId",
+                "sha256",
+                "readable AWS CloudFront URL or hash-identical local GLB"
+              ],
+              "reason": "The active AWS object cannot be read in this environment and no hash-identical local copy is indexed."
+            },
+            {
+              "kind": "corrected_immutable_glb_revision",
+              "fields": [
+                "exact catalog identity",
+                "connector-populated GLB",
+                "SHA-256",
+                "connector node names",
+                "local contact frames",
+                "active versioned manifest revision"
+              ],
+              "reason": "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent"
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/533251c6b9c8fbb574107b3d82835f34b9e9e7a86c7c63f4d9499ac3154340f1.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "correct-mcp9808-qwiic-sale-form",
+      "title": "Publish the exact MCP9808 sale form with populated Qwiic receptacles",
+      "kind": "corrected_sale_form_glb",
+      "status": "missing_corrected_glb",
+      "priority": "P1",
+      "clearsAssetIds": [
+        "adafruit-mcp9808-precision-temp-breakout-1782"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "adafruit-mcp9808-precision-temp-breakout-1782",
+        "catalogKey": "B00OKCQX96"
+      },
+      "sourceUrls": [
+        "https://www.adafruit.com/product/1782",
+        "https://www.amazon.com/dp/B00OKCQX96"
+      ],
+      "connectorContract": {
+        "family": "jst_sh_1.0mm_4p_qwiic",
+        "orderedSignals": [
+          "GND",
+          "3V3",
+          "SDA",
+          "SCL"
+        ]
+      },
+      "geometryContract": {
+        "requiredNodes": "each populated Qwiic receptacle body, four unique contacts per receptacle, keyed face, and wire-exit normal"
+      },
+      "acceptanceGates": [
+        "sale form matches product 1782",
+        "every receptacle contact extracts uniquely in source-backed order",
+        "Qwiic mate transform passes key and clearance checks",
+        "active AWS hash and regenerated profile reach ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "adafruit-mcp9808-precision-temp-breakout-1782",
+          "currentState": "pending",
+          "activeSha256": "ee84a6f2854bf3e6fa505d77898492bc10acbb96137e53fe60fef4841386824d",
+          "blockers": [
+            "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent",
+            "glb_contact_nodes_missing"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "immutable_glb_access",
+              "fields": [
+                "assetId",
+                "sha256",
+                "readable AWS CloudFront URL or hash-identical local GLB"
+              ],
+              "reason": "The active AWS object cannot be read in this environment and no hash-identical local copy is indexed."
+            },
+            {
+              "kind": "corrected_immutable_glb_revision",
+              "fields": [
+                "exact catalog identity",
+                "connector-populated GLB",
+                "SHA-256",
+                "connector node names",
+                "local contact frames",
+                "active versioned manifest revision"
+              ],
+              "reason": "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent"
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/ee84a6f2854bf3e6fa505d77898492bc10acbb96137e53fe60fef4841386824d.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "add-pn532-selector-shunts",
+      "title": "Add the two PN532 SPI selector shunts",
+      "kind": "selector_shunt_glb",
+      "status": "missing_verified_glb",
+      "priority": "P1",
+      "clearsAssetIds": [
+        "adafruit-pn532-nfc-breakout-364"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "adafruit-pn532-nfc-breakout-364",
+        "selectedMode": "SPI"
+      },
+      "sourceUrls": [
+        "https://learn.adafruit.com/adafruit-pn532-rfid-nfc/breakout-wiring",
+        "https://www.amazon.com/dp/B00KKUECAO",
+        "https://github.com/adafruit/Adafruit-PN532-RFID-NFC-Breakout"
+      ],
+      "connectorContract": {
+        "requiredState": [
+          "SEL0 to GND",
+          "SEL1 to VDD"
+        ],
+        "shuntCount": 2
+      },
+      "compilerContract": {
+        "deviceField": "selectorShuntRequirements",
+        "shuntField": "selectorShunt",
+        "connectionMode": "rigid-mate",
+        "requiredShuntInstances": 2,
+        "requiredRigidMates": 4,
+        "continuityRule": "each physical two-contact shunt closes only its own declared ordered target pair",
+        "allocationRule": "consume two distinct shunt part instances and never satisfy both requirements with one rendered body"
+      },
+      "geometryContract": {
+        "requiredNodes": "two shunt bodies, four socket contacts, target selector/rail contacts, and two rigid engagement transforms"
+      },
+      "acceptanceGates": [
+        "both shunts are exact physical parts",
+        "SPI truth table is source-bound",
+        "two distinct shunt assets provide exactly four physical contacts",
+        "the generic selectorShunt compiler emits four rigid mates and two independent internally continuous nets",
+        "engagement transforms close only intended nets",
+        "continuity and no-short checks pass",
+        "AWS objects and profile are hash-bound and ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "adafruit-pn532-nfc-breakout-364",
+          "currentState": "partial",
+          "activeSha256": "26562efb35b9980f83aba52589215083dfba06a7c577923691fc7ffc52671fca",
+          "blockers": [
+            "required_exact_selector_shunt_contract_missing:spi_sel0_gnd_sel1_vdd"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "selector_shunt_contract",
+              "fields": [
+                "selector-shunt assetId and SHA-256",
+                "two exact shunt socket/contact nodes",
+                "target selector and rail contact nodes",
+                "rigid transform, engagement depth, and orientation",
+                "chosen bus mode and continuity/no-short truth table"
+              ],
+              "reason": "required_exact_selector_shunt_contract_missing:spi_sel0_gnd_sel1_vdd. The selected interface mode requires installed physical jumper blocks; electrical labels alone cannot satisfy the selector state."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/26562efb35b9980f83aba52589215083dfba06a7c577923691fc7ffc52671fca.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "add-sen5x-jumper-wire",
+      "title": "Add the Sensirion SEN5x six-pin jumper-wire set",
+      "kind": "mating_cable_glb",
+      "status": "missing_verified_glb",
+      "priority": "P0",
+      "clearsAssetIds": [
+        "sensirion-sen55"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "manufacturerAccessory": "Sensirion SEN5x jumper wire",
+        "sensorPlug": "ACES 51452-006H0H0-001 compatible, for example JST GHR-06V-S"
+      },
+      "sourceUrls": [
+        "https://sensirion.com/products/catalog/SEN5x-jumper-wire",
+        "https://sensirion.com/resource/datasheet/sen5x",
+        "https://www.amazon.com/dp/B0D3BNHDPL",
+        "https://sensirion.com/products/catalog/SEN55"
+      ],
+      "connectorContract": {
+        "sensorEnd": {
+          "contactCount": 6,
+          "orderedSignals": [
+            "VDD",
+            "GND",
+            "SDA",
+            "SCL",
+            "SEL",
+            "NC"
+          ]
+        },
+        "oppositeEnd": "six individually addressable jumper terminations",
+        "requiredStrap": "SEL to GND at the opposite termination"
+      },
+      "electricalContract": {
+        "supplyV": 5,
+        "logic": "SDA/SCL are 3.3 V compatible",
+        "peakCurrentMa": 110
+      },
+      "compilerContract": {
+        "deviceField": "exactMatingCableRequirements",
+        "cableField": "exactMatingCable",
+        "connectionMode": "deformable-exact-mating-cable",
+        "routedSignals": [
+          "VDD",
+          "GND",
+          "SDA",
+          "SCL",
+          "SEL"
+        ],
+        "unmatedSignals": [
+          "NC"
+        ],
+        "signalStraps": [
+          {
+            "fromSignal": "SEL",
+            "toSignal": "GND",
+            "terminationMode": "opposite-cable-termination"
+          }
+        ]
+      },
+      "geometryContract": {
+        "requiredNodes": "six plug contacts, six opposite contacts including the retained NC far termination, five active conductor groups, ten active wire exits, one grouped keyed transform, five opposite-end transforms, and keyed engagement body"
+      },
+      "acceptanceGates": [
+        "accessory identity and six-pin order match the Sensirion datasheet",
+        "SEL-to-GND strap is one physical routed edge terminating at a distinct legal GND contact",
+        "NC retains both physical cable contacts but receives no electrical route or surface mate",
+        "the exactMatingCable compiler emits five conductors and ten rigid mates",
+        "5 V source provides at least the declared peak current",
+        "engagement, continuity, no-short, reach, bend, no-loop, and collision gates pass",
+        "AWS object and profile are hash-bound and ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "sensirion-sen55",
+          "currentState": "partial",
+          "activeSha256": "b9474b2a0d1626a80cf543ee55a20eecff64cd55bd3fca6caa0c23065bc70004",
+          "blockers": [
+            "required_exact_mating_cable_contract_missing:sensirion_sen5x_jst_ghr_06v_s"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "exact_mating_cable_contract",
+              "fields": [
+                "cable or adapter assetId and SHA-256",
+                "exact plug family and gender",
+                "ordered plug contact node names",
+                "opposite-end connector/contact nodes",
+                "conductor order, usable length, diameter, and bend radius",
+                "plug transform, engagement depth, and key/polarity"
+              ],
+              "reason": "required_exact_mating_cable_contract_missing:sensirion_sen5x_jst_ghr_06v_s. A logical connector pinout is insufficient until an exact two-ended physical mate can be seated and routed."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/b9474b2a0d1626a80cf543ee55a20eecff64cd55bd3fca6caa0c23065bc70004.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "correct-max30101-qwiic-and-add-rst-mfio-hooks",
+      "title": "Correct the MAX30101 Qwiic geometry and add RST/MFIO hook pigtails",
+      "kind": "corrected_sale_form_glb_and_ic_hook_pigtail_glbs",
+      "status": "missing_verified_glbs",
+      "priority": "P1",
+      "clearsAssetIds": [
+        "sparkfun-max30101-max32664-pulse-oximeter-sen-15219"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "sparkfun-max30101-max32664-pulse-oximeter-sen-15219",
+        "manufacturerSku": "SEN-15219",
+        "selectionRule": "correct both JST-SH ports and select exact no-solder hooks whose jaws fit RST and MFIO without bridging adjacent copper"
+      },
+      "sourceUrls": [
+        "https://learn.sparkfun.com/tutorials/sparkfun-pulse-oximeter-and-heart-rate-monitor-hookup-guide/hardware-hookup",
+        "https://www.sparkfun.com/qwiic-jst-connector-smd-4-pin-horizontal.html",
+        "https://cdn.sparkfun.com/assets/parts/1/2/2/8/9/Qwiic_Connector_Datasheet.pdf",
+        "https://www.sparkfun.com/sparkfun-pulse-oximeter-and-heart-rate-sensor-max30101-max32664-qwiic.html"
+      ],
+      "connectorContract": {
+        "qwiicPorts": {
+          "count": 2,
+          "family": "JST-SH 1.0 mm 4-pin",
+          "orderedSignals": [
+            "GND",
+            "3V3",
+            "SDA",
+            "SCL"
+          ]
+        },
+        "hookSignals": [
+          "RST",
+          "MFIO"
+        ],
+        "controllerEnd": "two independently addressable female sockets"
+      },
+      "compilerContract": {
+        "deviceField": "exactMatingCableRequirements",
+        "cableField": "exactMatingCable",
+        "connectionMode": "deformable-exact-mating-cable",
+        "requiredEdges": [
+          {
+            "connectorId": "rst-ic-hook-pad",
+            "routedSignals": [
+              "RST"
+            ],
+            "surfaceCapabilities": {
+              "RST": "DIGITAL"
+            }
+          },
+          {
+            "connectorId": "mfio-ic-hook-pad",
+            "routedSignals": [
+              "MFIO"
+            ],
+            "surfaceCapabilities": {
+              "MFIO": "DIGITAL"
+            }
+          }
+        ],
+        "compositionRule": "Qwiic owns exactly GND,3V3,SDA,SCL; the two one-contact pigtails own exactly RST and MFIO; no signal or cable instance is reused"
+      },
+      "geometryContract": {
+        "requiredNodes": "four 1.00 mm-pitch contacts in each keyed Qwiic receptacle; one hook jaw, one target pad, one controller-side termination, and two wire exits per pigtail; independent hook and far-end transforms; exact jaw keepouts"
+      },
+      "acceptanceGates": [
+        "both Qwiic contact rows measure 1.00 mm pitch instead of the active GLB's 1.50 mm pitch",
+        "each hook contacts only its named pad",
+        "jaw clearance proves no adjacent-pad short",
+        "controller-side contacts are unique",
+        "each hook pigtail emits one deformable conductor and two rigid mates",
+        "the combined graph owns GND,3V3,SDA,SCL,RST,MFIO exactly once",
+        "reach, bend, engagement, continuity, no-short, no-loop, and collision gates pass",
+        "Qwiic bus and hooks compile as one assembly",
+        "AWS objects and profile are hash-bound and ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "sparkfun-max30101-max32664-pulse-oximeter-sen-15219",
+          "currentState": "partial",
+          "activeSha256": "58908386f54124ce7385142988be3b36e52818b3646b1ba3156f17317744435b",
+          "blockers": [
+            "active_glb_sale_form_mismatch:qwiic_contact_pitch_1_5mm_not_1_0mm",
+            "required_exact_ic_hook_pigtail_contract_missing:rst_mfio"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "corrected_immutable_glb_revision",
+              "fields": [
+                "exact catalog identity",
+                "connector-populated GLB",
+                "SHA-256",
+                "connector node names",
+                "local contact frames",
+                "active versioned manifest revision"
+              ],
+              "reason": "active_glb_sale_form_mismatch:qwiic_contact_pitch_1_5mm_not_1_0mm"
+            },
+            {
+              "kind": "ic_hook_pigtail_contract",
+              "fields": [
+                "hook/pigtail assetId and SHA-256",
+                "exact hook jaw and target pad contact frames",
+                "controller-side socket contact frame",
+                "wire exit, usable length, diameter, and bend radius",
+                "engagement transform and no-short clearance"
+              ],
+              "reason": "required_exact_ic_hook_pigtail_contract_missing:rst_mfio. RESET and MFIO require real no-solder hook endpoints in addition to the existing keyed Qwiic bus."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/58908386f54124ce7385142988be3b36e52818b3646b1ba3156f17317744435b.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    },
+    {
+      "requestId": "add-waveshare-s3-touch-2-1-cables",
+      "title": "Add the exact Waveshare SH1.0 interface cables",
+      "kind": "mating_cable_glb",
+      "status": "missing_verified_glb",
+      "priority": "P0",
+      "clearsAssetIds": [
+        "waveshare-esp32-s3-2-1-round-display-board"
+      ],
+      "clearsAssemblyEdges": [],
+      "exactIdentity": {
+        "catalogAssetId": "waveshare-esp32-s3-2-1-round-display-board",
+        "catalogKey": "B0F18W86GC",
+        "requiredCableFamilies": [
+          "SH1.0 12-pin",
+          "SH1.0 4-pin I2C",
+          "SH1.0 4-pin UART"
+        ]
+      },
+      "sourceUrls": [
+        "https://docs.waveshare.com/ESP32-S3-Touch-LCD-2.1",
+        "https://www.amazon.com/dp/B0F18W86GC"
+      ],
+      "connectorContract": {
+        "twelvePinOrder": [
+          "GND",
+          "VBUS",
+          "GPIO19_USB_D_MINUS",
+          "GPIO20_USB_D_PLUS",
+          "GND",
+          "3V3",
+          "GPIO7_SCL",
+          "GPIO15_SDA",
+          "GPIO43_TX",
+          "GPIO44_RX",
+          "NC",
+          "GPIO0"
+        ],
+        "i2cFourPin": [
+          "GND",
+          "3V3",
+          "SDA",
+          "SCL"
+        ],
+        "uartFourPin": [
+          "GND",
+          "3V3",
+          "TX",
+          "RX"
+        ],
+        "oppositeEnds": "Each selected cable must declare the exact connector family, gender, contact order, and immutable contact frame at its non-board termination; a loose or unspecified far end is forbidden."
+      },
+      "compilerContract": {
+        "deviceField": "exactMatingCableRequirements",
+        "cableField": "exactMatingCable",
+        "connectionMode": "deformable-exact-mating-cable",
+        "selectionRule": "select only the one exact connector family required by the current electrical edge; never merge or substitute the 12-pin, I2C 4-pin, and UART 4-pin contracts",
+        "unmatedSignals": [
+          "NC"
+        ]
+      },
+      "geometryContract": {
+        "requiredNodes": "all keyed plug contacts, every opposite-end contact including deliberately unmated contacts, two wire exits per active conductor, grouped keyed-end transforms, independent far-end transforms, engagement depths, and key orientations"
+      },
+      "acceptanceGates": [
+        "each cable family and pin order matches official documentation",
+        "NC retains its physical contact pair but receives no electrical route or controller allocation",
+        "native USB pins are not allocated as generic GPIO",
+        "each selected cable emits exactly two rigid mates per active conductor",
+        "each selected cable passes key, polarity, continuity, no-short, reach, bend, no-loop, and collision checks",
+        "AWS objects and profiles are hash-bound and ready"
+      ],
+      "trackedProfiles": [
+        {
+          "assetId": "waveshare-esp32-s3-2-1-round-display-board",
+          "currentState": "partial",
+          "activeSha256": "a78dadf6301669bee2497ca2e1b70298aa894d06e63e3dc30a987850c32314c9",
+          "blockers": [
+            "required_exact_mating_cable_contract_missing:sh1_12pin_i2c_4pin_uart_4pin"
+          ],
+          "requiredEvidence": [
+            {
+              "kind": "exact_mating_cable_contract",
+              "fields": [
+                "cable or adapter assetId and SHA-256",
+                "exact plug family and gender",
+                "ordered plug contact node names",
+                "opposite-end connector/contact nodes",
+                "conductor order, usable length, diameter, and bend radius",
+                "plug transform, engagement depth, and key/polarity"
+              ],
+              "reason": "required_exact_mating_cable_contract_missing:sh1_12pin_i2c_4pin_uart_4pin. A logical connector pinout is insufficient until an exact two-ended physical mate can be seated and routed."
+            }
+          ],
+          "activeAwsUrl": "https://dvy6bet209exg.cloudfront.net/v1/approved-visual-catalog-v1/objects/sha256/a78dadf6301669bee2497ca2e1b70298aa894d06e63e3dc30a987850c32314c9.glb"
+        }
+      ],
+      "releaseRule": "All acceptance gates must pass against the active immutable AWS hashes before any linked asset or edge becomes selectable."
+    }
+  ]
+}

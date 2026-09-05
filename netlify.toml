@@ -11,7 +11,10 @@
   included_files = ["lib/verified-parts-catalog.csv"]
 
 [functions."build-background"]
-  included_files = ["lib/verified-parts-catalog.csv"]
+  included_files = ["lib/verified-parts-catalog.csv", "prompts/production/**", "artifacts/aws-assembly-release/prompt2circuit-production-ready79-speech-capture-20260904-v1/*.json"]
+
+[functions."api"]
+  included_files = ["lib/verified-parts-catalog.csv", "prompts/production/**", "artifacts/aws-assembly-release/prompt2circuit-production-ready79-speech-capture-20260904-v1/*.json"]
 
 [functions."build-cleanup"]
   included_files = ["lib/verified-parts-catalog.csv"]

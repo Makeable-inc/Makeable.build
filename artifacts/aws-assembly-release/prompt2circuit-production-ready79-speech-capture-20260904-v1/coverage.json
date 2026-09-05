@@ -1,0 +1,347 @@
+{
+  "schemaVersion": "MakeableInterfaceRegistryCoverageV1",
+  "generatedAt": "2026-09-01T23:10:09.983Z",
+  "totalProfiles": 91,
+  "batchCount": 10,
+  "byState": {
+    "ready": 78,
+    "partial": 10,
+    "pending": 3,
+    "blocked": 0
+  },
+  "readyAssetIds": [
+    "adafruit-scd41-co2-breakout-5190",
+    "seeed-xiao-esp32c3",
+    "aitrip-esp32-s3-44pin-expansion-board-b0h336qrxx",
+    "seeed-xiao-expansion-base-103030356",
+    "adafruit-4397-qwiic-to-female-sockets",
+    "thing-plus-esp32",
+    "adafruit-tsl2591-hdr-light-breakout-1980",
+    "adafruit-apds9960-gesture-breakout-3595",
+    "adafruit-as7341-spectral-breakout-4698",
+    "adafruit-bno055-orientation-breakout-2472",
+    "adafruit-ltr390-uv-breakout-4831",
+    "adafruit-pmsa003i-breakout-4632",
+    "adafruit-sgp30-voc-breakout-3709",
+    "adafruit-sht45-temp-humidity-breakout-5665",
+    "adafruit-sths34pf80-presence-breakout-6426",
+    "adafruit-vcnl4040-proximity-breakout-4161",
+    "adafruit-waterproof-ds18b20-probe-381",
+    "adafruit-yf-s201-water-flow-sensor-828",
+    "ads1115-adc",
+    "adxl345-b0bxwhtxwt-9",
+    "aoicrie-4pcs-esp32-esp32-c3-mini-development-board-pre-soldered",
+    "bh1750-light",
+    "bme280-gy-bme280",
+    "bmp180-sensor-module",
+    "bmp280-sensor-module",
+    "buzzer-module",
+    "dht22-am2302-temp-humidity",
+    "esp-wroom-32-multi-pack",
+    "esp32-0-96-oled-integrated-board",
+    "esp32-2432s028r-smart-display",
+    "esp32-c3-mini",
+    "esp32-c5-lcd-dev-board",
+    "esp32-c6-1-3inch-lcd-display-development-board-with-pre-soldered-header",
+    "esp32-c6-1-47inch-ips-touch-display-development-board-with-pre-soldered-header",
+    "esp32-c6-rgb-led-display-board",
+    "esp32-camera-board",
+    "esp32-s3-cam-dev-kit-exact-pre-soldered-header-variant",
+    "esp32-s3-devkit-n16r8",
+    "esp32-s3-devkitc-1-n8r2",
+    "esp32-s3-wroom-n16r8-camera-board",
+    "esp32-wroom-32-classic-dev-board",
+    "gy-302-bh1750",
+    "gy-bme280",
+    "hall-effect-magnetic-sensor",
+    "hc-sr04p-ultrasonic-distance",
+    "heltec-wifi-lora-32-v4",
+    "hibctr-4-pack-neo-7m-gps-module-sma-antenna-pre-soldered-headers-b0fnd6jn5s-27",
+    "hlk-ld2410c-radar",
+    "joystick-module",
+    "keypad-4x4",
+    "ky-040-rotary-encoder",
+    "led-traffic-light-module",
+    "microphone-sound-detector",
+    "mpu6050-b0bmy15tc4-8",
+    "neo-6m-gps-module",
+    "rain-water-level",
+    "reed-switch-magnetic-sensor",
+    "rgb-led-module",
+    "seeed-xiao-esp32c5",
+    "seeed-xiao-esp32c6",
+    "seeed-xiao-esp32s3",
+    "sparkfun-hx711-load-cell-amplifier-sen-13879",
+    "sparkfun-qwiic-compatible-with-micro-bit-breakout-with-headers",
+    "ssd1306-091-oled",
+    "ssd1306-096-oled-blue",
+    "ssd1306-096-oled-white",
+    "ssd1309-242-oled",
+    "st7789-225-tft-display-module",
+    "tft-154-lcd-display-module",
+    "ttp223-touch",
+    "vibration-motor-module-3-pcs-dc5v-9000rpm-for-diy-projects",
+    "vl53l1x-tof",
+    "waveshare-esp32-c6-lcd-1_47-m",
+    "waveshare-esp32-s3-1-91-amoled-display-board",
+    "waveshare-esp32-s3-eth-ov5640-camera-board",
+    "seeed-grove-sht31-101020212",
+    "seeed-grove-pir-motion-101020020",
+    "seeed-grove-moisture-101020008"
+  ],
+  "worklist": [
+    {
+      "assetId": "aitrip-esp32-c3-supermini-expansion-board-b0fbgfwfb1",
+      "state": "partial",
+      "category": "carrier",
+      "connectorIntent": "unclassified",
+      "requiredSignals": [
+        "GPIO5",
+        "GPIO6",
+        "GPIO7",
+        "GPIO8",
+        "GPIO9",
+        "GPIO10",
+        "GPIO20",
+        "GPIO21",
+        "5V",
+        "GND",
+        "3V3",
+        "GPIO4",
+        "GPIO3",
+        "GPIO2",
+        "GPIO1",
+        "GPIO0"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "carrier_contact_map_mismatch:three_lane_rows_are_ground_supply_signal_not_three_gpio_copies",
+        "carrier_supply_rail_unverified:vcc1_vcc2_default_voltage_and_continuity_unknown",
+        "controller_carrier_orientation_visual_mismatch:pin_labels_do_not_agree_in_populated_scene"
+      ],
+      "requiredAction": "Quarantine the carrier and its required controller family. Rebuild every three-lane row as verified ground, carrier-supply, and signal contacts instead of repeated GPIO aliases. Measure and record the default VCC1/VCC2 voltages and continuity under the permitted controller-USB power state before any peripheral route is selectable. Prove the populated controller orientation against carrier silkscreen, USB/power polarity, all socket contacts, and the immutable GLB hash in a rendered acceptance scene."
+    },
+    {
+      "assetId": "diyables-capacitive-soil-moisture-tlc555i",
+      "state": "partial",
+      "category": "sensor",
+      "connectorIntent": "factory_cable_or_shrouded",
+      "requiredSignals": [
+        "GND",
+        "VCC",
+        "AOUT"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "active_glb_sale_form_mismatch:included_dupont_contact_pitch_1mm_not_2_54mm",
+        "required_included_factory_harness_contract_missing:diyables_capacitive_soil_shrouded_to_dupont"
+      ],
+      "requiredAction": "Publish and activate a corrected hash-bound GLB that contains the connector/header geometry sold on the exact catalog revision, then re-extract and validate every physical contact. Add the exact included cable as a hash-bound two-ended harness contract with connector families, gender, signal order, wire exits, and immutable endpoint geometry."
+    },
+    {
+      "assetId": "fs90r-paired-wheel-kit",
+      "state": "partial",
+      "category": "actuator",
+      "connectorIntent": "servo_3p",
+      "requiredSignals": [
+        "GND",
+        "5V",
+        "PWM"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "required_servo_power_and_mating_contract_missing:regulated_4v8_to_6v_common_ground_intact_3p_mate"
+      ],
+      "requiredAction": "Add a compatible intact three-pin servo mate plus a regulated 4.8-6 V supply/distribution contract, current budget, and common-ground connection; never source servo power from a GPIO or 3.3 V sensor rail."
+    },
+    {
+      "assetId": "10pcs-max485-rs485-transceiver-module-ttl-serial-to-rs-485-module-b088q8td4v-19",
+      "state": "partial",
+      "category": "sensor",
+      "connectorIntent": "2.54mm_header",
+      "requiredSignals": [
+        "GND",
+        "VCC",
+        "RO",
+        "RE",
+        "DE",
+        "DI"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "carrier_power_contract_forbids_5v_peripheral_rail",
+        "connector_contract_unclassified:rs485_a_b_terminal_separate_from_logic_and_power_headers",
+        "required_external_rs485_bus_termination_contract_missing",
+        "required_half_duplex_direction_control_contract_missing:re_de_di_ro",
+        "required_powered_logic_interface_system_missing:max485_5v_supply_ro_level_shift_common_ground"
+      ],
+      "requiredAction": "Bind the connector family, gender, ordered pin signals, and mating part from authoritative evidence; numeric cavity names alone are not routeable."
+    },
+    {
+      "assetId": "adafruit-ina260-current-power-breakout-4226",
+      "state": "pending",
+      "category": "sensor",
+      "connectorIntent": "jst_sh_1.0mm_4p_qwiic",
+      "requiredSignals": [
+        "GND",
+        "3V3",
+        "SDA",
+        "SCL"
+      ],
+      "missingPhysicalContacts": null,
+      "blockers": [
+        "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent",
+        "glb_contact_nodes_missing"
+      ],
+      "requiredAction": "Publish and activate a corrected hash-bound GLB that contains the connector/header geometry sold on the exact catalog revision, then re-extract and validate every physical contact."
+    },
+    {
+      "assetId": "adafruit-mcp9600-thermocouple-breakout-4101",
+      "state": "pending",
+      "category": "sensor",
+      "connectorIntent": "jst_sh_1.0mm_4p_qwiic",
+      "requiredSignals": [
+        "GND",
+        "3V3",
+        "SDA",
+        "SCL"
+      ],
+      "missingPhysicalContacts": null,
+      "blockers": [
+        "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent",
+        "glb_contact_nodes_missing"
+      ],
+      "requiredAction": "Publish and activate a corrected hash-bound GLB that contains the connector/header geometry sold on the exact catalog revision, then re-extract and validate every physical contact."
+    },
+    {
+      "assetId": "adafruit-mcp9808-precision-temp-breakout-1782",
+      "state": "pending",
+      "category": "sensor",
+      "connectorIntent": "jst_sh_1.0mm_4p_qwiic",
+      "requiredSignals": [
+        "GND",
+        "3V3",
+        "SDA",
+        "SCL"
+      ],
+      "missingPhysicalContacts": null,
+      "blockers": [
+        "active_glb_sale_form_mismatch:qwiic_receptacle_geometry_absent",
+        "glb_contact_nodes_missing"
+      ],
+      "requiredAction": "Publish and activate a corrected hash-bound GLB that contains the connector/header geometry sold on the exact catalog revision, then re-extract and validate every physical contact."
+    },
+    {
+      "assetId": "adafruit-pn532-nfc-breakout-364",
+      "state": "partial",
+      "category": "sensor",
+      "connectorIntent": "2.54mm_header",
+      "requiredSignals": [
+        "VDD",
+        "SCK",
+        "MISO",
+        "MOSI_SDA_TX",
+        "NSS_SCL_RX",
+        "GND"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "required_exact_selector_shunt_contract_missing:spi_sel0_gnd_sel1_vdd"
+      ],
+      "requiredAction": "Add the two exact physical selector-shunt bodies and rigid-mate transforms for the chosen bus mode; signal labels alone cannot represent installed jumper blocks."
+    },
+    {
+      "assetId": "fs90r-single-servo",
+      "state": "partial",
+      "category": "actuator",
+      "connectorIntent": "servo_3p",
+      "requiredSignals": [
+        "GND",
+        "5V",
+        "PWM"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "required_servo_power_and_mating_contract_missing:regulated_4v8_to_6v_common_ground_intact_3p_mate"
+      ],
+      "requiredAction": "Add a compatible intact three-pin servo mate plus a regulated 4.8-6 V supply/distribution contract, current budget, and common-ground connection; never source servo power from a GPIO or 3.3 V sensor rail."
+    },
+    {
+      "assetId": "l76k-gnss",
+      "state": "partial",
+      "category": "sensor",
+      "connectorIntent": "2.54mm_header",
+      "requiredSignals": [
+        "GND",
+        "VCC",
+        "TX",
+        "RX"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "required_exact_mating_cable_contract_missing:waveshare_l76k_ph2_0_5p"
+      ],
+      "requiredAction": "Add the exact keyed mating cable as a hash-bound two-ended harness profile, including contact order, gender, wire exits, and any required fixed straps."
+    },
+    {
+      "assetId": "sensirion-sen55",
+      "state": "partial",
+      "category": "sensor",
+      "connectorIntent": "unclassified",
+      "requiredSignals": [
+        "GND",
+        "VDD",
+        "SDA",
+        "SCL"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "required_exact_mating_cable_contract_missing:sensirion_sen5x_jst_ghr_06v_s"
+      ],
+      "requiredAction": "Add the exact keyed mating cable as a hash-bound two-ended harness profile, including contact order, gender, wire exits, and any required fixed straps."
+    },
+    {
+      "assetId": "sparkfun-max30101-max32664-pulse-oximeter-sen-15219",
+      "state": "partial",
+      "category": "sensor",
+      "connectorIntent": "jst_sh_1.0mm_4p_qwiic",
+      "requiredSignals": [
+        "GND",
+        "3V3",
+        "SDA",
+        "SCL",
+        "RST",
+        "MFIO"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "active_glb_sale_form_mismatch:qwiic_contact_pitch_1_5mm_not_1_0mm",
+        "required_exact_ic_hook_pigtail_contract_missing:rst_mfio"
+      ],
+      "requiredAction": "Publish and activate a corrected hash-bound GLB that contains the connector/header geometry sold on the exact catalog revision, then re-extract and validate every physical contact. Add exact no-solder IC-hook/pigtail endpoint geometry for RST and MFIO alongside the existing Qwiic path."
+    },
+    {
+      "assetId": "waveshare-esp32-s3-2-1-round-display-board",
+      "state": "partial",
+      "category": "controller",
+      "connectorIntent": "factory_cable_or_shrouded",
+      "requiredSignals": [
+        "GPIO0",
+        "GND",
+        "RX",
+        "TX",
+        "SDA",
+        "SCL",
+        "3V3",
+        "GPIO20",
+        "GPIO19",
+        "VBUS"
+      ],
+      "missingPhysicalContacts": 0,
+      "blockers": [
+        "required_exact_mating_cable_contract_missing:sh1_12pin_i2c_4pin_uart_4pin"
+      ],
+      "requiredAction": "Add the exact keyed mating cable as a hash-bound two-ended harness profile, including contact order, gender, wire exits, and any required fixed straps."
+    }
+  ]
+}
