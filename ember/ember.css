@@ -101,37 +101,32 @@
   --leaderboard-builder-width: 180px;
   --leaderboard-column-gap: 14px;
   --leaderboard-row-height: 28px;
-  --campfire-avatar-size: 72px;
-  --campfire-avatar-stack: -18px;
-  --campfire-avatars-width: 180px;
-  --campfire-title-size: 30px;
-  --campfire-copy-size: 14px;
+  --campfire-title-size: 40px;
+  --campfire-copy-size: 17px;
   --league-panel-padding: 16px;
   --league-panel-gap: 16px;
-  --league-panel-min-height: 270px;
+  --league-panel-min-height: 394px;
   --league-panel-margin-top: var(--space-10);
   --league-panel-columns: repeat(2, minmax(0, 1fr));
-  --campfire-panel-padding: var(--space-5) var(--space-6);
-  --campfire-column-gap: var(--space-5);
-  --campfire-heading-gap: var(--space-3);
-  --campfire-mark-size: var(--space-10);
-  --campfire-mark-icon-size: var(--space-6);
-  --campfire-heading-size: 15px;
-  --campfire-heading-caption-size: 11px;
-  --campfire-heading-caption-margin-top: 2px;
-  --campfire-title-margin-top: var(--space-4);
+  --campfire-panel-padding: 0;
+  --campfire-panel-columns: 1fr;
+  --campfire-copy-width: 43%;
+  --campfire-copy-padding: var(--space-8);
+  --campfire-kicker-size: 16px;
+  --campfire-kicker-tracking: 0;
+  --campfire-title-margin-top: var(--space-6);
   --campfire-title-tracking: -.035em;
   --campfire-title-line-height: 1.05;
-  --campfire-copy-margin-top: var(--space-2);
-  --campfire-copy-max: 38ch;
+  --campfire-copy-margin-top: var(--space-5);
+  --campfire-copy-max: 17ch;
   --campfire-copy-line-height: 1.4;
-  --campfire-details-margin-top: var(--space-4);
-  --campfire-details-gap: var(--space-2);
-  --campfire-badge-padding: 5px 9px;
-  --campfire-badge-size: 10px;
-  --campfire-destination-margin-top: var(--space-3);
-  --campfire-destination-size: 11px;
-  --campfire-panel-background: radial-gradient(circle at 84% 38%, var(--color-campfire-mid), transparent 38%), linear-gradient(120deg, var(--color-campfire-top), var(--color-campfire-bottom));
+  --campfire-destination-margin-top: var(--space-6);
+  --campfire-destination-size: 15px;
+  --campfire-destination-padding: var(--space-3) var(--space-5);
+  --campfire-destination-radius: var(--radius-control);
+  --campfire-visual-min-height: 0;
+  --campfire-visual-position: center;
+  --campfire-panel-background: linear-gradient(120deg, var(--color-campfire-top), var(--color-campfire-bottom));
   --league-board-padding: var(--space-4) var(--space-5) var(--space-3);
   --league-header-display: flex;
   --league-header-min-height: 52px;
@@ -194,9 +189,9 @@
   --setup-render-margin-left: calc(var(--setup-render-overlap) * -1);
   --setup-render-aspect: auto;
   --setup-render-mask: linear-gradient(90deg, transparent 0, #000 18%, #000 100%);
-  --setup-render-top: 80px;
-  --setup-render-height: calc(100% - 50px);
-  --setup-render-position: 70% center;
+  --setup-render-top: 0;
+  --setup-render-height: 100%;
+  --setup-render-position: center;
   --setup-render-fit: cover;
   --setup-status-right: 28px;
   --setup-status-bottom: 26px;
@@ -327,22 +322,16 @@ h1, h2, h3, p { text-wrap: pretty; }
 .journey-node { display: grid; width: var(--journey-node-size); height: var(--journey-node-size); place-items: center; color: var(--color-orange-bright); border: 1px solid rgb(255 150 74 / 72%); border-radius: 50%; background: linear-gradient(145deg, rgb(71 43 30 / 94%), rgb(25 19 17 / 96%)); box-shadow: var(--shadow-milestone); font-size: 22px; font-weight: 760; font-variant-numeric: tabular-nums; }
 .journey-stage > strong { margin-top: 12px; color: var(--color-text); font-size: 17px; text-align: center; }
 .journey-stage > strong span { color: var(--color-orange-bright); }
-.journey-league { display: grid; width: 100%; min-height: var(--league-panel-min-height); margin: var(--league-panel-margin-top) 0 0; padding: var(--league-panel-padding); align-items: stretch; gap: var(--league-panel-gap); border-color: var(--color-league-border); border-radius: var(--radius-card); background: linear-gradient(145deg, var(--color-league-top), var(--color-league-bottom)); grid-template-columns: var(--league-panel-columns); }
-.campfire-showcase { display: grid; min-width: 0; padding: var(--campfire-panel-padding); overflow: hidden; align-content: center; column-gap: var(--campfire-column-gap); border: 1px solid var(--color-campfire-border); border-radius: var(--radius-stage); background: var(--campfire-panel-background); box-shadow: var(--shadow-campfire); grid-template-areas: "heading art" "title art" "copy art" "details details" "destination destination"; grid-template-columns: minmax(0, 1fr) var(--campfire-avatars-width); }
-.campfire-showcase__heading { display: flex; min-width: 0; align-items: center; gap: var(--campfire-heading-gap); grid-area: heading; }
-.campfire-showcase__mark { display: grid; width: var(--campfire-mark-size); height: var(--campfire-mark-size); flex: 0 0 var(--campfire-mark-size); place-items: center; color: var(--color-orange-bright); border-radius: 50%; background: var(--color-connection-icon); }
-.campfire-showcase__mark svg { width: var(--campfire-mark-icon-size); fill: currentColor; }
-.campfire-showcase__heading strong, .campfire-showcase__heading small { display: block; }
-.campfire-showcase__heading strong { color: var(--color-text); font-size: var(--campfire-heading-size); }
-.campfire-showcase__heading small { margin-top: var(--campfire-heading-caption-margin-top); color: var(--color-soft); font-size: var(--campfire-heading-caption-size); }
-.campfire-showcase__embers { display: flex; width: var(--campfire-avatars-width); align-items: center; justify-content: flex-end; grid-area: art; }
-.campfire-showcase__embers img { width: var(--campfire-avatar-size); height: var(--campfire-avatar-size); margin-left: var(--campfire-avatar-stack); object-fit: contain; border: 1px solid var(--color-campfire-avatar-border); border-radius: 50%; background: var(--color-campfire-avatar-bg); box-shadow: var(--shadow-campfire-avatar); }
-.campfire-showcase__embers img:first-child { margin-left: 0; }
-.campfire-showcase h3 { margin: var(--campfire-title-margin-top) 0 0; font-family: var(--font-display); font-size: var(--campfire-title-size); font-weight: 650; letter-spacing: var(--campfire-title-tracking); line-height: var(--campfire-title-line-height); grid-area: title; }
-.campfire-showcase > p { max-width: var(--campfire-copy-max); margin: var(--campfire-copy-margin-top) 0 0; color: var(--color-muted); font-size: var(--campfire-copy-size); line-height: var(--campfire-copy-line-height); grid-area: copy; }
-.campfire-showcase__details { display: flex; margin-top: var(--campfire-details-margin-top); flex-wrap: wrap; gap: var(--campfire-details-gap); grid-area: details; }
-.campfire-showcase__details span { padding: var(--campfire-badge-padding); color: var(--color-text); border: 1px solid var(--color-campfire-border); border-radius: var(--radius-pill); background: var(--color-campfire-bottom); font-size: var(--campfire-badge-size); font-weight: 620; }
-.campfire-showcase__destination { margin-top: var(--campfire-destination-margin-top); color: var(--color-orange-bright); font-size: var(--campfire-destination-size); grid-area: destination; }
+.journey-league { display: grid; width: 100%; min-height: var(--league-panel-min-height); margin: var(--league-panel-margin-top) 0 0; padding: 0; align-items: stretch; gap: var(--league-panel-gap); border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none; grid-template-columns: var(--league-panel-columns); }
+.campfire-showcase { position: relative; display: grid; min-width: 0; padding: var(--campfire-panel-padding); overflow: hidden; border: 1px solid var(--color-campfire-border); border-radius: var(--radius-stage); background: var(--campfire-panel-background); box-shadow: var(--shadow-campfire); grid-template-columns: var(--campfire-panel-columns); }
+.campfire-showcase__copy { position: relative; z-index: 2; display: flex; width: var(--campfire-copy-width); min-width: 0; padding: var(--campfire-copy-padding); flex-direction: column; justify-content: center; grid-area: 1 / 1; }
+.campfire-showcase__kicker { color: var(--color-orange-bright); font-size: var(--campfire-kicker-size); font-weight: 760; letter-spacing: var(--campfire-kicker-tracking); }
+.campfire-showcase h3 { max-width: 9ch; margin: var(--campfire-title-margin-top) 0 0; font-family: var(--font-display); font-size: var(--campfire-title-size); font-weight: 650; letter-spacing: var(--campfire-title-tracking); line-height: var(--campfire-title-line-height); }
+.campfire-showcase__copy > p { max-width: var(--campfire-copy-max); margin: var(--campfire-copy-margin-top) 0 0; color: var(--color-muted); font-size: var(--campfire-copy-size); line-height: var(--campfire-copy-line-height); }
+.campfire-showcase__destination { display: inline-flex; width: max-content; min-height: var(--space-12); margin-top: var(--campfire-destination-margin-top); padding: var(--campfire-destination-padding); align-items: center; justify-content: center; color: var(--color-text); border: 1px solid var(--color-campfire-avatar-border); border-radius: var(--campfire-destination-radius); background: linear-gradient(145deg, var(--color-cta-start), var(--color-orange) 48%, var(--color-flame)); box-shadow: var(--shadow-ember); font-size: var(--campfire-destination-size); }
+.campfire-showcase__visual { position: relative; z-index: 0; min-width: 0; min-height: var(--campfire-visual-min-height); margin: 0; overflow: hidden; grid-area: 1 / 1; }
+.campfire-showcase__visual::before { position: absolute; z-index: 1; inset: 0 auto 0 0; width: 52%; content: ""; background: linear-gradient(90deg, var(--color-panel-raised) 0%, transparent 100%); pointer-events: none; }
+.campfire-showcase__visual img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: var(--campfire-visual-position); }
 .league-board { min-width: 0; padding: var(--league-board-padding); border: 1px solid var(--color-league-board-border); border-radius: var(--radius-stage); background: var(--color-league-board-bg); box-shadow: var(--shadow-league-board); }
 .league-board__header { display: var(--league-header-display); min-height: var(--league-header-min-height); margin-bottom: var(--league-header-margin-bottom); align-items: center; justify-content: space-between; gap: var(--league-header-gap); }
 .league-kicker { display: block; margin-bottom: var(--league-kicker-margin-bottom); color: var(--color-orange-bright); font-size: var(--league-kicker-size); font-weight: 760; letter-spacing: var(--league-kicker-tracking); text-transform: uppercase; }
@@ -405,6 +394,10 @@ h1, h2, h3, p { text-wrap: pretty; }
 .site-footer__legal a { transition: color 160ms cubic-bezier(.32,.72,0,1); }
 .site-footer__legal a:hover { color: var(--color-text); }
 
+@media (min-width: 1041px) and (min-height: 941px) {
+  :root { --journey-grid-lift: 19px; --league-panel-margin-top: 51px; --leaderboard-row-height: 36px; --leaderboard-row-size: 14px; --leaderboard-header-height: 28px; --leaderboard-header-size: 10px; --league-board-padding: 22px 28px 18px; --league-header-min-height: 68px; --league-title-size: 27px; --league-stat-label-size: 10px; --league-stat-value-size: 16px; --leaderboard-note-size: 12px; }
+}
+
 @media (min-width: 1041px) and (max-height: 860px) {
   .hero__inner { padding-block: 96px 44px; }
   .hero-product { height: calc(100svh - 112px); min-height: 630px; }
@@ -413,12 +406,12 @@ h1, h2, h3, p { text-wrap: pretty; }
 }
 
 @media (min-width: 1041px) and (max-height: 940px) {
-  :root { --journey-stage-height: 250px; --journey-node-size: 56px; --journey-league-height: 238px; --journey-art-clearance: clamp(38px, 3.5vw, 50px); --leaderboard-row-height: 26px; --leaderboard-builder-width: 150px; --leaderboard-header-height: 18px; --campfire-avatar-size: 56px; --campfire-avatar-stack: -15px; --campfire-avatars-width: 138px; --campfire-title-size: 25px; --campfire-copy-size: 12px; --campfire-panel-padding: 12px 16px; --campfire-title-margin-top: 8px; --campfire-details-margin-top: 8px; --campfire-destination-margin-top: 8px; --league-panel-padding: 12px; --league-panel-gap: 12px; --league-panel-min-height: var(--journey-league-height); --league-panel-margin-top: 24px; --league-board-padding: 10px 12px 8px; --league-header-min-height: 44px; --league-title-size: 22px; }
-  .journey { min-height: 100svh; padding: 76px 0 12px; }
+  :root { --journey-stage-height: 250px; --journey-node-size: 56px; --journey-league-height: 360px; --journey-art-clearance: clamp(38px, 3.5vw, 50px); --leaderboard-row-height: 36px; --leaderboard-row-size: 14px; --leaderboard-builder-width: 150px; --leaderboard-header-height: 28px; --leaderboard-header-size: 10px; --leaderboard-note-size: 11px; --campfire-title-size: 31px; --campfire-copy-size: 15px; --campfire-copy-padding: 22px 14px 22px 24px; --campfire-title-margin-top: 14px; --campfire-copy-margin-top: 12px; --campfire-destination-margin-top: 16px; --campfire-destination-size: 13px; --league-panel-padding: 12px; --league-panel-gap: 12px; --league-panel-min-height: var(--journey-league-height); --league-panel-margin-top: 24px; --league-board-padding: 18px 20px 14px; --league-header-min-height: 60px; --league-title-size: 25px; }
+  .journey { min-height: auto; padding: 76px 0 12px; }
   .journey-heading .eyebrow { margin-bottom: 14px; }
   .journey-heading h2 { max-width: 590px; font-size: clamp(44px, 3.5vw, 52px); line-height: 1.04; }
   .journey-heading > p:last-child { max-width: 560px; margin-top: 15px; font-size: 16px; line-height: 1.45; }
-  .journey-grid { margin-top: -92px; }
+  .journey-grid { margin-top: 0; }
   .journey-stage--one img { max-width: clamp(150px, 15.6vw, 224px); }
   .journey-stage--two img { max-width: clamp(190px, 19vw, 274px); }
   .journey-stage--three img { max-width: clamp(260px, 24vw, 346px); }
@@ -426,7 +419,8 @@ h1, h2, h3, p { text-wrap: pretty; }
 }
 
 @media (min-width: 721px) and (max-width: 1040px) {
-  :root { --page-gutter: 20px; --header-edge: 14px; --hero-copy-width: auto; --hero-grid-gap: 22px; --hero-device-width: min(84%, 390px); --hero-app-width: clamp(220px, 29vw, 280px); --journey-stage-height: 230px; --journey-node-size: 52px; --journey-art-one: 118px; --journey-art-two: 170px; --journey-art-three: 224px; --journey-art-clearance: 38px; --leaderboard-rank-width: 30px; --leaderboard-builder-width: 110px; --leaderboard-streak-width: 56px; --leaderboard-points-width: 60px; --leaderboard-column-gap: 8px; --leaderboard-row-height: 27px; --campfire-avatar-size: 50px; --campfire-avatar-stack: -14px; --campfire-avatars-width: 120px; --campfire-title-size: 24px; --campfire-copy-size: 12px; --campfire-panel-padding: 12px; --campfire-column-gap: 10px; --campfire-title-margin-top: 10px; --campfire-details-margin-top: 10px; --campfire-badge-padding: 4px 7px; --campfire-badge-size: 9px; --campfire-destination-margin-top: 8px; --campfire-destination-size: 10px; --league-panel-padding: 12px; --league-panel-gap: 12px; --league-panel-min-height: 240px; --league-panel-margin-top: 22px; --league-panel-columns: minmax(0, .88fr) minmax(0, 1.12fr); --league-board-padding: 10px; --league-header-min-height: 46px; --league-title-size: 20px; --league-you-gap: 8px; --league-period-padding: 4px 7px; --league-period-size: 9px; --setup-copy-width: 44%; --setup-image-width: 56%; --setup-copy-padding: 88px 24px 42px; --setup-heading-size: clamp(36px, 4.4vw, 44px); --setup-support-margin-top: 24px; --setup-support-size: 17px; --setup-connections-margin: 24px 0; --setup-connections-columns: 1fr; --setup-connection-height: 70px; --setup-connection-padding: 12px; --setup-update-margin-bottom: 28px; --setup-update-size: 15px; --setup-button-width: 100%; --setup-button-min-width: 0; --setup-button-height: 60px; --setup-button-size: 16px; --setup-render-width: 100%; --setup-render-margin-left: 0; --setup-render-height: calc(100% - 110px); --setup-render-top: 110px; --setup-render-position: center; }
+  :root { --page-gutter: 20px; --header-edge: 14px; --hero-copy-width: auto; --hero-grid-gap: 22px; --hero-device-width: min(84%, 390px); --hero-app-width: clamp(220px, 29vw, 280px); --journey-stage-height: 230px; --journey-node-size: 52px; --journey-art-one: 118px; --journey-art-two: 170px; --journey-art-three: 224px; --journey-art-clearance: 38px; --leaderboard-rank-width: 30px; --leaderboard-builder-width: 110px; --leaderboard-streak-width: 56px; --leaderboard-points-width: 60px; --leaderboard-column-gap: 8px; --leaderboard-row-height: 27px; --campfire-panel-columns: minmax(170px, .92fr) minmax(170px, 1.08fr); --campfire-title-size: 28px; --campfire-copy-size: 14px; --campfire-copy-padding: 18px 10px 18px 18px; --campfire-title-margin-top: 12px; --campfire-copy-margin-top: 10px; --campfire-destination-margin-top: 12px; --campfire-destination-size: 12px; --league-panel-padding: 12px; --league-panel-gap: 12px; --league-panel-min-height: 240px; --league-panel-margin-top: 22px; --league-panel-columns: minmax(0, .88fr) minmax(0, 1.12fr); --league-board-padding: 10px; --league-header-min-height: 46px; --league-title-size: 20px; --league-you-gap: 8px; --league-period-padding: 4px 7px; --league-period-size: 9px; --setup-copy-width: 44%; --setup-image-width: 56%; --setup-copy-padding: 88px 24px 42px; --setup-heading-size: clamp(36px, 4.4vw, 44px); --setup-support-margin-top: 24px; --setup-support-size: 17px; --setup-connections-margin: 24px 0; --setup-connections-columns: 1fr; --setup-connection-height: 70px; --setup-connection-padding: 12px; --setup-update-margin-bottom: 28px; --setup-update-size: 15px; --setup-button-width: 100%; --setup-button-min-width: 0; --setup-button-height: 60px; --setup-button-size: 16px; --setup-render-width: 100%; --setup-render-margin-left: 0; --setup-render-height: calc(100% - 64px); --setup-render-top: 64px; --setup-render-position: center; }
+  :root { --campfire-panel-columns: 1fr; --campfire-copy-width: 48%; }
   .site-nav { gap: 28px; font-size: 15px; }
   .header-download { min-height: 44px; padding-inline: 16px; font-size: 15px; }
   .hero__inner { min-height: max(720px, 100svh); padding: 94px 0 46px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); }
@@ -439,7 +433,7 @@ h1, h2, h3, p { text-wrap: pretty; }
   .hero-product { height: min(650px, calc(100svh - 108px)); min-height: 540px; }
   .desk-ember { top: 25%; padding: 17px; border-radius: 24px; }
   .app-preview { top: 9%; }
-  .journey { min-height: 100svh; padding: 104px 0 20px; }
+  .journey { min-height: auto; padding: 104px 0 20px; }
   .journey-heading { max-width: 600px; }
   .journey-heading > p:last-child { max-width: 400px; }
   .journey-heading h2 { font-size: clamp(44px, 5.7vw, 56px); }
@@ -448,8 +442,12 @@ h1, h2, h3, p { text-wrap: pretty; }
   .journey-grid::after { right: 18px; }
 }
 
+@media (min-width: 721px) {
+  .journey-heading { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
 @media (max-width: 720px) {
-  :root { --page-gutter: 16px; --header-edge: 10px; --header-height: 54px; --makeable-wordmark-width: 118px; --makeable-wordmark-footer-width: 166px; --journey-title-size: clamp(42px, 12vw, 56px); --journey-stage-height: 150px; --journey-node-size: 48px; --journey-rail-size: 5px; --journey-art-one: 110px; --journey-art-two: 145px; --journey-art-three: 170px; --leaderboard-rank-width: 34px; --leaderboard-builder-width: 1fr; --leaderboard-streak-width: 58px; --leaderboard-points-width: 58px; --leaderboard-column-gap: 0; --leaderboard-row-height: 36px; --leaderboard-grid-template: var(--leaderboard-rank-width) minmax(0, 1fr) var(--leaderboard-streak-width) var(--leaderboard-points-width); --leaderboard-note-align: left; --campfire-avatar-size: 60px; --campfire-avatar-stack: -16px; --campfire-avatars-width: 146px; --campfire-title-size: 28px; --campfire-copy-size: 14px; --campfire-panel-padding: 16px; --campfire-column-gap: 10px; --campfire-details-margin-top: 12px; --league-panel-padding: 14px; --league-panel-gap: 14px; --league-panel-min-height: 0; --league-panel-margin-top: 30px; --league-panel-columns: 1fr; --league-board-padding: 14px 10px 10px; --league-header-display: grid; --league-header-min-height: 0; --league-header-margin-bottom: 10px; --league-header-gap: 12px; --league-title-size: 25px; --league-you-justify: space-between; --setup-min-height: auto; --setup-card-columns: minmax(0, 1fr); --setup-copy-max: none; --setup-copy-padding: 94px 24px 34px; --setup-heading-max: 12ch; --setup-heading-size: clamp(40px, 11vw, 52px); --setup-support-margin-top: 24px; --setup-support-size: 17px; --setup-connections-width: 100%; --setup-connections-margin: 26px 0; --setup-connections-columns: minmax(0, 1fr); --setup-update-margin-bottom: 28px; --setup-update-size: 15px; --setup-button-width: 100%; --setup-button-min-width: 0; --setup-button-height: 58px; --setup-button-size: 17px; --setup-render-width: 100%; --setup-render-max-width: 100%; --setup-render-min-height: 320px; --setup-render-margin-left: 0; --setup-render-mask: linear-gradient(180deg, transparent 0, #000 14%, #000 100%); --setup-render-height: 100%; --setup-render-top: 0; --setup-status-right: 16px; --setup-status-bottom: 16px; }
+  :root { --page-gutter: 16px; --header-edge: 10px; --header-height: 54px; --makeable-wordmark-width: 118px; --makeable-wordmark-footer-width: 166px; --journey-title-size: clamp(42px, 12vw, 56px); --journey-stage-height: 150px; --journey-node-size: 48px; --journey-rail-size: 5px; --journey-art-one: 110px; --journey-art-two: 145px; --journey-art-three: 170px; --leaderboard-rank-width: 34px; --leaderboard-builder-width: 1fr; --leaderboard-streak-width: 58px; --leaderboard-points-width: 58px; --leaderboard-column-gap: 0; --leaderboard-row-height: 36px; --leaderboard-grid-template: var(--leaderboard-rank-width) minmax(0, 1fr) var(--leaderboard-streak-width) var(--leaderboard-points-width); --leaderboard-note-align: left; --campfire-panel-columns: 1fr; --campfire-title-size: 32px; --campfire-copy-size: 16px; --campfire-copy-padding: 22px 20px 24px; --campfire-title-margin-top: 14px; --campfire-copy-margin-top: 12px; --campfire-destination-margin-top: 16px; --campfire-destination-size: 14px; --campfire-visual-min-height: 210px; --league-panel-padding: 14px; --league-panel-gap: 14px; --league-panel-min-height: 0; --league-panel-margin-top: 30px; --league-panel-columns: 1fr; --league-board-padding: 14px 10px 10px; --league-header-display: grid; --league-header-min-height: 0; --league-header-margin-bottom: 10px; --league-header-gap: 12px; --league-title-size: 25px; --league-you-justify: space-between; --setup-min-height: auto; --setup-card-columns: minmax(0, 1fr); --setup-copy-max: none; --setup-copy-padding: 94px 24px 34px; --setup-heading-max: 12ch; --setup-heading-size: clamp(40px, 11vw, 52px); --setup-support-margin-top: 24px; --setup-support-size: 17px; --setup-connections-width: 100%; --setup-connections-margin: 26px 0; --setup-connections-columns: minmax(0, 1fr); --setup-update-margin-bottom: 28px; --setup-update-size: 15px; --setup-button-width: 100%; --setup-button-min-width: 0; --setup-button-height: 58px; --setup-button-size: 17px; --setup-render-width: 100%; --setup-render-max-width: 100%; --setup-render-min-height: 320px; --setup-render-margin-left: 0; --setup-render-mask: linear-gradient(180deg, transparent 0, #000 14%, #000 100%); --setup-render-height: 100%; --setup-render-top: 0; --setup-status-right: 16px; --setup-status-bottom: 16px; }
   html { scroll-padding-top: 76px; }
   .site-header { background: var(--color-canvas); }
   .site-header__inner { padding-left: 12px; grid-template-columns: 1fr auto; }
@@ -473,6 +471,11 @@ h1, h2, h3, p { text-wrap: pretty; }
   .journey-heading .eyebrow { margin-bottom: 18px; }
   .journey-heading h2 { line-height: 1.02; }
   .journey-heading > p:last-child { margin-top: 20px; font-size: 16px; line-height: 1.5; }
+  .campfire-showcase { grid-template-rows: auto var(--campfire-visual-min-height); }
+  .campfire-showcase__copy { width: 100%; grid-area: 1 / 1; }
+  .campfire-showcase__visual { grid-area: 2 / 1; }
+  .campfire-showcase__visual::before { display: none; }
+  .campfire-showcase__visual img { object-position: 62% center; }
   .journey-grid { margin-top: 28px; padding: 0 0 8px; gap: 16px; grid-template-columns: 1fr; }
   .journey-grid::before { top: 24px; right: auto; bottom: 24px; left: 22px; width: var(--journey-rail-size); height: auto; background: linear-gradient(var(--color-flame), var(--color-orange-bright) 56%, var(--color-gold)); }
   .journey-grid::after { top: auto; right: auto; bottom: 0; left: 10px; border-block-start: 18px solid var(--color-gold); border-block-end: 0; border-inline: 13px solid transparent; }
