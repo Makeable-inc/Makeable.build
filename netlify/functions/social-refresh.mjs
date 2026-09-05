@@ -4,7 +4,7 @@ import { persistSocialRecords, readSocialRecords, reconcileRefreshedSocialRecord
 import { loadTikTokAccessToken } from "../../lib/tiktok-oauth.mjs";
 import { loadYouTubeAccessToken } from "../../lib/youtube-oauth.mjs";
 
-export const config = { schedule: "0 * * * *" };
+export const config = { schedule: "*/15 * * * *" };
 
 export default async function handler(_req, context = {}) {
   try {

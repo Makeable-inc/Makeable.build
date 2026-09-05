@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { refreshSocialRecords } from "../lib/social-refresh.mjs";
+import { config as scheduledRefreshConfig } from "../netlify/functions/social-refresh.mjs";
+
+test("production social analytics refresh every fifteen minutes", () => {
+  assert.deepEqual(scheduledRefreshConfig, { schedule: "*/15 * * * *" });
+});
 
 test("official YouTube refresh uses public video counters without calling paid collectors", async () => {
   const requests = [];
