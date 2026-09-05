@@ -27,7 +27,7 @@
     <div class="site-header__inner glass-bar">
       <a class="makeable-mark" href="/" aria-label="Makeable home"><img src="/assets/ember/makeable-wordmark-white.png" alt="Makeable" /></a>
       <nav class="site-nav" aria-label="Ember navigation"><a href="#journey">How it works</a><a href="#setup">Setup</a></nav>
-      <a class="header-download" href="https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg" data-download-link><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download</span></a>
+      <a class="header-download" href="https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg" data-download-link aria-label="Download Ember for Mac"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download</span></a>
     </div>
   </header>
 
@@ -89,9 +89,25 @@
           <li class="journey-stage journey-stage--three"><img src="/assets/ember/growth/adult-happy-poster.png" data-animated-src="/assets/ember/growth/adult-happy.gif" data-still-src="/assets/ember/growth/adult-happy-poster.png" width="500" height="500" alt="Happy Ember in its third evolution" loading="lazy" decoding="async" /><span class="journey-node" aria-hidden="true">3</span><strong><span>3 ·</span> Full Flame</strong></li>
         </ol>
         <aside class="journey-league glass-card" aria-labelledby="league-title">
-          <div class="league-summary"><p>Ember League</p><h3 id="league-title">You're #2</h3><strong>1,598 pts</strong><span>369 points to take #1</span></div>
-          <ol class="league-podium" aria-label="Ember League leaders"><li><img src="/assets/ember/site-v2/app-growth-adult.png" width="640" height="480" alt="" /><span><b>Cutie Pookie</b><small>1,966</small><strong>#1</strong></span></li><li class="is-you"><img src="/assets/ember/site-v2/app-growth-baby.png" width="640" height="480" alt="" /><span><b>imrayng</b><small>1,598</small><strong>#2</strong></span></li><li><img src="/assets/ember/site-v2/app-growth-teen.png" width="640" height="480" alt="" /><span><b>Cinder</b><small>1,080</small><strong>#3</strong></span></li></ol>
-          <a href="https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg" data-download-link><span>Race your friends</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></a>
+          <div class="league-summary">
+            <p>Ember League</p>
+            <h3 id="league-title">Public leaderboard</h3>
+            <span class="league-summary__lede">Consistency moves you up.</span>
+            <dl class="league-you"><div><dt>Your rank</dt><dd>#2</dd></div><div><dt>Your points</dt><dd>1,598</dd></div></dl>
+            <span class="league-summary__next">369 points to take #1</span>
+          </div>
+          <div class="league-board">
+            <div class="league-board__header"><div><h4>Top builders</h4><span>Public rankings</span></div><span class="league-period">This week</span></div>
+            <div class="league-columns" aria-hidden="true"><span>Rank</span><span>Builder</span><span>Streak</span><span>Points</span></div>
+            <ol class="league-rankings" aria-label="Public Ember League rankings">
+              <li><span class="league-rank">1</span><strong>Cutie Pookie</strong><span>21 days</span><b>1,966</b></li>
+              <li class="is-you"><span class="league-rank">2</span><strong>imrayng <small>You</small></strong><span>14 days</span><b>1,598</b></li>
+              <li><span class="league-rank">3</span><strong>Cinder</strong><span>12 days</span><b>1,080</b></li>
+              <li><span class="league-rank">4</span><strong>EmberFox</strong><span>9 days</span><b>942</b></li>
+              <li><span class="league-rank">5</span><strong>Workbench</strong><span>8 days</span><b>811</b></li>
+            </ol>
+            <p class="league-note">Full rankings live in Ember's Compete tab.</p>
+          </div>
         </aside>
       </div>
     </section>
