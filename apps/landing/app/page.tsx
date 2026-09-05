@@ -1756,11 +1756,6 @@ function BuildWorkspace({
         idea={isLoading || isClarifying ? prompt : build?.idea || build?.summary}
         label={isLoading ? "In the workshop" : isClarifying ? "Clarification" : build ? "Project" : "Library"}
         onHome={onBack}
-        action={build && surface === "overview" && wiringReady ? (
-          <button className="mk-context-primary" type="button" onClick={() => setSurface("wiring")}>
-            Open wiring <ArrowIcon />
-          </button>
-        ) : undefined}
       />}
 
       <section className="mk-workspace-main" aria-labelledby="workspace-title">
@@ -1779,7 +1774,7 @@ function BuildWorkspace({
             ? <LockedCodePanel onBack={() => setSurface("overview")} />
             : surface === "wiring" && wiringReady
               ? <ProjectWiringGuide build={build} />
-              : <BuildWorkspaceResult build={build} />
+              : <ProjectOverview key={build.id} build={build} onOpenWiring={() => setSurface("wiring")} />
         ) : null}
       </section>
 

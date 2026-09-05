@@ -81,6 +81,28 @@ body.guide-mode { height: 100dvh; min-height: 0; overflow: hidden; }
   .canvas-footer #scene-summary { display: none; }
   .icon-button, .guide-mode .icon-button { padding: 0 9px; font-size: 13px; }
 }
+
+/* Approved interaction toolbar: real OrbitControls modes, not camera presets. */
+.interaction-tools { position: absolute; z-index: 8; bottom: 14px; left: 16px; display: flex; border: 1px solid #d9d5ce; border-radius: 8px; overflow: hidden; background: #fffdf9; }
+.interaction-tools button { display: grid; place-items: center; gap: 5px; width: 84px; min-height: 66px; padding: 10px; border: 0; border-right: 1px solid #e1ddd5; background: transparent; color: #101316; font-size: 14px; cursor: pointer; }
+.interaction-tools button:last-child { border-right: 0; }
+.interaction-tools button[aria-pressed="true"] { background: #ffe6df; }
+.interaction-tools button:hover { background: #fff0e9; }
+.interaction-tools svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.original-step { margin-top: 16px; font-size: 14px; }
+.original-step summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; text-decoration: underline; text-underline-offset: 4px; }
+.original-step p { font-size: 14px; }
+.step-controls #step-next { background: #ff6f62; color: #101316; border-color: #ff6f62; }
+.guide-mode:not(.embedded-guide-mode) .assembly-progress { display: flex; grid-row: 1; gap: 10px; justify-content: center; margin: 0; padding: 0; align-items: center; }
+.guide-mode .assembly-progress button { flex: 0 0 44px; width: 44px; min-width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border: 1px solid #d9d5ce; border-radius: 8px; background: transparent; color: #101316; }
+.guide-mode .assembly-progress button::after, .guide-mode .assembly-progress button::before { display: none; }
+.guide-mode .assembly-progress button[aria-current="step"] { background: #ff6f62; border-color: #ff6f62; }
+.guide-mode:not(.embedded-guide-mode) .result-stage { grid-template-rows: 44px minmax(0,1fr) 54px; }
+@media(max-width:650px) {
+  .interaction-tools { left: 10px; bottom: 10px; }
+  .interaction-tools button { width: 72px; min-height: 60px; }
+  .guide-mode:not(.embedded-guide-mode):not([data-guide-pane="details"]) .result-stage { grid-template-rows: 44px auto minmax(0,1fr) 54px; }
+}
 @media (max-width: 650px) {
   .topbar, .guide-mode .topbar { padding: 0 16px; }
   .brand img { width: 108px; }
@@ -88,7 +110,7 @@ body.guide-mode { height: 100dvh; min-height: 0; overflow: hidden; }
   .guide-view-toggle button { min-height: 44px; padding: 0 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #bcc0c5; font-size: 13px; }
   .guide-view-toggle button[aria-pressed="true"] { color: white; border-color: white; }
   .guide-mode .result-stage { padding: 12px 12px 10px; gap: 8px; }
-  .guide-mode:not(.embedded-guide-mode):not([data-guide-pane="details"]) .result-stage { grid-template-rows: auto minmax(0,1fr) 54px; }
+  .guide-mode:not(.embedded-guide-mode):not([data-guide-pane="details"]) .result-stage { grid-template-rows: 44px auto minmax(0,1fr) 54px; }
   .guide-mode:not(.embedded-guide-mode):not([data-guide-pane="details"]) .guide-current-step { display: block; padding: 4px 0 8px; }
   .guide-current-step strong { font-size: 17px; }
   .guide-current-step p { font-size: 13px; line-height: 1.45; margin: 8px 0 0; color: var(--muted); }

@@ -313,11 +313,6 @@ export default function BuildAppPage() {
         idea={activeBuild?.idea || activeBuild?.summary}
         label={loading ? "Opening" : activeBuild ? "Project" : "Library"}
         onHome={goHome}
-        action={activeBuild && surface === "overview" && projectWiringReady(activeBuild) ? (
-          <button className="mk-context-primary" type="button" onClick={() => void openWiring()} disabled={wiringLoading}>
-            {wiringLoading ? "Opening guide…" : <>Open wiring <ArrowIcon /></>}
-          </button>
-        ) : undefined}
       />
 
       <section className="mk-workspace-main" aria-labelledby="workspace-title">
@@ -338,7 +333,7 @@ export default function BuildAppPage() {
             ? <LockedCodePanel onBack={() => setSurface("overview")} />
             : surface === "wiring" && projectWiringReady(activeBuild)
               ? <ProjectWiringGuide key={activeBuild.id} build={activeBuild} />
-              : <BuildWorkspaceResult build={activeBuild} />
+              : <ProjectOverview key={activeBuild.id} build={activeBuild} onOpenWiring={() => void openWiring()} wiringLoading={wiringLoading} />
         ) : (
           <div className="mk-empty-library">
             <h1 id="workspace-title">{accountUnavailable ? "Your projects are temporarily unavailable" : "My builds"}</h1>

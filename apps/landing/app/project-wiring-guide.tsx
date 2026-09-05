@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { type ProjectPart } from "./project-overview";
+import { useMemo, useState } from "react";
+import { compactStepNumbers, friendlyPartName, wiringCopy, wiringEndpointLabel } from "../../circuit-lab/wiring-presentation.mjs";
+import { PartThumbnail, type ProjectPart } from "./project-overview";
 import { SavedWiringViewer } from "./saved-wiring-viewer";
 import { projectDisplayIdentity } from "./project-identity.mjs";
 import { projectWiringSteps, wiringConnectionsForStep } from "./project-wiring-data.mjs";
@@ -75,22 +76,7 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
 
   const boundedIndex = Math.min(activeIndex, Math.max(0, steps.length - 1));
   const activeStep = steps[boundedIndex];
-  const progressRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const nav = progressRef.current;
-    const current = nav?.querySelector<HTMLElement>('[aria-current="step"]');
-    if (!nav || !current) return;
-    const keepCurrentVisible = () => {
-      const frame = nav.getBoundingClientRect();
-      const button = current.getBoundingClientRect();
-      if (button.left < frame.left) nav.scrollLeft -= frame.left - button.left + 8;
-      else if (button.right > frame.right) nav.scrollLeft += button.right - frame.right + 8;
-    };
-    keepCurrentVisible();
-    const observer = new ResizeObserver(keepCurrentVisible);
-    observer.observe(nav);
-    return () => observer.disconnect();
-  }, [boundedIndex]);
+  const copy = wiringCopy(activeStep, build.artifacts?.assembly);
   const connections = useMemo(
     () => wiringConnectionsForStep(build, activeStep) as WiringConnection[],
     [activeStep, build],
@@ -105,26 +91,26 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
       <h1 id="workspace-title" className="mk-visually-hidden">Wire {identity.title}</h1>
 
       <div className="mk-wiring-toolbar">
-        <nav ref={progressRef} className="mk-wiring-progress" aria-label="Wiring steps">
-          {steps.map((step, index) => (
+        <nav className="mk-wiring-progress" aria-label="Wiring steps">
+          {compactStepNumbers(steps.length, boundedIndex).map((entry, position) => entry === "gap" ? <span className="mk-step-gap" key={`gap-${position}`} aria-hidden="true">…</span> : (
             <button
               type="button"
-              key={step.id}
-              aria-current={index === boundedIndex ? "step" : undefined}
-              onClick={() => setActiveIndex(index)}
+              key={entry}
+              aria-label={`Step ${Number(entry) + 1}: ${wiringCopy(steps[Number(entry)], build.artifacts?.assembly).title}`}
+              aria-current={entry === boundedIndex ? "step" : undefined}
+              onClick={() => setActiveIndex(Number(entry))}
             >
-              <strong>{index + 1}</strong>
-              <span>{step.title}</span>
+              <strong>{Number(entry) + 1}</strong>
             </button>
           ))}
         </nav>
         <div className="mk-wiring-pane-toggle" aria-label="Wiring view">
-          <button type="button" aria-pressed={mobilePane === "visual"} onClick={() => setMobilePane("visual")}>Visual</button>
-          <button type="button" aria-pressed={mobilePane === "details"} onClick={() => setMobilePane("details")}>Details</button>
+          <button type="button" aria-pressed={mobilePane === "visual"} onClick={() => setMobilePane("visual")}>3D view</button>
+          <button type="button" aria-pressed={mobilePane === "details"} onClick={() => setMobilePane("details")}>Instructions</button>
         </div>
       </div>
 
-      <div className="mk-wiring-mobile-instruction" role="status"><strong>{activeStep?.title}</strong><span>{activeStep?.beginnerInstruction}</span>{activeStep?.safetyNote && <span className="mk-wiring-mobile-safety">{activeStep.safetyNote}</span>}</div>
+      <div className="mk-wiring-mobile-instruction" role="status"><strong>{copy.title}</strong>{copy.safety && <span className="mk-wiring-mobile-safety">{copy.safety}</span>}</div>
       <div className="mk-wiring-workbench">
         <section className="mk-wiring-simulation" aria-labelledby="wiring-simulation-title">
           <div className="mk-wiring-simulation-heading">
@@ -139,8 +125,8 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
         {activeStep && <article className="mk-wiring-step-card">
           <div className="mk-wiring-step-heading" aria-live="polite" aria-atomic="true">
             <span>Step {boundedIndex + 1} of {steps.length}</span>
-            <h2>{activeStep.title}</h2>
-            <p>{activeStep.beginnerInstruction || "Follow the highlighted connection labels for this step."}</p>
+            <h2>{copy.title}</h2>
+            <p>{copy.instruction || "Follow the highlighted connection labels for this step."}</p>
           </div>
 
           <div className="mk-wiring-connections" tabIndex={0} role="region" aria-label="Connection instructions">
@@ -149,8 +135,8 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
                 <i style={{ backgroundColor: connection.color || "#ff6470" }} aria-hidden="true" />
                 <div>
                   <strong>{connection.label || connection.signal || "Connection"}</strong>
-                  <span><b>From</b> {connection.from?.label || connection.from?.nodeName || connection.from?.partId}</span>
-                  <span><b>To</b> {connection.to?.label || connection.to?.nodeName || connection.to?.partId}</span>
+                  <span><b>From</b> {wiringEndpointLabel(connection.from, build.artifacts?.assembly)}</span>
+                  <span><b>To</b> {wiringEndpointLabel(connection.to, build.artifacts?.assembly)}</span>
                 </div>
               </div>
             )) : wirelessLinks.length ? wirelessLinks.map((link) => (
@@ -160,15 +146,18 @@ export function ProjectWiringGuide({ build }: { build: WiringProject }) {
               </div>
             )) : (
               <div className="mk-wiring-preparation">
-                <strong>{activeStep.kind === "placement" ? "No wire is needed yet." : "No external wire is required."}</strong>
-                <span>{activeStep.kind === "placement" ? "Arrange or seat the named parts first, then continue." : "Follow the check above using the controller’s built-in hardware."}</span>
+                {activeStep.kind === "mount" ? (build.artifacts?.assembly?.parts || []).filter(part => activeStep.visibleParts?.includes(part.id)).map(part => {
+                  const catalog = build.parts.find(item => item.id === part.catalogPartId || item.name === part.label);
+                  return <div className="mk-step-part" key={part.id}>{catalog && <PartThumbnail part={catalog} />}<strong>{friendlyPartName(part)}</strong></div>;
+                }) : <><strong>{activeStep.kind === "placement" ? "No wires needed yet." : "Check the connections shown."}</strong><span>{activeStep.kind === "placement" ? "Arrange the parts as shown." : "Follow the instructions above."}</span></>}
               </div>
             )}
           </div>
 
-          {activeStep.safetyNote && <aside className="mk-wiring-safety">
+          <details className="mk-wiring-original"><summary>Part details</summary><p>{activeStep.title}</p><p>{activeStep.beginnerInstruction}</p></details>
+          {copy.safety && <aside className="mk-wiring-safety">
             <strong>Before you continue</strong>
-            <span>{activeStep.safetyNote}</span>
+            <span>{copy.safety}</span>
           </aside>}
         </article>}
       </div>

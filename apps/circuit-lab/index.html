@@ -110,6 +110,11 @@
             <div class="canvas-status"><i></i><span id="canvas-status">Awaiting an API build</span></div>
           </div>
           <div id="canvas" class="canvas" aria-label="Interactive 3D assembly viewer">
+            <div class="interaction-tools" role="group" aria-label="Move the 3D view">
+              <button type="button" data-interaction="rotate" aria-pressed="true" title="Drag to rotate the view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5M4 16a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/></svg><span>Rotate</span></button>
+              <button type="button" data-interaction="pan" aria-pressed="false" title="Drag to move the view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6a2 2 0 0 1 4 0v6-8a2 2 0 0 1 4 0v8-6a2 2 0 0 1 4 0v9c0 4-2 7-6 7h-1c-3 0-4-2-6-5l-3-5c-1-2 1-4 3-2l1 2Z"/></svg><span>Pan</span></button>
+              <button type="button" data-interaction="zoom" aria-pressed="false" title="Drag up or down to zoom"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6m-3-3v6"/></svg><span>Zoom</span></button>
+            </div>
             <div id="empty-state" class="empty-state">
               <div class="empty-orbit" aria-hidden="true"><span></span><span></span><span></span><i></i></div>
               <h3>Ready for your first idea</h3>
@@ -124,7 +129,7 @@
             </div>
           </div>
           <footer class="canvas-footer">
-            <span>Drag to rotate · scroll or pinch to zoom</span>
+            <span id="interaction-hint" aria-live="polite">Drag to rotate · scroll or pinch to zoom</span>
             <span id="scene-summary">0 parts · 0 wires</span>
           </footer>
         </section>

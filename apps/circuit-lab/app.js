@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { compactStepNumbers, wiringCopy, wiringEndpointLabel } from "./wiring-presentation.mjs";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const form = document.querySelector("#idea-form");
@@ -81,6 +82,7 @@ try {
   controls.target.set(0, 0.01, 0);
   controls.minDistance = .07;
   controls.maxDistance = 1.8;
+  controls.screenSpacePanning = true;
 } catch {
   document.querySelector("#canvas").classList.add("diagram-fallback");
 }
@@ -655,16 +657,19 @@ function selectStep(index) {
   }
   activeStepIndex = Math.max(0, Math.min(index, activeBuildSteps.length - 1));
   const step = activeBuildSteps[activeStepIndex];
-  document.querySelector("#mobile-step-title").textContent = `${activeStepIndex + 1} / ${activeBuildSteps.length} · ${step.title}`;
-  document.querySelector("#mobile-step-safety").textContent = step.safetyNote || "";
+  const copy = wiringCopy(step, activeAssembly);
+  document.querySelector("#mobile-step-title").textContent = `${activeStepIndex + 1} / ${activeBuildSteps.length} · ${copy.title}`;
+  document.querySelector("#mobile-step-safety").textContent = copy.safety;
   activeStepNumber.textContent = String(activeStepIndex + 1);
-  activeStep.innerHTML = `<span class="step-kicker">Step ${activeStepIndex + 1} of ${activeBuildSteps.length}</span><h3>${escapeHtml(step.title)}</h3><p>${escapeHtml(step.beginnerInstruction)}</p>`;
+  activeStep.innerHTML = `<span class="step-kicker">Step ${activeStepIndex + 1} of ${activeBuildSteps.length}</span><h3>${escapeHtml(copy.title)}</h3><p>${escapeHtml(copy.instruction)}</p><details class="original-step"><summary>Part details</summary><p>${escapeHtml(step.title)}</p><p>${escapeHtml(step.beginnerInstruction)}</p></details>`;
+  assemblyProgress.innerHTML = compactStepNumbers(activeBuildSteps.length, activeStepIndex).map(entry => entry === "gap" ? '<span aria-hidden="true">…</span>' : `<button type="button" data-progress-index="${entry}" aria-label="Step ${entry + 1}: ${escapeHtml(wiringCopy(activeBuildSteps[entry], activeAssembly).title)}" aria-current="${entry === activeStepIndex ? "step" : "false"}">${entry + 1}</button>`).join("");
+  assemblyProgress.querySelectorAll("button").forEach(button => button.addEventListener("click", () => selectStep(Number(button.dataset.progressIndex))));
   stepProgress.style.width = `${((activeStepIndex + 1) / activeBuildSteps.length) * 100}%`;
   stepBack.disabled = activeStepIndex === 0;
   stepNext.disabled = activeStepIndex === activeBuildSteps.length - 1;
   renderActiveConnections(step);
   applyAssemblyStepFocus(step);
-  if (renderedWireMeshes.size && step.cameraView === "pin-close-up" && step.activeWires?.length) {
+  if (assemblyGroup.children.length && step.cameraView === "pin-close-up" && (step.activeWires?.length || step.kind === "mount")) {
     setView("pin", document.querySelector('[data-view="pin"]'));
   } else if (renderedWireMeshes.size) {
     setView("iso", document.querySelector('[data-view="iso"]'));
@@ -691,8 +696,8 @@ function renderActiveConnections(step) {
       : connectionKind(wire) === "POWER"
         ? "Red"
         : friendlyColorName(color);
-    const from = friendlyEndpoint(wire.from, partLabelById);
-    const to = friendlyEndpoint(wire.to, partLabelById);
+    const from = wiringEndpointLabel(wire.from, activeAssembly);
+    const to = wiringEndpointLabel(wire.to, activeAssembly);
     return `<article class="step-connection" style="--wire-color:${escapeHtml(color)}"><i></i><span><strong>${escapeHtml(colorName)}: ${escapeHtml(wire.signal || wire.label)}</strong><small>${escapeHtml(from)} → ${escapeHtml(to)}</small></span></article>`;
   }).join("");
   stepConnections.hidden = activeWires.length === 0;
@@ -1052,6 +1057,10 @@ function focusActiveConnections() {
     box.expandByObject(mesh);
     included = true;
   }
+  if (step?.kind === "mount") {
+    const visible = new Set(step.visibleParts || []);
+    for (const child of assemblyGroup.children) if (visible.has(child.userData.partId)) { box.expandByObject(child); included = true; }
+  }
   if (!included || box.isEmpty()) return fitAssembly();
   // Include the connected modules, not just their wire endpoints.
   const partIds = new Set((activeAssembly?.wires || []).filter(wire => activeIds.has(wire.id)).flatMap(wire => [wire.from?.partId, wire.to?.partId]));
@@ -1087,6 +1096,21 @@ function frameBounds(box, direction) {
   camera.updateProjectionMatrix();
   controls.update();
 }
+
+function setInteractionMode(mode) {
+  if (!controls || !renderer) return;
+  const modes = { rotate: THREE.MOUSE.ROTATE, pan: THREE.MOUSE.PAN, zoom: THREE.MOUSE.DOLLY };
+  if (!(mode in modes)) return;
+  controls.mouseButtons.LEFT = modes[mode];
+  controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+  controls.touches.ONE = mode === "pan" ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
+  controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+  renderer.domElement.style.cursor = mode === "zoom" ? "ns-resize" : "grab";
+  document.querySelectorAll("[data-interaction]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.interaction === mode)));
+  document.querySelector("#interaction-hint").textContent = mode === "pan" ? "Drag to move the view · scroll or pinch to zoom" : mode === "zoom" ? "Drag up or down to zoom · pinch on touchscreens" : "Drag to rotate · scroll or pinch to zoom";
+}
+document.querySelectorAll("[data-interaction]").forEach(button => button.addEventListener("click", () => setInteractionMode(button.dataset.interaction)));
+setInteractionMode("rotate");
 
 function resize() {
   if (!renderer) return;

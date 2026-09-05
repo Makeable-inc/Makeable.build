@@ -3,6 +3,7 @@ import "./globals.css";
 import "./production.css";
 import "./workspace.css";
 import "./premium-workspace.css";
+import "./approved-workspace.css";
 import PostHogProvider from "./posthog-provider";
 
 export const metadata: Metadata = {

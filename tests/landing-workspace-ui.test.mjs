@@ -136,7 +136,7 @@ test("the generated project journey is overview with parts, wiring, then locked 
   assert.match(workspace, /onSelect\("wiring"\)/);
   assert.match(workspace, /<WorkspaceIcon kind="code" \/> Code/);
   assert.doesNotMatch(workspace.match(/export function ProjectNavigation[\s\S]*?\n\}/)?.[0] || "", /parts|enclosure/i);
-  assert.match(overview, /<h2 id="project-parts-title">Parts<\/h2>/);
+  assert.match(overview, /<h2 id="project-parts-title">Your parts<\/h2>/);
   assert.match(overview, /priceLabel/);
   assert.doesNotMatch(overview, /base \* 0\.62|retailerSearchUrl/);
   assert.match(wiringData, /projectWiringReady/);
@@ -169,7 +169,11 @@ test("Wiring embeds the original AWS GLB renderer instead of drawing replacement
   const guide = await readFile(wiringGuidePath, "utf8");
   const viewer = await readFile(new URL("../apps/landing/app/saved-wiring-viewer.tsx", import.meta.url), "utf8");
   assert.match(guide, /<SavedWiringViewer key=\{build.id\} buildId=\{build.id\} stepIndex=\{boundedIndex\}/);
-  assert.doesNotMatch(guide, /PartThumbnail|connectionPaths|mk-wiring-connection-map|wiringPartsForStep/);
+  assert.doesNotMatch(guide, /connectionPaths|mk-wiring-connection-map|wiringPartsForStep/);
+  // Part thumbnails are allowed in the instruction sidebar, never as the 3D view.
+  const simulation = guide.slice(guide.indexOf('<section className="mk-wiring-simulation"'), guide.indexOf('{activeStep && <article'));
+  assert.doesNotMatch(simulation, /PartThumbnail/);
+  assert.match(simulation, /SavedWiringViewer/);
   assert.match(viewer, /\/circuit-studio\/\?mode=guide&embed=1&sourceBuildId=\$\{encodeURIComponent\(buildId\)\}/);
   assert.match(viewer, /type: "makeable:wiring-step", buildId, stepIndex/);
   assert.match(viewer, /window.location.origin/);
