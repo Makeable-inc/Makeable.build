@@ -8,6 +8,46 @@ import {
   validateSemanticFulfillment,
 } from "../lib/prompt2circuit-semantic-contract.mjs";
 
+test("plain-language touch interaction survives capability extraction and repair validation", () => {
+  for (const idea of [
+    "A lamp with a touch pad.", "A touch-activated RGB LED lamp.",
+    "A lamp. Tap to change its color.", "A touchpad controls an RGB LED.",
+    "Build a small USB-powered desk lamp with one RGB LED and a touch pad. Each tap cycles between warm white, coral, and blue. No display or sound.",
+  ]) {
+    assert.deepEqual(requestedCapabilitiesForIdea(idea), ["light_output", "touch_input"], idea);
+    const incomplete = validateSemanticFulfillment({idea, parts: [
+      {id:"controller",category:"controller",name:"ESP32-S3"},
+      {id:"rgb",category:"output",name:"RGB LED module"},
+    ]});
+    assert.equal(incomplete.ok, false, idea);
+    assert.deepEqual(incomplete.missingCapabilities, ["touch_input"]);
+    const complete = validateSemanticCohesion({idea, plan:{title:"Touch-controlled RGB lamp"},parts:[
+      {id:"controller",category:"controller",name:"ESP32-S3"},
+      {id:"rgb",category:"output",name:"RGB LED module"},
+      {id:"touch",category:"input",name:"TTP223 touch sensor"},
+    ]});
+    assert.equal(complete.ok,true,idea);
+    assert.deepEqual(complete.unrelatedParts,[]);
+  }
+});
+
+test("negation covers coordinated lists but not a new affirmative clause", () => {
+  for (const idea of [
+    "A lamp without a display, with a touch sensor.",
+    "A lamp without a display and with a touch sensor.",
+    "A lamp with a touch sensor. No display or buzzer.",
+    "A lamp. No display, buzzer, or camera; include a touch sensor.",
+    "A lamp without using a display, add a touch sensor.",
+    "A lamp. Do not include a display, but include a touch sensor.",
+  ]) assert.deepEqual(requestedCapabilitiesForIdea(idea),["light_output","touch_input"],idea);
+  for (const idea of [
+    "A lamp with no display or buzzer.", "A lamp without a display, buzzer, or touch sensor.",
+    "A lamp. Do not include a display or touch sensor.", "A lamp without using a display or touch sensor.",
+    "A lamp without a module with a display.",
+  ]) assert.deepEqual(requestedCapabilitiesForIdea(idea),["light_output"],idea);
+  assert.ok(!requestedCapabilitiesForIdea("A water tap with a flow meter").includes("touch_input"));
+});
+
 test("plural sensors cannot disappear from the reported Macintosh request",()=>{
  const idea="i want to build a macintosh with some sensors";
  assert.ok(requestedCapabilitiesForIdea(idea).includes("generic_sensing"));

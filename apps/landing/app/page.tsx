@@ -18,6 +18,7 @@ import {
   makeableReferringDomain,
 } from "./analytics";
 import { advanceBuildProgress } from "./generation-progress";
+import { readIdeaDraft, writeIdeaDraft } from "./idea-draft.mjs";
 import {
   PartThumbnail,
   ProjectImage,
@@ -683,6 +684,17 @@ export default function Home() {
   const authUserRef = useRef<AuthUser | null>(null);
   const authInFlightRef = useRef(false);
   const currentJobRef = useRef<BuildJob | null>(null);
+  useEffect(() => {
+    try {
+      const draft = readIdeaDraft(window.sessionStorage);
+      if (draft) setIdea(draft);
+    } catch { /* Some browsers disallow access to sessionStorage itself. */ }
+  }, []);
+
+  const updateIdea = useCallback((value: string) => {
+    setIdea(value);
+    try { writeIdeaDraft(window.sessionStorage, value); } catch { /* Keep editing available. */ }
+  }, []);
   const lastAutomaticResumeAtRef = useRef(0);
 
   useEffect(() => {
@@ -896,6 +908,7 @@ export default function Home() {
     setGeneratedBuilds((current) => [build, ...current.filter((item) => item.id !== build.id)]);
     setAccountBuilds((current) => [build, ...current.filter((item) => item.id !== build.id)]);
     setIdea("");
+    try { writeIdeaDraft(window.sessionStorage, ""); } catch { /* Project is already saved. */ }
     pendingIdeaRef.current = "";
     pendingClaimJobIdRef.current = "";
     void fetchAccount(false);
@@ -1359,6 +1372,7 @@ export default function Home() {
       return;
     }
     pendingIdeaRef.current = trimmed;
+    try { writeIdeaDraft(window.sessionStorage, trimmed); } catch { /* Authentication still works. */ }
     setGenerationError("");
     captureMakeableEvent("makeable build idea submitted", { placement: "composer" });
     if (!authUser) {
@@ -1532,7 +1546,7 @@ export default function Home() {
             if (retryIdea) void generateBuildForIdea(retryIdea);
           }}
           onChooseClarification={(refinedIdea) => {
-            setIdea(refinedIdea);
+            updateIdea(refinedIdea);
             pendingIdeaRef.current = refinedIdea;
             setBuildClarification(null);
             void generateBuildForIdea(refinedIdea);
@@ -1542,7 +1556,7 @@ export default function Home() {
             clearSavedBuildJobId();
             setGenerationBusy(false);
             const retryIdea = (currentJob?.idea || pendingIdeaRef.current || idea).trim();
-            if (retryIdea) setIdea(retryIdea);
+            if (retryIdea) updateIdea(retryIdea);
             setWorkspaceOpen(false);
             setGenerationError("");
             window.setTimeout(() => document.getElementById("make")?.scrollIntoView({ behavior: "smooth" }), 0);
@@ -1648,7 +1662,7 @@ export default function Home() {
             <textarea
               id="build-idea"
               value={idea}
-              onChange={(event) => setIdea(event.target.value)}
+              onChange={(event) => updateIdea(event.target.value)}
               onKeyDown={onComposerKeyDown}
               placeholder="Describe what you want to build..."
               rows={3}
@@ -1752,7 +1766,7 @@ export default function Home() {
           build={detailBuild}
           onClose={() => setDetailBuild(null)}
           onMake={() => {
-            setIdea(`Make a ${detailBuild.title}`);
+            updateIdea(`Make a ${detailBuild.title}`);
             setDetailBuild(null);
             window.setTimeout(() => document.getElementById("make")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
           }}

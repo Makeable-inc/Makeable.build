@@ -12,10 +12,14 @@ export function compactStepNumbers(count, current) {
 }
 
 export function friendlyPartName(part = {}) {
-  const value = `${part.role || ""} ${part.category || ""} ${part.label || ""} ${part.name || ""}`;
+  // Actual assembly roles take precedence over retailer compatibility text.
+  if (part.role === "carrier") return "Expansion board";
+  if (part.role === "controller") return "Controller";
+  const value = `${part.assetId || ""} ${part.category || ""} ${part.label || ""} ${part.name || ""}`;
   if (/microphone|inmp.?441|i2s.+mic|audio capture/i.test(value)) return "Microphone";
+  if (/ttp223|touch sensor|touch pad|capacitive button/i.test(value)) return "Touch sensor";
+  if (/rgb[ -]led|led[ -]module|status light/i.test(value)) return "Status light";
   if (/carrier|expansion|breakout base/i.test(value)) return "Expansion board";
-  if (/controller|devkit|esp32|microcontroller|arduino/i.test(value)) return "Controller";
   if (/rotary|encoder|knob/i.test(value)) return "Control knob";
   if (/vibration/i.test(value)) return "Vibration motor";
   if (/servo/i.test(value)) return "Servo motor";
@@ -24,6 +28,8 @@ export function friendlyPartName(part = {}) {
   if (/button/i.test(value)) return "Button";
   if (/temperature|humidity/i.test(value)) return "Climate sensor";
   if (/buzzer|speaker/i.test(value)) return "Sound module";
+  // "for Arduino, ESP32" does not turn an input/output module into a controller.
+  if (!/^(?:input|output|sensor|actuator)$/.test(part.role || "") && /controller|devkit|esp32|microcontroller|arduino/i.test(value)) return "Controller";
   return part.label || part.name || "Part";
 }
 
@@ -35,6 +41,13 @@ export function wiringCopy(step, assembly = {}) {
   let title = simplify(step.title).replace(/^Seat\s+/i, "Add ").replace(/the rotary knob/i, "the knob");
   let instruction = simplify(step.beginnerInstruction);
   const sourceCopy = `${step.title || ""} ${step.beginnerInstruction || ""}`;
+  if (step.kind === "connection" && /touch sensor|ttp223|touch pad/i.test(sourceCopy)) {
+    title = "Connect the touch sensor";
+    instruction = "Match each labeled touch sensor pin to the destination shown below.";
+  } else if (step.kind === "connection" && /rgb[ -]led|led[ -]module/i.test(sourceCopy)) {
+    title = "Connect the light";
+    instruction = "Match each labeled light pin to the destination shown below.";
+  }
   if (/microphone|inmp.?441|i2s.+mic|audio capture/i.test(sourceCopy)) {
     title = "Connect the microphone";
     instruction = "Match each labeled microphone pin to the exact destination shown on the expansion board.";

@@ -22,12 +22,35 @@ const releaseManifest = JSON.parse(
   await readFile(new URL("manifest.json", releaseRoot), "utf8"),
 );
 
+test("presentation style recovery preserves the exact AWS models, physical routes and guide", async () => {
+  const pipeline=await loadProductionBuildPipeline();
+  const selected=pipeline.createOptions({env:{}}).finalizeSelectedParts(
+    verifiedPartsCatalog().filter(p=>["b0bpg115t1-46","b0bxkmgsg6-52"].includes(p.id)),
+    {idea:"An RGB LED lamp with a touch pad"},
+  );
+  const options={parts:selected,profiles:normalizeProductionProfileContracts(releaseProfiles),manifest:releaseManifest,validateRemoteAssets:false};
+  const baseline=await createPrompt2CircuitArtifacts(options);
+  const events=[];
+  const planner=({placement})=>({contractFingerprint:placement.fingerprint,acknowledgedPartIds:placement.parts.map(p=>p.id),assemblySteps:[{title:"Connect the parts",beginnerInstruction:"Keep power disconnected."}],routingPresentation:{wireDiameterMm:1.2,minimumBendRadiusMm:3,style:"natural arch; no coil or rectangular route",loopsAllowed:false}});
+  const recovered=await createPrompt2CircuitArtifacts({...options,presentationPlanner:planner,onEvent:async(name,details)=>events.push({name,...details})});
+  assert.deepEqual(recovered.assembly.parts,baseline.assembly.parts);
+  assert.deepEqual(recovered.assembly.wires,baseline.assembly.wires);
+  assert.deepEqual(recovered.assembly.guideSteps,baseline.assembly.guideSteps);
+  assert.ok(recovered.assembly.parts.some(p=>p.assetId.includes("touch")));
+  assert.ok(events.some(e=>e.name==="wiring_presentation_recovered" && e.rejectedStyle.includes("no coil")));
+  for(const override of [
+    {contractFingerprint:"wrong"}, {acknowledgedPartIds:[]},
+    {routingPresentation:{style:"short-open-natural-arch",loopsAllowed:true}},
+    {assemblySteps:[{title:"Do not assemble",beginnerInstruction:"Blocked"}]},
+  ]) await assert.rejects(createPrompt2CircuitArtifacts({...options,presentationPlanner:args=>({...planner(args),...override})}),/sol_/);
+});
+
 test("the website pipeline stays pinned to the focused speech-capture release", async () => {
   const pipeline = await loadProductionBuildPipeline();
   assert.equal(pipeline.catalogRevision, "prompt2circuit-production-ready79-speech-capture-20260904-v1");
   assert.equal(pipeline.promptPackageRevision, "2026-09-04.2");
   assert.equal(pipeline.compilerPatchRevision, "bme280-straps-xiao-s3-contact-frame-v2");
-  assert.equal(pipeline.semanticPatchRevision, "speech-capture-and-cloud-api-v5");
+  assert.equal(pipeline.semanticPatchRevision, "touch-intent-negation-and-presentation-v6");
   const selected = pipeline.createOptions({ env: {} }).finalizeSelectedParts([], {
     idea: "a desktop temperature display",
   });
