@@ -20,6 +20,16 @@ test('compact stepper always includes current and endpoints without a scrolling 
  assert.deepEqual(compactStepNumbers(9,4),[0,'gap',3,4,5,'gap',8]);
  for(let n=1;n<40;n++)for(let i=0;i<n;i++){const list=compactStepNumbers(n,i),numbers=list.filter(x=>typeof x==='number');assert.ok(numbers.includes(i));assert.ok(numbers.includes(0));assert.ok(numbers.includes(n-1));assert.ok(numbers.length<=5);assert.equal(new Set(numbers).size,numbers.length);}
 });
+test('numeric steps reset legacy label columns and compact controls retain usable targets',async()=>{
+ const css=await readFile(new URL('../apps/landing/app/approved-workspace.css',import.meta.url),'utf8');
+ const studio=await readFile(new URL('../apps/circuit-lab/refined.css',import.meta.url),'utf8');
+ assert.match(css,/\.mk-app-shell \.mk-wiring-progress button \{[^}]*grid-template-columns: 1fr; gap: 0; place-items: center; text-align: center;/);
+ assert.match(css,/\.mk-app-shell \.mk-wiring-progress button strong \{[^}]*line-height: 1; font-variant-numeric: tabular-nums;/);
+ assert.match(studio,/width: 58\.6px; min-height: 45\.6px;/);
+ assert.match(studio,/width: 50\.2px; min-height: 44\.9px;/);
+ assert.match(studio,/\.interaction-tools button:focus-visible \{ outline-offset: -3px; \}/);
+ assert.match(studio,/\[aria-pressed="true"\] span \{ text-decoration: underline;/);
+});
 test('friendly copy is display-only and keeps exact pins and original source',()=>{
  const part={id:'controller-a',role:'controller',label:'AITRIP ESP32-S3 DevKitC-1 N8R2'};
  const step={kind:'mount',title:`Seat ${part.label}`,beginnerInstruction:'Match the polarity and USB orientation.',safetyNote:'Never force a reversed board.',activeWires:[]};

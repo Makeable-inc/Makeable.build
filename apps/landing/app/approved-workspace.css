@@ -42,9 +42,10 @@
 .mk-overview-actions button:hover, .mk-app-shell .mk-wiring-step-controls button:last-child:hover { background: #fa5e51; }
 .mk-overview-actions button:disabled, .mk-app-shell .mk-wiring-step-controls button:disabled { opacity: .45; cursor: default; }
 .mk-app-shell .mk-wiring-progress { display: flex; align-items: center; justify-content: center; gap: 10px; overflow: visible; padding: 0; }
-.mk-app-shell .mk-wiring-progress button { flex: 0 0 44px; min-width: 44px; width: 44px; height: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; border: 1px solid #d9d5ce; border-radius: 8px; }
-.mk-app-shell .mk-wiring-progress button strong { display: block; width: auto; height: auto; background: transparent; border: 0; color: #101316; font-size: 16px; }
+.mk-app-shell .mk-wiring-progress button { flex: 0 0 44px; min-width: 44px; width: 44px; height: 44px; min-height: 44px; padding: 0; display: grid; grid-template-columns: 1fr; gap: 0; place-items: center; text-align: center; border: 1px solid #d9d5ce; border-radius: 8px; }
+.mk-app-shell .mk-wiring-progress button strong { display: block; width: auto; height: auto; background: transparent; border: 0; color: #101316; font-size: 16px; line-height: 1; font-variant-numeric: tabular-nums; }
 .mk-app-shell .mk-wiring-progress button[aria-current="step"] { background: #ff6f62; border-color: #ff6f62; }
+.mk-app-shell .mk-wiring-progress button:focus-visible { outline: 2px solid var(--studio-ink); outline-offset: 3px; }
 .mk-step-gap { width: 20px; text-align: center; color: #59544f; }
 .mk-app-shell .mk-wiring-simulation-heading { display: none; }
 .mk-app-shell .mk-wiring-simulation { grid-template-rows: minmax(0,1fr); }

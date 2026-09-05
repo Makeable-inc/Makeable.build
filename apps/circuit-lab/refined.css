@@ -84,11 +84,13 @@ body.guide-mode { height: 100dvh; min-height: 0; overflow: hidden; }
 
 /* Approved interaction toolbar: real OrbitControls modes, not camera presets. */
 .interaction-tools { position: absolute; z-index: 8; bottom: 14px; left: 16px; display: flex; border: 1px solid #d9d5ce; border-radius: 8px; overflow: hidden; background: #fffdf9; }
-.interaction-tools button { display: grid; place-items: center; gap: 5px; width: 84px; min-height: 66px; padding: 10px; border: 0; border-right: 1px solid #e1ddd5; background: transparent; color: #101316; font-size: 14px; cursor: pointer; }
-.interaction-tools button:last-child { border-right: 0; }
+.interaction-tools button { display: grid; place-items: center; align-content: center; gap: 2px; width: 58.6px; min-height: 45.6px; padding: 5px; border: 0; border-inline-end: 1px solid #e1ddd5; background: transparent; color: #101316; font-size: 12px; line-height: 1.333333; cursor: pointer; touch-action: manipulation; }
+.interaction-tools button:last-child { border-inline-end: 0; }
 .interaction-tools button[aria-pressed="true"] { background: #ffe6df; }
-.interaction-tools button:hover { background: #fff0e9; }
-.interaction-tools svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.interaction-tools button[aria-pressed="true"] span { text-decoration: underline; text-underline-offset: 2px; }
+.interaction-tools button:focus-visible { outline-offset: -3px; }
+@media (hover: hover) { .interaction-tools button:hover:not([aria-pressed="true"]) { background: #fff0e9; } }
+.interaction-tools svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .original-step { margin-top: 16px; font-size: 14px; }
 .original-step summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; text-decoration: underline; text-underline-offset: 4px; }
 .original-step p { font-size: 14px; }
@@ -100,7 +102,7 @@ body.guide-mode { height: 100dvh; min-height: 0; overflow: hidden; }
 .guide-mode:not(.embedded-guide-mode) .result-stage { grid-template-rows: 44px minmax(0,1fr) 54px; }
 @media(max-width:650px) {
   .interaction-tools { left: 10px; bottom: 10px; }
-  .interaction-tools button { width: 72px; min-height: 60px; }
+  .interaction-tools button { width: 50.2px; min-height: 44.9px; }
   .guide-mode:not(.embedded-guide-mode):not([data-guide-pane="details"]) .result-stage { grid-template-rows: 44px auto minmax(0,1fr) 54px; }
 }
 @media (max-width: 650px) {
