@@ -1579,7 +1579,7 @@ export default function Home() {
           <a href="https://www.youtube.com/@makeablebuild" target="_blank" rel="noreferrer" aria-label="YouTube">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c0 3.2-.4 5.2-1.1 6-.7.7-2.5 1-7.9 1s-7.2-.3-7.9-1C3.4 17.2 3 15.2 3 12s.4-5.2 1.1-6C4.8 5.3 6.6 5 12 5s7.2.3 7.9 1c.7.8 1.1 2.8 1.1 6Z" /><path className="mk-footer-social-play" d="m10 8.8 5 3.2-5 3.2V8.8Z" /></svg>
           </a>
-          <a href="https://www.facebook.com/1321564764369821" target="_blank" rel="noreferrer" aria-label="Facebook">
+          <a href="https://www.facebook.com/profile.php?id=61593473267038" target="_blank" rel="noreferrer" aria-label="Facebook">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 21v-7.7h2.6l.4-3h-3V8.4c0-.9.3-1.5 1.6-1.5h1.7V4.2c-.3 0-1.3-.2-2.4-.2-2.4 0-4.1 1.5-4.1 4.2v2.1H8v3h2.5V21h3.2Z" /></svg>
           </a>
         </nav>

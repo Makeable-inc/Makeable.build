@@ -60,7 +60,7 @@ test("Facebook links target the live Page used by owner analytics", async () => 
   ]);
 
   for (const source of [socialScript, landingPage]) {
-    assert.match(source, /https:\/\/www\.facebook\.com\/1321564764369821/);
+    assert.match(source, /https:\/\/www\.facebook\.com\/profile\.php\?id=61593473267038/);
     assert.doesNotMatch(source, /61593471075023/);
   }
 });

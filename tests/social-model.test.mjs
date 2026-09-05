@@ -304,7 +304,7 @@ test("buildSocialView attaches canonical profile links to every configured accou
     ["instagram", "@makeable.build", "makeable_build", "https://www.instagram.com/makeable.build/"],
     ["instagram", "@makeable.zak", "makeable_zak", "https://www.instagram.com/makeable.zak/"],
     ["tiktok", "@trymakeable.build", "trymakeable_build", "https://www.tiktok.com/@trymakeable.build"],
-    ["facebook", "Makeable Facebook", "makeable_facebook", "https://www.facebook.com/1321564764369821"],
+    ["facebook", "Makeable Facebook", "makeable_facebook", "https://www.facebook.com/profile.php?id=61593473267038"],
     ["youtube", "@makeablebuild", "makeable_youtube", "https://www.youtube.com/@makeablebuild"],
   ];
   const view = buildSocialView([record({
