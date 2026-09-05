@@ -9,7 +9,7 @@ import {
   loadProductionBuildPipeline,
   normalizeProductionProfileContracts,
 } from "../lib/production-build-pipeline.mjs";
-import { createPrompt2CircuitArtifacts } from "../lib/prompt2circuit-production.mjs";
+import { createPrompt2CircuitArtifacts, requestSolAssemblyPresentation } from "../lib/prompt2circuit-production.mjs";
 
 const releaseRoot = new URL(
   "../artifacts/aws-assembly-release/prompt2circuit-production-ready79-speech-capture-20260904-v1/",
@@ -39,10 +39,59 @@ test("presentation style recovery preserves the exact AWS models, physical route
   assert.ok(recovered.assembly.parts.some(p=>p.assetId.includes("touch")));
   assert.ok(events.some(e=>e.name==="wiring_presentation_recovered" && e.rejectedStyle.includes("no coil")));
   for(const override of [
-    {contractFingerprint:"wrong"}, {acknowledgedPartIds:[]},
+    {contractFingerprint:"wrong"},
     {routingPresentation:{style:"short-open-natural-arch",loopsAllowed:true}},
     {assemblySteps:[{title:"Do not assemble",beginnerInstruction:"Blocked"}]},
   ]) await assert.rejects(createPrompt2CircuitArtifacts({...options,presentationPlanner:args=>({...planner(args),...override})}),/sol_/);
+});
+
+test("a mismatched prose part list cannot stop a valid compiled circuit or alter AWS wiring", async () => {
+  const pipeline = await loadProductionBuildPipeline();
+  const selected = pipeline.createOptions({env:{}}).finalizeSelectedParts([], {
+    idea: "A desk buddy with an I2S microphone sending audio to a cloud API",
+  });
+  const options = {parts:selected, profiles:normalizeProductionProfileContracts(releaseProfiles), manifest:releaseManifest, validateRemoteAssets:false};
+  const baseline = await createPrompt2CircuitArtifacts(options);
+  const planner = ({placement}) => ({
+    contractFingerprint:placement.fingerprint,
+    acknowledgedPartIds:["wrong-catalog-id"],
+    assemblySteps:[{title:"Untrusted generated prose",beginnerInstruction:"Place the boards."}],
+    routingPresentation:{style:"short-open-natural-arch",loopsAllowed:false},
+  });
+  for (const ids of [["wrong-catalog-id"], [], null, ["duplicate", "duplicate"]]) {
+    const events = [];
+    const recovered = await createPrompt2CircuitArtifacts({...options,
+      presentationPlanner:args=>({...planner(args),acknowledgedPartIds:ids}),
+      onEvent:async(name,details)=>events.push({name,...details}),
+    });
+    assert.deepEqual(recovered, baseline, "recovery must equal the independently generated deterministic artifact");
+    const recovery = events.find(e=>e.recovery === "discard-mismatched-presentation");
+    assert.equal(recovery.reason, "sol_part_set_not_acknowledged");
+    assert.equal(recovery.expectedPartIds.length, baseline.assembly.parts.length);
+  }
+  for (const override of [
+    {contractFingerprint:"another-project"},
+    {assemblySteps:[]},
+    {assemblySteps:[{title:"Do not assemble",beginnerInstruction:"Blocked"}]},
+    {routingPresentation:{style:"short-open-natural-arch",loopsAllowed:true}},
+  ]) await assert.rejects(createPrompt2CircuitArtifacts({...options,presentationPlanner:args=>({...planner(args),...override})}),/sol_/);
+  await assert.rejects(createPrompt2CircuitArtifacts({...options,validateRemoteAssets:true,
+    presentationPlanner:planner,fetchFn:async()=>new Response("wrong GLB bytes"),
+  }),/aws_glb_sha_mismatch/);
+});
+
+test("presentation response schema binds model acknowledgement to exact instance IDs", async () => {
+  const placement = {fingerprint:"exact-fingerprint",parts:[{id:"controller-1"},{id:"mic-1"}],routes:[]};
+  await requestSolAssemblyPresentation({env:{OPENAI_API_KEY:"test-only"},placement,graph:{connections:[]},resolved:{selectedCatalogPartIds:["catalog-id"]},
+    fetchFn:async(_url,options)=>{
+      const schema=JSON.parse(options.body).text.format.schema.properties;
+      assert.deepEqual(schema.contractFingerprint.enum,[placement.fingerprint]);
+      assert.deepEqual(schema.acknowledgedPartIds.items.enum,["controller-1","mic-1"]);
+      assert.equal(schema.acknowledgedPartIds.minItems,2);
+      assert.equal(schema.acknowledgedPartIds.maxItems,2);
+      return Response.json({output_text:JSON.stringify({assemblySteps:[]})});
+    },
+  });
 });
 
 test("the website pipeline stays pinned to the focused speech-capture release", async () => {
