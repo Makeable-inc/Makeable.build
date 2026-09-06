@@ -36,7 +36,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body><PostHogProvider>{children}</PostHogProvider></body>
+      <head>
+        <script src="https://www.useinflect.ai/inflect-tracking.js" data-tracking-key="inf_sEr4CIL4-1W0k12YGoFSeYK4AkIKuh-R" data-inflect-install-version="2026-08-12.1"></script>
+      </head>
+      <body>
+        <img src="https://www.useinflect.ai/api/bot-traffic/pixel?tk=inf_sEr4CIL4-1W0k12YGoFSeYK4AkIKuh-R&iv=2026-08-12.1" alt="" width="1" height="1" style={{ display: "none" }} referrerPolicy="unsafe-url" />
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   );
 }

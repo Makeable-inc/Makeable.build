@@ -108,7 +108,7 @@ for = "/r/youtube/makeable"
   for = "/dashboard*"
   [headers.values]
     Cache-Control = "no-store"
-    Content-Security-Policy = "default-src 'self'; connect-src 'self'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+    Content-Security-Policy = "default-src 'self'; connect-src 'self'; img-src 'self' data: https:; media-src 'self' data: blob: https:; style-src 'self'; script-src 'self' https://www.useinflect.ai; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
     Referrer-Policy = "no-referrer"
     X-Frame-Options = "DENY"
     X-Robots-Tag = "noindex, nofollow, noarchive"
@@ -122,7 +122,7 @@ for = "/r/youtube/makeable"
 [[headers]]
   for = "/ember/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data: https://www.useinflect.ai; style-src 'self'; script-src 'self' https://www.useinflect.ai; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     X-Frame-Options = "DENY"
 
@@ -139,7 +139,7 @@ for = "/r/youtube/makeable"
 [[headers]]
   for = "/hologram/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data: blob: https://www.useinflect.ai; media-src 'self' blob:; style-src 'self'; script-src 'self' https://www.useinflect.ai; worker-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
     Permissions-Policy = "bluetooth=(self), camera=(), microphone=(), geolocation=(), payment=()"
     X-Frame-Options = "DENY"
 

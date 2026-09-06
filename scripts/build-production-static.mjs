@@ -1,10 +1,31 @@
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const nextExport = path.join(root, "apps", "landing", "out");
 const output = path.join(root, "release-dist");
+const trackingScript = '<script src="https://www.useinflect.ai/inflect-tracking.js" data-tracking-key="inf_sEr4CIL4-1W0k12YGoFSeYK4AkIKuh-R" data-inflect-install-version="2026-08-12.1"></script>';
+const trackingPixel = '<img src="https://www.useinflect.ai/api/bot-traffic/pixel?tk=inf_sEr4CIL4-1W0k12YGoFSeYK4AkIKuh-R&iv=2026-08-12.1" alt="" width="1" height="1" style="display:none;" referrerpolicy="unsafe-url" />';
+
+async function injectTrackingIntoStaticHtml(directory) {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".html")) continue;
+
+    const filePath = path.join(entry.parentPath, entry.name);
+    const html = await readFile(filePath, "utf8");
+    if (html.includes("www.useinflect.ai")) continue;
+
+    const withScript = html.replace("</head>", `${trackingScript}</head>`);
+    const trackedHtml = withScript.replace(/<body([^>]*)>/, `<body$1>${trackingPixel}`);
+    if (trackedHtml === html) {
+      throw new Error(`Could not add Tracky markup to ${filePath}`);
+    }
+
+    await writeFile(filePath, trackedHtml);
+  }
+}
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
@@ -42,3 +63,5 @@ for (const file of ["controls/OrbitControls.js", "loaders/GLTFLoader.js", "utils
   await mkdir(path.dirname(target), { recursive: true });
   await cp(path.join(three, "examples", "jsm", file), target);
 }
+
+await injectTrackingIntoStaticHtml(output);
