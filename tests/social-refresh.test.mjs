@@ -12,6 +12,7 @@ test("official YouTube refresh uses public video counters without calling paid c
   const fetchImpl = async (url) => {
     requests.push(url);
     if (url.includes("/search?")) {
+      assert.equal(new URL(url).searchParams.get("maxResults"), "50");
       return new Response(JSON.stringify({ items: [{ id: { videoId: "latest-short" } }] }));
     }
     if (url.includes("/videos?")) {
@@ -229,6 +230,7 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
       return Response.json({ followers_count: 235, media_count: 8 });
     }
     if (parsed.pathname.endsWith("/ig-build/media")) {
+      assert.equal(parsed.searchParams.get("limit"), "50");
       assert.doesNotMatch(parsed.searchParams.get("fields"), /insights\.metric/);
       return Response.json({ data: [{
         id: "ig-post",
@@ -265,6 +267,7 @@ test("Meta refresh uses current per-content insights without dropping Facebook o
       ] });
     }
     if (parsed.pathname.endsWith("/page-1/posts")) {
+      assert.equal(parsed.searchParams.get("limit"), "50");
       assert.doesNotMatch(parsed.searchParams.get("fields"), /insights\.metric/);
       return Response.json({ data: [{
         id: "fb-post",

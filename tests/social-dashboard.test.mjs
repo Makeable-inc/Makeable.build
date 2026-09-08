@@ -253,7 +253,7 @@ test("mergeSocialRecords preserves bounded range-specific account analytics", ()
   assert.deepEqual(merged.accountAnalytics, incoming[0].accountAnalytics);
 });
 
-test("reconcileRefreshedSocialRecords replaces successful sources and preserves failed ones", () => {
+test("reconcileRefreshedSocialRecords updates bounded source results without deleting older history", () => {
   const existing = [
     socialRecord({ contentId: "stale-instagram", id: "instagram:@makeable.build:stale-instagram" }),
     socialRecord({ platform: "facebook", account: "Makeable Facebook", attributionKey: "makeable_facebook", contentId: "kept-facebook", id: "facebook:Makeable Facebook:kept-facebook" }),
@@ -264,7 +264,7 @@ test("reconcileRefreshedSocialRecords replaces successful sources and preserves 
 
   const reconciled = reconcileRefreshedSocialRecords(existing, incoming, ["instagram"]);
 
-  assert.equal(reconciled.some(({ contentId }) => contentId === "stale-instagram"), false);
+  assert.equal(reconciled.some(({ contentId }) => contentId === "stale-instagram"), true);
   assert.equal(reconciled.some(({ contentId }) => contentId === "current-instagram"), true);
   assert.equal(reconciled.some(({ contentId }) => contentId === "kept-facebook"), true);
 });
