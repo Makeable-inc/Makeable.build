@@ -16,6 +16,7 @@ Makeable turns a typed idea into an ESP32 build: a parts list and a 3D step-by-s
 - `lib/`: shared logic, including the build pipeline (`production-build-pipeline.mjs`, `prompt2circuit-*.mjs`).
 - `apps/circuit-lab/`: the 3D wiring viewer, served at `/circuit-studio`.
 - `pilot/`, `server.mjs`, `infra/`: the older photo-to-firmware flow on AWS. Treat it as legacy.
+- `docs/`: runbooks and specs, indexed in `docs/README.md`. `docs/archive/` is history and may not match the code.
 
 ## Build pipeline
 
