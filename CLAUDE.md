@@ -25,13 +25,16 @@ The AI chooses and deterministic rules verify. AI calls pick parts and write wor
 
 ## Running locally
 
-1. `npm ci`, then `npm run build` (builds the site into `release-dist/`).
-2. `npx -y netlify-cli@24.9.0 dev --offline --dir release-dist --functions netlify/functions --port 3001`, then open http://localhost:3001.
+1. `npm ci`, then `npm run dev:local`. It builds the site into `release-dist/` and serves it on http://localhost:3001, with `/api/*` and background builds running through the same Lambda adapter as AWS. Storage is in memory and resets on restart. `--skip-build` reuses the last build, `--port` picks another port.
+2. Sign in at http://localhost:3001/__local-login?next=/ (a test user; this route exists only in `scripts/dev-local.mjs`).
+3. `npm run dev:build -- "<idea>"` runs one real build against the running app and prints each stage, the parts and the artifact states.
+
+How to verify a change end to end is in `.claude/skills/verify-setup/` and the `verify-*` skills next to it.
 
 Gotchas:
 - `NEXT_PUBLIC_MAKEABLE_API_ORIGIN` in `apps/landing/.env.local` is baked into the build. Leave it unset for the steps above.
-- Google sign-in only works on origins registered on the OAuth client.
-- `node server.mjs` runs a demo build workshop with a fixed timer and template parts. Use the Netlify setup to test the real pipeline.
+- Google sign-in only works on origins registered on the OAuth client. Use the local login instead.
+- `node server.mjs` runs a demo build workshop with a fixed timer and template parts. Use `dev:local` to test the real pipeline.
 
 ## Working rules
 
