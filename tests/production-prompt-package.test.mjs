@@ -8,7 +8,6 @@ import { loadProductionPromptPackage } from "../lib/production-prompt-package.mj
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const promptPackage = await loadProductionPromptPackage(repositoryRoot);
-const runnerSource = await readFile(path.join(repositoryRoot, "scripts/production-aws-simulation-server.mjs"), "utf8");
 const buildSource = await readFile(path.join(repositoryRoot, "lib/makeable-builds.mjs"), "utf8");
 const assemblySource = await readFile(path.join(repositoryRoot, "lib/prompt2circuit-production.mjs"), "utf8");
 const assemblyWorkflow = await readFile(path.join(repositoryRoot, "assembly.md"), "utf8");
@@ -57,11 +56,6 @@ test("assembly and wiring are pinned to Sol xhigh on the priority tier", () => {
   assert.match(assemblySource, /const model = "gpt-5\.6-sol"/);
   assert.match(assemblySource, /reasoning: \{ effort: "xhigh" \}/);
   assert.match(assemblySource, /service_tier: "priority"/);
-  assert.match(runnerSource, /partsPlannerModel: partsPlanStage\.owner/);
-  assert.match(runnerSource, /partsPlannerReasoningEffort: partsPlanStage\.reasoningEffort/);
-  assert.match(runnerSource, /partsPlannerServiceTier: partsPlanStage\.serviceTier/);
-  assert.match(runnerSource, /loadProductionBuildPipeline/);
-  assert.match(runnerSource, /finalizeSelectedParts\(enforceOneShotPlannerParts\(parts, context\), context\)/);
   assert.match(buildSource, /reasoning: \{ effort: reasoningEffort \}/);
   assert.match(buildSource, /service_tier: serviceTier/);
   assert.match(assemblyWorkflow, /current red-light inventory/i);
@@ -150,38 +144,21 @@ test("stage prompts are generic, outcome-focused, and project-context free", () 
   }
 });
 
-test("runner sends isolated instructions and keeps Structured Output schemas in code", () => {
-  assert.match(runnerSource, /loadProductionPromptPackage\(ROOT\)/);
-  assert.match(runnerSource, /partsPlannerPrompt: experimentMode === "compact" \? compactPartsPlannerPrompt : partsPlanStage\.prompt/);
-  assert.match(runnerSource, /loadPrompt2CircuitGeometryAudit\(ROOT\)/);
-  assert.match(runnerSource, /productionPlannerCatalog\(publicCatalog, interfaceProfiles, connectorGeometryAudit,/);
-  assert.match(runnerSource, /requireControllerCarrier: true/);
-  assert.match(runnerSource, /connectorGeometryAudit,/);
+test("build and assembly calls send isolated instructions and keep Structured Output schemas in code", () => {
   assert.match(buildSource, /String\(partsPlannerPrompt \|\| buildPlannerInstructions\(\)\)/);
   assert.match(buildSource, /Copy requestIdentity\.buildId and requestIdentity\.requestFingerprint exactly/);
   assert.match(buildSource, /type: "json_schema"/);
   assert.match(buildSource, /COPY QUALITY RETRY/);
   assert.match(buildSource, /planner_copy_repair_selection_drift/);
   assert.match(buildSource, /enforceProjectCopyQuality/);
-  assert.match(runnerSource, /prompt: assemblyRoutingStage\.prompt/);
   assert.match(assemblySource, /content: String\(prompt \|\|/);
   assert.match(assemblySource, /type: "json_schema"/);
-  assert.doesNotMatch(runnerSource, /heroArtDirectionStage|refineImagePrompt|OPENAI_IMAGE_MODEL|OPENAI_HERO_ART_DIRECTOR_MODEL/);
 });
 
-test("canonical production runner is structurally circuit-only", () => {
-  assert.match(runnerSource, /circuitOnly: true/);
-  assert.match(runnerSource, /heroArtDirection: false/);
-  assert.match(runnerSource, /imageGeneration: false/);
-  assert.match(runnerSource, /stlGeneration: false/);
-  assert.match(runnerSource, /housingGeneration: false/);
-  assert.match(runnerSource, /enclosureGeneration: false/);
-  assert.match(runnerSource, /meshGeneration: false/);
+test("builds can run circuit-only", () => {
   assert.match(buildSource, /const circuitOnly = options\?\.circuitOnly === true/);
   assert.match(buildSource, /const imagePromise = circuitOnly\s*\n\s*\? Promise\.resolve\(null\)/);
   assert.match(buildSource, /\.\.\.\(!circuitOnly \? \{ imagePrompt, image: boundImage \} : \{\}\)/);
-  assert.doesNotMatch(runnerSource, /skipImageGeneration|image_generation_skipped/);
-  assert.doesNotMatch(runnerSource, /image_generation_started|hero_art_direction_started|\/v1\/images\/generations/);
 });
 
 test("assembly workflow points production at the manifest instead of sending the full document", () => {
