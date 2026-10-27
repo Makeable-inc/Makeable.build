@@ -5,9 +5,12 @@ Description: Lets GitHub Actions deploy the makeable-prod stack and the Amplify 
 #   --stack-name makeable-github-deploy --capabilities CAPABILITY_NAMED_IAM --profile makeable
 
 Parameters:
-  Repository:
+  # GitHub's immutable subject for this repo (org and repo ids, so a rename or a
+  # look-alike repo cannot match). From:
+  #   gh api repos/Makeable-inc/Makeable.build/actions/oidc/customization/sub
+  SubjectPrefix:
     Type: String
-    Default: Makeable-inc/Makeable.build
+    Default: repo:Makeable-inc@312807118/Makeable.build@1303168834
   Environment:
     Type: String
     Default: aws-production
@@ -41,7 +44,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub repo:${Repository}:environment:${Environment}
+                token.actions.githubusercontent.com:sub: !Sub ${SubjectPrefix}:environment:${Environment}
       Policies:
         - PolicyName: deploy
           PolicyDocument:
