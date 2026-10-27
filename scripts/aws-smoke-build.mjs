@@ -5,6 +5,7 @@
 // (e.g. `aws sso login`), so it does nothing for anyone without them.
 //
 //   AWS_PROFILE=makeable node scripts/aws-smoke-build.mjs [--stack makeable-prod] [--idea "..."]
+//        [--base https://main.<id>.amplifyapp.com]   (go through the site instead of the API URL)
 //
 // Exit code: 0 ready, 1 anything else. Each build calls OpenAI (~60 s, a few cents).
 import { randomBytes } from "node:crypto";
@@ -45,8 +46,9 @@ async function main() {
   const stack = (await new CloudFormationClient({ region }).send(new DescribeStacksCommand({ StackName: stackName }))).Stacks[0];
   const output = (key) => stack.Outputs.find((o) => o.OutputKey === key)?.OutputValue;
   const param = (key) => stack.Parameters.find((p) => p.ParameterKey === key)?.ParameterValue;
-  const api = output("ApiUrl").replace(/\/$/, "");
-  const publicOrigin = param("PublicOrigin");
+  const base = arg("--base", "");
+  const api = (base || output("ApiUrl")).replace(/\/$/, "");
+  const publicOrigin = base ? new URL(base).origin : param("PublicOrigin");
   const context = { deploy: { context: param("DeployContext") } };
 
   process.env.AWS_REGION = region;

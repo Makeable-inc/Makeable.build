@@ -26,5 +26,6 @@ export function deployOptions(env = process.env) {
   // No default: 0 behind Amplify would put every visitor in one rate-limit bucket.
   const hops = String(env.MAKEABLE_TRUSTED_PROXY_HOPS ?? "");
   if (!/^\d+$/.test(hops)) throw new Error("MAKEABLE_TRUSTED_PROXY_HOPS must be a whole number");
-  return { deployContext, publicOrigin, trustedProxyHops: Number(hops) };
+  const logClientIp = env.MAKEABLE_LOG_CLIENT_IP === "1";
+  return { deployContext, publicOrigin, trustedProxyHops: Number(hops), logClientIp };
 }
