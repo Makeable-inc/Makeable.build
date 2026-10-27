@@ -1,0 +1,85 @@
+name: Deploy to AWS
+
+# Every push to staging deploys the AWS stack and the Amplify site. Merging the
+# PR is the approval. If the deploy itself fails, the last commit that deployed
+# and passed the smoke build (tag aws-last-good) is redeployed, site first.
+# "Run workflow" deploys any ref by hand, e.g. aws-last-good.
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to deploy (aws-last-good rolls back)
+        required: true
+        default: staging
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer push waits, it never cancels a running deploy.
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: aws-production
+    timeout-minutes: 60
+    permissions:
+      id-token: write
+      contents: write
+    env:
+      AWS_CFN_EXECUTION_ROLE_ARN: ${{ vars.AWS_CFN_EXECUTION_ROLE_ARN }}
+      AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
+      AMPLIFY_SITE_URL: ${{ vars.AMPLIFY_SITE_URL }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Some tests read the built site, so build first (as pr-check.yml does).
+      - name: Build site and validate files
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Log in to AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy and smoke build
+        id: deploy
+        run: bash scripts/ci-deploy.sh
+
+      # Only a failed deploy rolls back: not a failed test (nothing deployed)
+      # and not a failed tag push (the deploy worked).
+      - name: Roll back to last good deploy
+        if: failure() && steps.deploy.outcome == 'failure' && inputs.ref != 'aws-last-good'
+        run: bash scripts/ci-rollback.sh
+
+      - name: Mark as last good deploy
+        if: success()
+        run: |
+          git tag -f aws-last-good HEAD
+          git push -f origin aws-last-good

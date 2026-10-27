@@ -8,8 +8,8 @@ cached = true
 parallel = true
 
 [default.deploy.parameters]
+# No profile here so CI (role login) and laptops (AWS_PROFILE=makeable) share it.
 region = "us-east-1"
-profile = "makeable"
 capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
@@ -18,3 +18,4 @@ fail_on_empty_changeset = false
 # real client IP and drop any value the visitor sent (checked 27 Oct).
 # PublicOrigin is the Amplify test URL until cutover, then https://makeable.build.
 parameter_overrides = "TrustedProxyHops=1 PublicOrigin=https://main.d1pesirg786fm3.amplifyapp.com LogClientIp=0"
+

@@ -4,7 +4,9 @@
 // netlify.toml (with /api/* proxied to the stack's API Lambda), uploads the
 // files plus customHttp.yml (headers), and waits until the deployment is live.
 //
-//   npm run build && AWS_PROFILE=makeable node scripts/deploy-site.mjs [--stack makeable-prod] [--branch main]
+//   npm run build && AWS_PROFILE=makeable node scripts/deploy-site.mjs [--app-id d1pesirg786fm3] [--stack makeable-prod] [--branch main]
+//
+// --app-id picks the app directly (CI); without it the app is found or created by name.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -27,11 +29,17 @@ export function siteZip(siteDir, customHttpYaml) {
   return zipSync(files, { level: 6 });
 }
 
+// Amplify runs one deployment per branch at a time.
+export function runningJobId(jobSummaries) {
+  return jobSummaries.find((job) => job.status === "PENDING" || job.status === "RUNNING")?.jobId || "";
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const arg = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
   const stackName = arg("--stack", "makeable-prod");
   const appName = arg("--app", `${stackName}-site`);
+  const appId = arg("--app-id", "");
   const branchName = arg("--branch", "main");
   const siteDir = path.join(ROOT, "release-dist");
   const region = process.env.AWS_REGION || "us-east-1";
@@ -46,8 +54,8 @@ async function main() {
   const rules = amplifyRules({ netlify, apiOrigin });
 
   const amplify = new amplifySdk.AmplifyClient({ region });
-  let app;
-  for (let nextToken; !app; ) {
+  let app = appId ? (await amplify.send(new amplifySdk.GetAppCommand({ appId }))).app : undefined;
+  for (let nextToken; !app && !appId; ) {
     const page = await amplify.send(new amplifySdk.ListAppsCommand({ nextToken }));
     app = page.apps.find((candidate) => candidate.name === appName);
     nextToken = page.nextToken;
@@ -61,9 +69,6 @@ async function main() {
     }))).app;
     console.log(`created Amplify app ${app.appId}`);
   }
-  await amplify.send(new amplifySdk.UpdateAppCommand({ appId: app.appId, customRules: rules }));
-  console.log(`rules: ${rules.length} (api → ${apiOrigin})`);
-
   try {
     await amplify.send(new amplifySdk.GetBranchCommand({ appId: app.appId, branchName }));
   } catch (error) {
@@ -71,6 +76,18 @@ async function main() {
     await amplify.send(new amplifySdk.CreateBranchCommand({ appId: app.appId, branchName, stage: "PRODUCTION" }));
     console.log(`created branch ${branchName}`);
   }
+
+  for (;;) {
+    const jobs = (await amplify.send(new amplifySdk.ListJobsCommand({ appId: app.appId, branchName, maxResults: 5 }))).jobSummaries;
+    const running = runningJobId(jobs);
+    if (!running) break;
+    console.log(`waiting for deployment ${running} to finish`);
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+  }
+
+  // Rules change only once no other deployment is mid-flight.
+  await amplify.send(new amplifySdk.UpdateAppCommand({ appId: app.appId, customRules: rules }));
+  console.log(`rules: ${rules.length} (api → ${apiOrigin})`);
 
   const zip = siteZip(siteDir, amplifyCustomHttp(netlify));
   console.log(`zip: ${(zip.length / 1048576).toFixed(1)} MB`);
