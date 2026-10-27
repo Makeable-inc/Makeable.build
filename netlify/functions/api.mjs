@@ -1,5 +1,6 @@
 import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
-import { getStore } from "@netlify/blobs";
+import { backgroundDispatchFetch } from "../../lib/aws/background-invoke.mjs";
+import { openStore } from "../../lib/storage/index.mjs";
 import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createGoogleWaitlistResult } from "../../lib/acquisition.mjs";
@@ -306,7 +307,7 @@ const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
 const DEFAULT_OPENAI_REASONING_EFFORT = "xhigh";
 const DEFAULT_OPENAI_SERVICE_TIER = "priority";
 
-function getEnv() {
+export function getEnv() {
   const keys = [
     "OPENAI_API_KEY",
     "MAKEABLE_ATOMIC_BUILD_GENERATION_ENABLED",
@@ -361,6 +362,8 @@ function getEnv() {
     "MAKEABLE_DRAFT_COOKIE_SECRET",
     "MAKEABLE_ANALYTICS_ID_SECRET",
     "MAKEABLE_BACKGROUND_SECRET",
+    "MAKEABLE_BUILD_DISPATCH",
+    "MAKEABLE_PIPELINE_FUNCTION",
     "MAKEABLE_BUILD_GENERATION_ENABLED",
     "MAKEABLE_ANONYMOUS_GENERATION_ENABLED",
     "NODE_ENV",
@@ -805,7 +808,7 @@ async function saveBuildInterest(req, context) {
   };
   const key = `build-interest-${createHash("sha256").update(email).digest("hex")}`;
   try {
-    const store = getStore({
+    const store = openStore({
       name: waitlistStoreNameForFunctionContext(context),
       consistency: "strong",
     });
@@ -1261,15 +1264,15 @@ async function authSession(req, context) {
 
 function buildStateStore(context) {
   return createRoutedBuildStateStore({
-    jobStore: getStore({
+    jobStore: openStore({
       name: buildJobStateStoreNameForFunctionContext(context),
       consistency: "strong",
     }),
-    quotaStore: getStore({
+    quotaStore: openStore({
       name: buildJobQuotaStoreNameForFunctionContext(context),
       consistency: "strong",
     }),
-    communityStore: getStore({
+    communityStore: openStore({
       name: buildCommunityStoreNameForFunctionContext(context),
       consistency: "strong",
     }),
@@ -1277,14 +1280,14 @@ function buildStateStore(context) {
 }
 
 function buildImageStore(context) {
-  return getStore({
+  return openStore({
     name: buildJobImageStoreNameForFunctionContext(context),
     consistency: "strong",
   });
 }
 
 function builderSessionStore(context) {
-  return getStore({
+  return openStore({
     name: builderSessionStoreNameForFunctionContext(context),
     consistency: "strong",
   });
@@ -1511,7 +1514,7 @@ async function dashboardSocial(req, env, context) {
   const result = await dashboardSocialResult(
     { method: req.method, body },
     {
-      store: getStore({
+      store: openStore({
         name: socialStoreNameForFunctionContext(context),
         consistency: "strong",
       }),
@@ -1531,7 +1534,7 @@ async function dashboardSocialPublicRefresh(req, env, context) {
   const csrfFailure = sameOriginFailure(req);
   if (csrfFailure) return csrfFailure;
   try {
-    const store = getStore({
+    const store = openStore({
       name: socialStoreNameForFunctionContext(context),
       consistency: "strong",
     });
@@ -1604,7 +1607,7 @@ async function dashboardTikTokCallback(req, env, context) {
     redirectUri: tiktokRedirectUri(env),
     fetchImpl: fetch,
   });
-  const store = getStore({
+  const store = openStore({
     name: socialStoreNameForFunctionContext(context),
     consistency: "strong",
   });
@@ -1667,7 +1670,7 @@ async function dashboardYouTubeCallback(req, env, context) {
     redirectUri: youtubeRedirectUri(env),
     fetchImpl: fetch,
   });
-  const store = getStore({
+  const store = openStore({
     name: socialStoreNameForFunctionContext(context),
     consistency: "strong",
   });
@@ -1738,15 +1741,15 @@ function dashboardAuthorizationFailure(req, env, allowedMethod) {
 }
 
 async function loadDashboardReport(context) {
-  const waitlistStore = getStore({
+  const waitlistStore = openStore({
     name: waitlistStoreNameForFunctionContext(context),
     consistency: "strong",
   });
-  const sessionsStore = getStore({
+  const sessionsStore = openStore({
     name: builderSessionStoreNameForFunctionContext(context),
     consistency: "strong",
   });
-  const galleryStore = getStore({
+  const galleryStore = openStore({
     name: buildCommunityStoreNameForFunctionContext(context),
     consistency: "strong",
   });
@@ -1924,7 +1927,7 @@ async function completeGoogleWaitlist(req, env, context) {
 
 async function deliverWaitlistRecord(record, env, context) {
   try {
-    const store = getStore({
+    const store = openStore({
       name: waitlistStoreNameForFunctionContext(context),
       consistency: "strong",
     });
@@ -1950,7 +1953,7 @@ async function deliverWaitlistRecord(record, env, context) {
 
 async function createBrowserConfirmation(signupKey, context) {
   try {
-    const store = getStore({
+    const store = openStore({
       name: waitlistSessionStoreNameForFunctionContext(context),
       consistency: "strong",
     });
@@ -1977,11 +1980,11 @@ async function waitlistStatus(req, context) {
     });
   }
   try {
-    const signupStore = getStore({
+    const signupStore = openStore({
       name: waitlistStoreNameForFunctionContext(context),
       consistency: "strong",
     });
-    const sessionStore = getStore({
+    const sessionStore = openStore({
       name: waitlistSessionStoreNameForFunctionContext(context),
       consistency: "strong",
     });
@@ -2003,7 +2006,7 @@ async function waitlistStatus(req, context) {
 async function forgetBrowserConfirmation(req, context) {
   if (waitlistSessionCookieState(req).state === "valid") {
     try {
-      const sessionStore = getStore({
+      const sessionStore = openStore({
         name: waitlistSessionStoreNameForFunctionContext(context),
         consistency: "strong",
       });
@@ -2354,7 +2357,7 @@ async function publicPartPrices(url, context) {
   }
 
   try {
-    const store = getStore({
+    const store = openStore({
       name: priceStoreNameForFunctionContext(context),
       consistency: "strong",
     });
@@ -2502,7 +2505,7 @@ async function accountBuild(req, context, buildId) {
 }
 
 
-export async function invokeBackgroundBuildJob(req, env, jobId, fetchFn = fetch) {
+export async function invokeBackgroundBuildJob(req, env, jobId, fetchFn = backgroundDispatchFetch(env)) {
   const dispatch = createBackgroundBuildDispatch(env, jobId);
   try {
     const response = await fetchFn(new URL(dispatch.path, req.url), {
