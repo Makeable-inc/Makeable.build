@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
+    "dev:local": "node scripts/dev-local.mjs",
+    "dev:build": "node scripts/dev-build.mjs",
     "build": "npm run build:landing && npm run check && npm run build:static",
     "build:landing": "npm --prefix apps/landing ci && npm --prefix apps/landing run build",
     "build:static": "node scripts/build-production-static.mjs",
