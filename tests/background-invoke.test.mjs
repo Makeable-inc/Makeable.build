@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { backgroundDispatchFetch, createLambdaInvokeFetch } from "../lib/aws/background-invoke.mjs";
 import { toBackgroundEventHandler } from "../lib/aws/lambda-http.mjs";
-import { verifyBackgroundBuildSignature } from "../lib/build-jobs.mjs";
+import { createBackgroundBuildSignature, verifyBackgroundBuildSignature } from "../lib/build-jobs.mjs";
 import { invokeBackgroundBuildJob } from "../netlify/functions/api.mjs";
 
 const JOB_ID = "job_1234567890123456789012";
@@ -105,12 +105,47 @@ test("background event reaches the handler as a signed request that verifies", a
   ), true);
 });
 
-test("background event with a bad signature is rejected by the real pipeline handler", async () => {
+test("the real pipeline handler rejects a forged signature and accepts a valid one", async () => {
   const { default: buildBackground } = await import("../netlify/functions/build-background.mjs");
-  const result = await toBackgroundEventHandler(buildBackground)({
-    jobId: JOB_ID,
-    timestamp: new Date().toISOString(),
-    signature: "forged",
-  });
-  assert.equal(result.statusCode, 401);
+  const saved = { ...process.env };
+  process.env.MAKEABLE_BACKGROUND_SECRET = lambdaEnv.MAKEABLE_BACKGROUND_SECRET;
+  process.env.MAKEABLE_STORAGE_BACKEND = "memory";
+  try {
+    const timestamp = new Date().toISOString();
+    const forged = await toBackgroundEventHandler(buildBackground)({ jobId: JOB_ID, timestamp, signature: "forged" });
+    assert.equal(forged.statusCode, 401);
+    const signature = createBackgroundBuildSignature(lambdaEnv, JOB_ID, timestamp);
+    const valid = await toBackgroundEventHandler(buildBackground)({ jobId: JOB_ID, timestamp, signature });
+    assert.notEqual(valid.statusCode, 401);
+  } finally {
+    for (const key of ["MAKEABLE_BACKGROUND_SECRET", "MAKEABLE_STORAGE_BACKEND"]) {
+      if (key in saved) process.env[key] = saved[key];
+      else delete process.env[key];
+    }
+  }
+});
+
+test("the API's own env passes the dispatch settings through", async () => {
+  const { getEnv } = await import("../netlify/functions/api.mjs");
+  const saved = { ...process.env };
+  Object.assign(process.env, lambdaEnv);
+  try {
+    const env = getEnv();
+    assert.equal(env.MAKEABLE_BUILD_DISPATCH, "lambda");
+    assert.equal(env.MAKEABLE_PIPELINE_FUNCTION, "pipeline-fn");
+    const lambdaClient = fakeLambdaClient();
+    const result = await invokeBackgroundBuildJob(
+      new Request("https://staging.makeable.build/api/build-jobs"),
+      env,
+      JOB_ID,
+      backgroundDispatchFetch(env, { lambdaClient }),
+    );
+    assert.equal(result.ok, true);
+    assert.equal(lambdaClient.sent.length, 1);
+  } finally {
+    for (const key of Object.keys(lambdaEnv)) {
+      if (key in saved) process.env[key] = saved[key];
+      else delete process.env[key];
+    }
+  }
 });

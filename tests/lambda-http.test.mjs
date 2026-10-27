@@ -135,3 +135,13 @@ test("scheduled event calls the handler with a POST request and deploy context",
   assert.equal(seen.request.method, "POST");
   assert.equal(seen.context.deploy.context, "production");
 });
+
+test("publicOrigin replaces the Lambda's own host in the request URL", async () => {
+  const { seen, handler } = capture();
+  await toLambdaHandler(handler, { publicOrigin: "https://staging.makeable.build" })(urlEvent({
+    rawPath: "/api/build-jobs",
+    rawQueryString: "a=1",
+    headers: { host: "abc123.lambda-url.us-east-1.on.aws" },
+  }));
+  assert.equal(seen.request.url, "https://staging.makeable.build/api/build-jobs?a=1");
+});

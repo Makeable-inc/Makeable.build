@@ -17,3 +17,19 @@ test("s3: object key is <store name>/<key>", async () => {
   await store.setJSON("job-1", { id: 1 });
   assert.deepEqual([...client.objects.get("test-bucket").keys()], ["makeable-build-jobs/job-1"]);
 });
+
+test("s3: a concurrent-write conflict on onlyIfNew counts as not modified", async () => {
+  const client = createFakeS3Client();
+  const realSend = client.send;
+  client.send = async (command) => {
+    if (command.constructor.name === "PutObjectCommand" && command.input.IfNoneMatch === "*") {
+      throw Object.assign(new Error("ConditionalRequestConflict"), {
+        name: "ConditionalRequestConflict",
+        $metadata: { httpStatusCode: 409 },
+      });
+    }
+    return realSend(command);
+  };
+  const store = createS3Store({ client, bucket: "test-bucket", name: "waitlist" });
+  assert.deepEqual(await store.setJSON("signup-1", { v: 1 }, { onlyIfNew: true }), { modified: false });
+});

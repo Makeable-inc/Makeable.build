@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 process.env.MAKEABLE_STORAGE_BACKEND = "memory";
+process.env.MAKEABLE_DEPLOY_CONTEXT = "staging";
+process.env.MAKEABLE_PUBLIC_ORIGIN = "https://staging.makeable.build";
 
 for (const name of ["api", "pipeline", "cleanup", "social-refresh", "social-link"]) {
   test(`aws/functions/${name}.mjs exports a Lambda handler`, async () => {
