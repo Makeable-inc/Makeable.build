@@ -84,3 +84,16 @@ test("a signed-in build start through the api entry invokes the pipeline Lambda 
     LambdaClient.prototype.send = realSend;
   }
 });
+
+test("api entry serves /r/* short links, including per-post links and trailing slashes", async () => {
+  const { handler } = await import("../aws/functions/api.mjs");
+  const get = (rawPath) => handler(urlEvent({ rawPath }));
+  const post = await get("/r/ig/makeable-build/some-post");
+  assert.equal(post.statusCode, 302);
+  assert.match(post.headers.location, /utm_content=makeable_build_post_some-post/);
+  assert.equal(post.headers["cache-control"], "no-store");
+  const slash = await get("/r/ig/makeable-build/");
+  assert.equal(slash.statusCode, 302);
+  assert.match(slash.headers.location, /utm_content=makeable_build_bio/);
+  assert.equal((await get("/r/unknown")).statusCode, 404);
+});

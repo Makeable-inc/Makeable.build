@@ -15,6 +15,7 @@ test("valid settings are read", () => {
     deployContext: "staging",
     publicOrigin: "https://staging.makeable.build",
     trustedProxyHops: 1,
+    logClientIp: false,
   });
 });
 

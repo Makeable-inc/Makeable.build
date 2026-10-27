@@ -14,5 +14,7 @@ capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
 fail_on_empty_changeset = false
-# TrustedProxyHops=0 until we see real headers through Amplify; set it before cutover.
-parameter_overrides = "TrustedProxyHops=0"
+# TrustedProxyHops=1: Amplify and the Function URL both set x-forwarded-for to the
+# real client IP and drop any value the visitor sent (checked 27 Oct).
+# PublicOrigin is the Amplify test URL until cutover, then https://makeable.build.
+parameter_overrides = "TrustedProxyHops=1 PublicOrigin=https://main.d1pesirg786fm3.amplifyapp.com LogClientIp=0"

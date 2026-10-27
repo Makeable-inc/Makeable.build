@@ -21,6 +21,11 @@ Parameters:
     Type: Number
     MinValue: 0
     Description: Proxies in front of the API (Amplify) that append to x-forwarded-for. No default on purpose; 0 behind Amplify puts every visitor in one rate-limit bucket.
+  LogClientIp:
+    Type: String
+    AllowedValues: ["0", "1"]
+    Default: "0"
+    Description: Temporary. 1 logs each API request's sourceIp and x-forwarded-for, to choose TrustedProxyHops.
   SecretName:
     Type: String
     Default: makeable/prod
@@ -46,6 +51,7 @@ Globals:
         MAKEABLE_DEPLOY_CONTEXT: !Ref DeployContext
         MAKEABLE_PUBLIC_ORIGIN: !Ref PublicOrigin
         MAKEABLE_TRUSTED_PROXY_HOPS: !Ref TrustedProxyHops
+        MAKEABLE_LOG_CLIENT_IP: !Ref LogClientIp
 
 Resources:
   # All app data (was Netlify Blobs), stored as "<store name>/<key>".

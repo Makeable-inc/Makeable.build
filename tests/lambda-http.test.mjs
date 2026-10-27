@@ -145,3 +145,24 @@ test("publicOrigin replaces the Lambda's own host in the request URL", async () 
   }));
   assert.equal(seen.request.url, "https://staging.makeable.build/api/build-jobs?a=1");
 });
+
+test("logClientIp logs where the client IP came from, only when switched on", async () => {
+  const lines = [];
+  const realLog = console.log;
+  console.log = (line) => lines.push(line);
+  try {
+    const event = urlEvent({ headers: { host: "x", "x-forwarded-for": "1.1.1.1, 198.51.100.9" } });
+    await toLambdaHandler(capture().handler)(event);
+    assert.deepEqual(lines, []);
+    await toLambdaHandler(capture().handler, { logClientIp: true, trustedProxyHops: 1 })(event);
+    assert.deepEqual(lines.map((line) => JSON.parse(line)), [{
+      type: "client_ip_debug",
+      sourceIp: "203.0.113.7",
+      xForwardedFor: "1.1.1.1, 198.51.100.9",
+      trustedProxyHops: 1,
+      chosen: "198.51.100.9",
+    }]);
+  } finally {
+    console.log = realLog;
+  }
+});
