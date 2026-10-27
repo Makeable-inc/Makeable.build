@@ -1,4 +1,5 @@
 import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
+import { backgroundDispatchFetch } from "../../lib/aws/background-invoke.mjs";
 import { openStore } from "../../lib/storage/index.mjs";
 import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -2502,7 +2503,7 @@ async function accountBuild(req, context, buildId) {
 }
 
 
-export async function invokeBackgroundBuildJob(req, env, jobId, fetchFn = fetch) {
+export async function invokeBackgroundBuildJob(req, env, jobId, fetchFn = backgroundDispatchFetch(env)) {
   const dispatch = createBackgroundBuildDispatch(env, jobId);
   try {
     const response = await fetchFn(new URL(dispatch.path, req.url), {
