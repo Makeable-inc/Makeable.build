@@ -27,7 +27,7 @@ export function parseNetlifyToml(text) {
 }
 
 // Amplify uses the first matching rule, so the order here is the routing order.
-export function amplifyRules({ netlify, apiOrigin, pageDirs }) {
+export function amplifyRules({ netlify, apiOrigin }) {
   const rule = (source, target, status) => ({ source, target, status });
   const rules = netlify.redirects.map(({ from, to, status }) => rule(from, to, status));
   const taken = new Set(rules.map((entry) => entry.source));
@@ -41,12 +41,7 @@ export function amplifyRules({ netlify, apiOrigin, pageDirs }) {
   rules.push(rule("/api/<*>", `${api}/api/<*>`, "200"));
   rules.push(rule("/config.local.js", `${api}/config.local.js`, "200"));
 
-  // Amplify would redirect /app to /app/; Netlify served /app directly.
-  for (const dir of pageDirs) {
-    if (dir.startsWith("_") || dir === "404" || taken.has(`/${dir}`)) continue;
-    rules.push(rule(`/${dir}`, `/${dir}/index.html`, "200"));
-  }
-
+  // No rules for folder pages: Amplify redirects /app to /app/, as Netlify does.
   rules.push(rule("/<*>", "/404.html", "404"));
   return rules;
 }

@@ -9,10 +9,10 @@ import {
 
 const toml = readFileSync(new URL("../netlify.toml", import.meta.url), "utf8");
 const API = "https://abc123.lambda-url.us-east-1.on.aws";
-const PAGE_DIRS = ["_not-found", "404", "app", "circuit-studio", "dashboard", "ember", "hologram", "privacy", "terms"];
+
 
 function rules() {
-  return amplifyRules({ netlify: parseNetlifyToml(toml), apiOrigin: API, pageDirs: PAGE_DIRS });
+  return amplifyRules({ netlify: parseNetlifyToml(toml), apiOrigin: API });
 }
 
 test("netlify.toml redirects are read in order with their status", () => {
@@ -57,18 +57,11 @@ test("/api/* and /config.local.js are proxied to the API Lambda", () => {
   });
 });
 
-test("folder pages are served without a trailing-slash redirect, like Netlify", () => {
+test("folder pages get no extra rule, so Amplify adds the trailing slash like Netlify (/app → /app/)", () => {
   const all = rules();
   for (const dir of ["app", "circuit-studio", "privacy", "terms"]) {
-    assert.deepEqual(all.find((rule) => rule.source === `/${dir}`), {
-      source: `/${dir}`,
-      target: `/${dir}/index.html`,
-      status: "200",
-    });
+    assert.equal(all.find((rule) => rule.source === `/${dir}`), undefined, dir);
   }
-  assert.equal(all.filter((rule) => rule.source === "/dashboard").length, 1);
-  assert.equal(all.find((rule) => rule.source === "/_not-found"), undefined);
-  assert.equal(all.find((rule) => rule.source === "/404"), undefined);
 });
 
 test("unknown paths get the 404 page, as the last rule", () => {

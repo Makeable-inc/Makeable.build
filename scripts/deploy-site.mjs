@@ -43,14 +43,7 @@ async function main() {
   const stack = (await new CloudFormationClient({ region }).send(new DescribeStacksCommand({ StackName: stackName }))).Stacks[0];
   const apiOrigin = stack.Outputs.find((output) => output.OutputKey === "ApiUrl").OutputValue;
   const netlify = parseNetlifyToml(readFileSync(path.join(ROOT, "netlify.toml"), "utf8"));
-  const pageDirs = readdirSync(siteDir).filter((name) => {
-    try {
-      return statSync(path.join(siteDir, name, "index.html")).isFile();
-    } catch {
-      return false;
-    }
-  });
-  const rules = amplifyRules({ netlify, apiOrigin, pageDirs });
+  const rules = amplifyRules({ netlify, apiOrigin });
 
   const amplify = new amplifySdk.AmplifyClient({ region });
   let app;
