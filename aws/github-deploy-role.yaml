@@ -177,6 +177,11 @@ Resources:
                 Effect: Allow
                 Action: [s3:GetObject]
                 Resource: arn:aws:s3:::aws-sam-cli-managed-default-samclisourcebucket-*/*
+              # CloudFormation expands the SAM template as this role.
+              - Sid: SamTransform
+                Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
               - Sid: ReadOnlyLookups
                 Effect: Allow
                 Action: [lambda:GetLayerVersion, iam:ListRoles, logs:DescribeLogGroups, scheduler:ListSchedules]
