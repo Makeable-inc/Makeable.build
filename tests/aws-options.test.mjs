@@ -5,6 +5,8 @@ import { deployOptions } from "../aws/functions/options.mjs";
 const valid = {
   MAKEABLE_DEPLOY_CONTEXT: "staging",
   MAKEABLE_PUBLIC_ORIGIN: "https://staging.makeable.build",
+  MAKEABLE_DRAFT_COOKIE_SECRET: "d".repeat(32),
+  MAKEABLE_BACKGROUND_SECRET: "b".repeat(32),
 };
 
 test("valid settings are read", () => {
@@ -28,4 +30,11 @@ test("a missing or malformed public origin is refused", () => {
 test("a bad proxy hop count is refused", () => {
   assert.throws(() => deployOptions({ ...valid, MAKEABLE_TRUSTED_PROXY_HOPS: "-1" }), /MAKEABLE_TRUSTED_PROXY_HOPS/);
   assert.throws(() => deployOptions({ ...valid, MAKEABLE_TRUSTED_PROXY_HOPS: "one" }), /MAKEABLE_TRUSTED_PROXY_HOPS/);
+});
+
+test("missing or short signing secrets are refused, so AWS never falls back to the public dev secret", () => {
+  for (const name of ["MAKEABLE_DRAFT_COOKIE_SECRET", "MAKEABLE_BACKGROUND_SECRET"]) {
+    assert.throws(() => deployOptions({ ...valid, [name]: "" }), new RegExp(name));
+    assert.throws(() => deployOptions({ ...valid, [name]: "short" }), new RegExp(name));
+  }
 });

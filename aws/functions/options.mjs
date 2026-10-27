@@ -1,4 +1,7 @@
 const DEPLOY_CONTEXTS = new Set(["production", "staging"]);
+// Off Netlify, lib/build-jobs.mjs draftCookieSecret() falls back to a dev
+// secret that is public in this repo, so these must be set for real.
+const REQUIRED_SECRETS = ["MAKEABLE_DRAFT_COOKIE_SECRET", "MAKEABLE_BACKGROUND_SECRET"];
 
 // Settings every Lambda entry shares, set on the function by the infra stack.
 // Refuses to start on a missing value: store names fall back to production
@@ -11,6 +14,9 @@ export function deployOptions(env = process.env) {
   const publicOrigin = env.MAKEABLE_PUBLIC_ORIGIN || "";
   if (!/^https:\/\/[^/]+$/.test(publicOrigin)) {
     throw new Error("MAKEABLE_PUBLIC_ORIGIN must be an https origin, e.g. https://makeable.build");
+  }
+  for (const name of REQUIRED_SECRETS) {
+    if (String(env[name] || "").length < 32) throw new Error(`${name} must be set (32+ characters)`);
   }
   const hops = String(env.MAKEABLE_TRUSTED_PROXY_HOPS ?? "0");
   if (!/^\d+$/.test(hops)) throw new Error("MAKEABLE_TRUSTED_PROXY_HOPS must be a whole number");
