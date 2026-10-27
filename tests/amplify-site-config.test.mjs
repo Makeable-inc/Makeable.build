@@ -55,8 +55,10 @@ test("folder pages get no extra rule, so Amplify adds the trailing slash like Ne
   }
 });
 
-test("unknown paths get the 404 page, as the last rule", () => {
-  assert.deepEqual(rules().at(-1), { source: "/<*>", target: "/404.html", status: "404" });
+// Measured on Amplify 27 Oct: "404" redirects (302) to /404.html, no rule gives a
+// blank 404, "404-200" serves /404.html in place with status 404 like Netlify.
+test("unknown paths are answered 404 with the site's 404 page, in place, as the last rule", () => {
+  assert.deepEqual(rules().at(-1), { source: "/<*>", target: "/404.html", status: "404-200" });
 });
 
 test("every netlify.toml header becomes an Amplify custom header with the same value", () => {

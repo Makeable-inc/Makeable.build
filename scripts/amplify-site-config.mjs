@@ -38,7 +38,8 @@ export function amplifyRules({ netlify, apiOrigin }) {
   rules.push(rule("/config.local.js", `${api}/config.local.js`, "200"));
 
   // No rules for folder pages: Amplify redirects /app to /app/, as Netlify does.
-  rules.push(rule("/<*>", "/404.html", "404"));
+  // "404-200" serves /404.html in place with status 404; plain "404" redirects to it.
+  rules.push(rule("/<*>", "/404.html", "404-200"));
   return rules;
 }
 
