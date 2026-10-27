@@ -36,6 +36,14 @@ Gotchas:
 - Google sign-in only works on origins registered on the OAuth client. Use the local login instead.
 - `node server.mjs` runs a demo build workshop with a fixed timer and template parts. Use `dev:local` to test the real pipeline.
 
+## AWS backend
+
+`template.yaml` (SAM) defines the stack `makeable-prod` in us-east-1: the API and pipeline Lambdas, the S3 data bucket and the schedules. It becomes production when makeable.build's DNS points at it. Settings and secrets come from the Secrets Manager secret `makeable/prod`, never from the repo.
+
+- Deploy: `aws sso login --sso-session makeable`, then `npm run aws:build` and `sam deploy`. Deploying this stack needs approval.
+- Check a deploy: `AWS_PROFILE=makeable node scripts/aws-smoke-build.mjs` runs one real build through the API URL, prints each stage and deletes its own test records. Exit 0 means ready. Each run calls OpenAI.
+- A build can fail on the AI's side (for example `planner_identity_echo_mismatch`); rerun once before treating it as a deploy problem.
+
 ## Working rules
 
 - Reproduce a bug as a failing test before fixing it.
