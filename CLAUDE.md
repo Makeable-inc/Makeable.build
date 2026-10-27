@@ -40,8 +40,8 @@ Gotchas:
 
 `template.yaml` (SAM) defines the stack `makeable-prod` in us-east-1: the API and pipeline Lambdas, the S3 data bucket and the schedules. It becomes production when makeable.build's DNS points at it. Settings and secrets come from the Secrets Manager secret `makeable/prod`, never from the repo.
 
-- Deploys are automatic: every push to `staging` runs `.github/workflows/deploy-aws.yml` (tests, backend, website, smoke build). Merging the PR is the approval. If any step fails it redeploys the tag `aws-last-good`; "Run workflow" with a ref deploys that ref by hand.
-- By hand (only if the workflow can't): `aws sso login --sso-session makeable`, `npm run aws:build`, `sam deploy`, then `node scripts/deploy-site.mjs`.
+- Deploys are automatic: every push to `staging` runs `.github/workflows/deploy-aws.yml` (build, tests, backend, website, smoke build). Merging the PR is the approval. If the deploy itself fails it redeploys the tag `aws-last-good`, website first; "Run workflow" with a ref deploys that ref by hand. A rollback is a redeploy (minutes), not an instant switch.
+- By hand (only if the workflow can't): `aws sso login --sso-session makeable`, then with `AWS_PROFILE=makeable`: `npm run aws:build`, `sam deploy`, `node scripts/deploy-site.mjs`.
 - Check a deploy: `AWS_PROFILE=makeable node scripts/aws-smoke-build.mjs` runs one real build through the API URL, prints each stage and deletes its own test records. Exit 0 means ready. Each run calls OpenAI.
 - A build can fail on the AI's side (for example `planner_identity_echo_mismatch`); rerun once before treating it as a deploy problem.
 

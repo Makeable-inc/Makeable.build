@@ -1,9 +1,9 @@
 name: Deploy to AWS
 
 # Every push to staging deploys the AWS stack and the Amplify site. Merging the
-# PR is the approval. If any step fails, the last commit that deployed and
-# passed the smoke build (tag aws-last-good) is redeployed, backend and site
-# together. "Run workflow" deploys any ref by hand, e.g. aws-last-good.
+# PR is the approval. If the deploy itself fails, the last commit that deployed
+# and passed the smoke build (tag aws-last-good) is redeployed, site first.
+# "Run workflow" deploys any ref by hand, e.g. aws-last-good.
 on:
   push:
     branches:
@@ -27,7 +27,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: aws-production
-    timeout-minutes: 40
+    timeout-minutes: 60
     permissions:
       id-token: write
       contents: write
@@ -52,64 +52,34 @@ jobs:
         with:
           use-installer: true
 
-      - name: Log in to AWS
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: us-east-1
-
       - name: Install dependencies
         run: npm ci
+
+      # Some tests read the built site, so build first (as pr-check.yml does).
+      - name: Build site and validate files
+        run: npm run build
 
       - name: Run tests
         run: npm test
 
-      - name: Deploy and smoke build
-        run: bash scripts/ci-deploy.sh
-
-      - name: Mark as last good deploy
-        run: |
-          git tag -f aws-last-good HEAD
-          git push -f origin aws-last-good
-
-  rollback:
-    needs: deploy
-    if: failure() && inputs.ref != 'aws-last-good'
-    runs-on: ubuntu-latest
-    environment: aws-production
-    timeout-minutes: 40
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      AWS_CFN_EXECUTION_ROLE_ARN: ${{ vars.AWS_CFN_EXECUTION_ROLE_ARN }}
-      AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
-      AMPLIFY_SITE_URL: ${{ vars.AMPLIFY_SITE_URL }}
-    steps:
-      - name: Check out last good deploy
-        uses: actions/checkout@v4
-        with:
-          ref: aws-last-good
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-
-      - name: Set up SAM CLI
-        uses: aws-actions/setup-sam@v2
-        with:
-          use-installer: true
-
       - name: Log in to AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Redeploy last good commit
+      - name: Deploy and smoke build
+        id: deploy
         run: bash scripts/ci-deploy.sh
+
+      # Only a failed deploy rolls back: not a failed test (nothing deployed)
+      # and not a failed tag push (the deploy worked).
+      - name: Roll back to last good deploy
+        if: failure() && steps.deploy.outcome == 'failure' && inputs.ref != 'aws-last-good'
+        run: bash scripts/ci-rollback.sh
+
+      - name: Mark as last good deploy
+        if: success()
+        run: |
+          git tag -f aws-last-good HEAD
+          git push -f origin aws-last-good

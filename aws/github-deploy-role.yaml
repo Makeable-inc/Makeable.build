@@ -67,7 +67,7 @@ Resources:
                   - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
               - Sid: TemplateChecks
                 Effect: Allow
-                Action: [cloudformation:ValidateTemplate, cloudformation:GetTemplateSummary]
+                Action: cloudformation:ValidateTemplate
                 Resource: "*"
               - Sid: HandOffToExecutor
                 Effect: Allow
@@ -139,6 +139,10 @@ Resources:
                   - iam:AttachRolePolicy
                   - iam:DetachRolePolicy
                   - iam:UpdateAssumeRolePolicy
+                  - iam:UpdateRoleDescription
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRoleTags
                 Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppStack}-*
               - Sid: Schedules
                 Effect: Allow
@@ -158,6 +162,12 @@ Resources:
                   - s3:PutLifecycleConfiguration
                   - s3:GetEncryptionConfiguration
                   - s3:PutEncryptionConfiguration
+                  - s3:GetAccelerateConfiguration
+                  - s3:GetReplicationConfiguration
+                  - s3:GetAnalyticsConfiguration
+                  - s3:GetMetricsConfiguration
+                  - s3:GetInventoryConfiguration
+                  - s3:GetIntelligentTieringConfiguration
                   - s3:ListBucket
                 Resource: !Sub arn:${AWS::Partition}:s3:::${AppStack}-databucket-*
               - Sid: SamArtifacts
