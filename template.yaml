@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Makeable backend (API, build pipeline, schedules, data bucket). Becomes production when makeable.build points at it.
+
+# Build: npm run aws:build   Deploy: sam deploy   (settings in samconfig.toml)
+# Secrets and Netlify-era settings live in one Secrets Manager secret
+# (SecretName below, a JSON object); each Lambda loads it at cold start.
+
+Parameters:
+  DeployContext:
+    Type: String
+    AllowedValues: [production, staging]
+    Default: production
+    Description: Picks the store names inside the bucket. production = same names as Netlify Blobs, so copied data shows up as-is.
+  PublicOrigin:
+    Type: String
+    Default: https://makeable.build
+    AllowedPattern: "https://[^/]+"
+    Description: The site address users see. Origin checks and Stripe return URLs use it.
+  TrustedProxyHops:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: Proxies in front of the API (Amplify) that append to x-forwarded-for. Set from real headers before cutover.
+  SecretName:
+    Type: String
+    Default: makeable/prod
+  SocialRefreshState:
+    Type: String
+    AllowedValues: [ENABLED, DISABLED]
+    Default: DISABLED
+    Description: Keep DISABLED until cutover; Netlify refreshes the same social tokens until then.
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    CodeUri: .aws-sam-src/
+    MemorySize: 1024
+    Timeout: 30
+    Environment:
+      Variables:
+        NODE_ENV: production
+        MAKEABLE_SECRET_ID: !Ref SecretName
+        MAKEABLE_STORAGE_BACKEND: s3
+        MAKEABLE_STORAGE_BUCKET: !Ref DataBucket
+        MAKEABLE_DEPLOY_CONTEXT: !Ref DeployContext
+        MAKEABLE_PUBLIC_ORIGIN: !Ref PublicOrigin
+        MAKEABLE_TRUSTED_PROXY_HOPS: !Ref TrustedProxyHops
+
+Resources:
+  # All app data (was Netlify Blobs), stored as "<store name>/<key>".
+  DataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+  # /api/* and /config.local.js
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: aws/functions/api.handler
+      Timeout: 60
+      FunctionUrlConfig:
+        AuthType: NONE
+      Environment:
+        Variables:
+          MAKEABLE_BUILD_DISPATCH: lambda
+          MAKEABLE_PIPELINE_FUNCTION: !Ref PipelineFunction
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref DataBucket }
+        - LambdaInvokePolicy: { FunctionName: !Ref PipelineFunction }
+        - &ReadSecret
+          Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretName}-*
+
+  # The build pipeline, started by the API with an async invoke (~45-110 s per build).
+  PipelineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: aws/functions/pipeline.handler
+      Timeout: 900
+      MemorySize: 2048
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref DataBucket }
+        - *ReadSecret
+
+  CleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: aws/functions/cleanup.handler
+      Timeout: 300
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref DataBucket }
+        - *ReadSecret
+      Events:
+        Daily:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 day)
+
+  SocialRefreshFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: aws/functions/social-refresh.handler
+      Timeout: 120
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref DataBucket }
+        - *ReadSecret
+      Events:
+        Every15Minutes:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(15 minutes)
+            State: !Ref SocialRefreshState
+
+  # /r/* short links
+  SocialLinkFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: aws/functions/social-link.handler
+      MemorySize: 256
+      FunctionUrlConfig:
+        AuthType: NONE
+      Policies:
+        - *ReadSecret
+
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ApiFunction}
+      RetentionInDays: 30
+  PipelineLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${PipelineFunction}
+      RetentionInDays: 30
+  CleanupLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${CleanupFunction}
+      RetentionInDays: 30
+  SocialRefreshLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${SocialRefreshFunction}
+      RetentionInDays: 30
+  SocialLinkLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${SocialLinkFunction}
+      RetentionInDays: 30
+
+Outputs:
+  ApiUrl:
+    Description: Amplify rewrites /api/* and /config.local.js here.
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl
+  SocialLinkUrl:
+    Description: Amplify rewrites /r/* here.
+    Value: !GetAtt SocialLinkFunctionUrl.FunctionUrl
+  DataBucketName:
+    Value: !Ref DataBucket

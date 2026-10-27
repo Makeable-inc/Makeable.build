@@ -7,6 +7,7 @@
     "start": "node server.mjs",
     "dev:local": "node scripts/dev-local.mjs",
     "dev:build": "node scripts/dev-build.mjs",
+    "aws:build": "node scripts/build-lambda-bundle.mjs && sam build",
     "build": "npm run build:landing && npm run check && npm run build:static",
     "build:landing": "npm --prefix apps/landing ci && npm --prefix apps/landing run build",
     "build:static": "node scripts/build-production-static.mjs",
