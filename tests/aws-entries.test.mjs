@@ -11,6 +11,7 @@ const awsEnv = {
   MAKEABLE_PUBLIC_ORIGIN: "https://staging.makeable.build",
   MAKEABLE_DRAFT_COOKIE_SECRET: "d".repeat(32),
   MAKEABLE_BACKGROUND_SECRET: "b".repeat(32),
+  MAKEABLE_TRUSTED_PROXY_HOPS: "0",
   MAKEABLE_BUILD_DISPATCH: "lambda",
   MAKEABLE_PIPELINE_FUNCTION: "makeable-pipeline-staging",
 };
@@ -28,7 +29,7 @@ function urlEvent(overrides = {}) {
   };
 }
 
-for (const name of ["api", "pipeline", "cleanup", "social-refresh", "social-link"]) {
+for (const name of ["api", "pipeline", "cleanup", "social-refresh"]) {
   test(`aws/functions/${name}.mjs exports a Lambda handler`, async () => {
     const entry = await import(`../aws/functions/${name}.mjs`);
     assert.equal(typeof entry.handler, "function");

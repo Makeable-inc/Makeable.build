@@ -1,3 +1,8 @@
+import { loadSecretsIntoEnv } from "../../lib/aws/secrets.mjs";
+
+// Runs once per cold start, before any entry reads its settings.
+await loadSecretsIntoEnv();
+
 const DEPLOY_CONTEXTS = new Set(["production", "staging"]);
 // Off Netlify, lib/build-jobs.mjs draftCookieSecret() falls back to a dev
 // secret that is public in this repo, so these must be set for real.
@@ -18,7 +23,8 @@ export function deployOptions(env = process.env) {
   for (const name of REQUIRED_SECRETS) {
     if (String(env[name] || "").length < 32) throw new Error(`${name} must be set (32+ characters)`);
   }
-  const hops = String(env.MAKEABLE_TRUSTED_PROXY_HOPS ?? "0");
+  // No default: 0 behind Amplify would put every visitor in one rate-limit bucket.
+  const hops = String(env.MAKEABLE_TRUSTED_PROXY_HOPS ?? "");
   if (!/^\d+$/.test(hops)) throw new Error("MAKEABLE_TRUSTED_PROXY_HOPS must be a whole number");
   return { deployContext, publicOrigin, trustedProxyHops: Number(hops) };
 }
