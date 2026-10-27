@@ -7,7 +7,12 @@
 //   ... --apply                  copy new and changed records
 //   ... --apply --delete-extra   also delete S3 records Netlify no longer has (final run)
 //   ... --apply --archive        raw copy of every Netlify store under netlify-archive/
-//   ... --stores waitlist,builder-sessions   limit to some stores
+//   ... --verify                 write nothing; compare S3 with Netlify (every JSON record, a sample of images)
+//   ... --stores waitlist,builder-sessions   limit to some stores (also limits --archive)
+//
+// --delete-extra refuses for a store when Netlify lists nothing or when it would
+// delete more than a fifth of what is on S3. Records that fail to read (Netlify
+// is live during a run) are counted, not fatal; a rerun picks them up.
 //
 // Netlify login: the Netlify CLI's (netlify login) or NETLIFY_AUTH_TOKEN.
 // Re-runnable: each S3 object keeps the Netlify etag in its metadata
@@ -30,6 +35,7 @@ export const LIVE_STORES = [
 ];
 const NETLIFY_SITE_ID = "48e05fd1-e30a-457c-bc84-985d5d275f52";
 const ARCHIVE_PREFIX = "netlify-archive";
+const MAX_DELETE_SHARE = 0.2;
 
 export function planStore(sourceEntries, targetEntries) {
   const target = new Map(targetEntries.map((entry) => [entry.key, entry.etag]));
@@ -55,26 +61,68 @@ export function contentTypeFor(bytes, metadata = {}) {
 }
 
 export async function migrateStore({ source, target, apply = false, deleteExtra = false, log = () => {} }) {
-  const plan = planStore(await source.list(), await target.list());
+  const sourceEntries = await source.list();
+  const targetEntries = await target.list();
+  const plan = planStore(sourceEntries, targetEntries);
   if (!apply) {
     return { copied: 0, unchanged: plan.unchanged.length, extra: plan.extra.length, deleted: 0, toCopy: plan.copy.length };
   }
+  // Netlify stays live during a run: a record can be deleted or fail to read
+  // between listing and reading. Count it and carry on; a rerun picks it up.
   let copied = 0;
+  let failed = 0;
   await pool(plan.copy, 8, async (key) => {
-    const record = await source.read(key);
-    const metadata = { ...stringValues(record.metadata), "netlify-etag": record.etag };
-    await target.write(key, record.bytes, { contentType: contentTypeFor(record.bytes, record.metadata), metadata });
-    copied += 1;
-    if (copied % 250 === 0) log(`  ${copied}/${plan.copy.length} copied`);
+    try {
+      const record = await source.read(key);
+      if (!record) throw new Error("gone");
+      const metadata = { ...stringValues(record.metadata), "netlify-etag": record.etag };
+      await target.write(key, record.bytes, { contentType: contentTypeFor(record.bytes, record.metadata), metadata });
+      copied += 1;
+      if (copied % 250 === 0) log(`  ${copied}/${plan.copy.length} copied`);
+    } catch {
+      failed += 1;
+    }
   });
-  let deleted = 0;
-  if (deleteExtra) {
+  const result = { copied, unchanged: plan.unchanged.length, extra: plan.extra.length, deleted: 0, failed };
+  if (deleteExtra && plan.extra.length) {
+    // A listing that wrongly comes back empty must not empty the bucket.
+    const refused = sourceEntries.length === 0
+      ? "source is empty"
+      : plan.extra.length > targetEntries.length * MAX_DELETE_SHARE
+        ? `would delete ${plan.extra.length} of ${targetEntries.length}`
+        : "";
+    if (refused) return { ...result, deleteRefused: refused };
     for (const key of plan.extra) {
       await target.remove(key);
-      deleted += 1;
+      result.deleted += 1;
     }
   }
-  return { copied, unchanged: plan.unchanged.length, extra: plan.extra.length, deleted };
+  return result;
+}
+
+// Checks what is on S3 against Netlify: missing records, records changed on
+// Netlify since they were copied, and byte equality (all records, or a sample).
+export async function verifyStore({ source, target, compareAll = false, sample = 20 }) {
+  const copiedEtags = new Map((await target.list()).map((entry) => [entry.key, entry.etag]));
+  let missing = 0;
+  let changedSinceCopy = 0;
+  const comparable = [];
+  for (const { key, etag } of await source.list()) {
+    if (!copiedEtags.has(key)) missing += 1;
+    else if (copiedEtags.get(key) !== etag) changedSinceCopy += 1;
+    else comparable.push(key);
+  }
+  const keys = compareAll ? comparable : [...comparable].sort(() => Math.random() - 0.5).slice(0, sample);
+  let same = 0;
+  await pool(keys, 8, async (key) => {
+    const [record, copy] = [await source.read(key), await target.read(key)];
+    if (record && copy && sha256(record.bytes) === sha256(copy)) same += 1;
+  });
+  return { checked: keys.length, same, mismatched: keys.length - same, changedSinceCopy, missing };
+}
+
+function sha256(data) {
+  return createHash("sha256").update(data).digest("hex");
 }
 
 function stringValues(metadata = {}) {
@@ -143,21 +191,11 @@ function s3Target(s3, client, bucket, prefix) {
   };
 }
 
-// Byte-compares a few random records per store after a copy.
-async function sampleCheck(source, target, keys, count = 5) {
-  const sample = [...keys].sort(() => Math.random() - 0.5).slice(0, count);
-  let same = 0;
-  for (const key of sample) {
-    const [a, b] = [(await source.read(key)).bytes, await target.read(key)];
-    if (createHash("sha256").update(a).digest("hex") === createHash("sha256").update(b).digest("hex")) same += 1;
-  }
-  return `${same}/${sample.length}`;
-}
-
 async function main() {
   const args = process.argv.slice(2);
   const arg = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
-  const apply = args.includes("--apply");
+  const verifyOnly = args.includes("--verify");
+  const apply = args.includes("--apply") && !verifyOnly;
   const deleteExtra = args.includes("--delete-extra");
   const archive = args.includes("--archive");
   const region = process.env.AWS_REGION || "us-east-1";
@@ -181,29 +219,35 @@ async function main() {
   const missing = live.filter((name) => !allStores.includes(name));
   if (missing.length) console.log(`not on Netlify (skipped): ${missing.join(", ")}`);
 
-  console.log(`${apply ? "APPLY" : "DRY RUN"} → s3://${bucket}${deleteExtra ? " (delete extra)" : ""}`);
-  let failures = 0;
+  const mode = verifyOnly ? "VERIFY" : apply ? "APPLY" : "DRY RUN";
+  console.log(`${mode} → s3://${bucket}${deleteExtra && apply ? " (delete extra)" : ""}`);
+  let problems = 0;
   for (const job of jobs) {
     if (!allStores.includes(job.name)) continue;
     const source = netlifySource(blobs, job.name);
     const target = s3Target(s3, client, bucket, job.prefix);
     const label = job.archive ? `${ARCHIVE_PREFIX}/${job.name}` : job.name;
-    const result = await migrateStore({
-      source, target, apply, deleteExtra: deleteExtra && !job.archive, log: (line) => console.log(line),
-    });
-    if (!apply) {
-      console.log(`${label}: ${result.toCopy} to copy, ${result.unchanged} unchanged, ${result.extra} extra on S3`);
-      continue;
+    let summary = "";
+    if (!verifyOnly) {
+      const result = await migrateStore({
+        source, target, apply, deleteExtra: deleteExtra && !job.archive, log: (line) => console.log(line),
+      });
+      if (!apply) {
+        console.log(`${label}: ${result.toCopy} to copy, ${result.unchanged} unchanged, ${result.extra} extra on S3`);
+        continue;
+      }
+      if (result.failed || result.deleteRefused) problems += 1;
+      summary = `copied ${result.copied}, unchanged ${result.unchanged}, failed ${result.failed}, deleted ${result.deleted}`
+        + `${result.deleteRefused ? ` (delete refused: ${result.deleteRefused})` : ""} | `;
     }
-    const after = planStore(await source.list(), await target.list());
-    const ok = after.copy.length === 0 && (!deleteExtra || job.archive || after.extra.length === 0);
-    if (!ok) failures += 1;
-    const sample = await sampleCheck(source, target, after.unchanged);
-    console.log(`${label}: copied ${result.copied}, unchanged ${result.unchanged}, deleted ${result.deleted}, `
-      + `extra ${after.extra.length} | verify: ${ok ? "in sync" : `${after.copy.length} still differ`}, sample bytes equal ${sample}`);
+    // Every JSON record is cheap to compare; images are sampled.
+    const check = await verifyStore({ source, target, compareAll: job.name !== "makeable-build-images" });
+    if (check.missing || check.mismatched) problems += 1;
+    console.log(`${label}: ${summary}verify: bytes equal ${check.same}/${check.checked}, missing ${check.missing}, `
+      + `changed on Netlify since copy ${check.changedSinceCopy}`);
   }
-  if (failures) {
-    console.log(`${failures} store(s) not in sync`);
+  if (problems) {
+    console.log(`${problems} store(s) need attention; rerun to retry failed or changed records`);
     process.exit(1);
   }
 }
