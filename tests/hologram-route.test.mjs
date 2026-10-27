@@ -7,8 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("the static build publishes the complete mobile hologram app", async () => {
-  await import(`../scripts/build-static.mjs?hologram-test=${Date.now()}`);
+test("the production build publishes the complete mobile hologram app", async () => {
   for (const relativePath of [
     "hologram/index.html",
     "hologram/hologram.css",
@@ -21,9 +20,10 @@ test("the static build publishes the complete mobile hologram app", async () => 
     "hologram/firmware/hologram-c3-supermini.bin",
     "hologram/firmware/hologram-c3-source.zip",
     "hologram/firmware/manifest.json",
-  ]) await access(path.join(root, "dist", relativePath));
+  ]) await access(path.join(root, "release-dist", relativePath));
 
-  const html = await readFile(path.join(root, "dist", "hologram", "index.html"), "utf8");
+  // Check the source page: the release build adds the analytics script.
+  const html = await readFile(path.join(root, "hologram", "index.html"), "utf8");
   assert.match(html, /id="drawCanvas"/);
   assert.match(html, /accept="image\/\*,video\/\*,\.gif"/);
   assert.match(html, /id="messageInput"/);
