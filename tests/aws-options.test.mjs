@@ -7,6 +7,7 @@ const valid = {
   MAKEABLE_PUBLIC_ORIGIN: "https://staging.makeable.build",
   MAKEABLE_DRAFT_COOKIE_SECRET: "d".repeat(32),
   MAKEABLE_BACKGROUND_SECRET: "b".repeat(32),
+  MAKEABLE_TRUSTED_PROXY_HOPS: "0",
 };
 
 test("valid settings are read", () => {
@@ -27,7 +28,9 @@ test("a missing or malformed public origin is refused", () => {
   assert.throws(() => deployOptions({ ...valid, MAKEABLE_PUBLIC_ORIGIN: "https://x.com/path" }), /MAKEABLE_PUBLIC_ORIGIN/);
 });
 
-test("a bad proxy hop count is refused", () => {
+test("a bad or missing proxy hop count is refused", () => {
+  const { MAKEABLE_TRUSTED_PROXY_HOPS, ...withoutHops } = valid;
+  assert.throws(() => deployOptions(withoutHops), /MAKEABLE_TRUSTED_PROXY_HOPS/);
   assert.throws(() => deployOptions({ ...valid, MAKEABLE_TRUSTED_PROXY_HOPS: "-1" }), /MAKEABLE_TRUSTED_PROXY_HOPS/);
   assert.throws(() => deployOptions({ ...valid, MAKEABLE_TRUSTED_PROXY_HOPS: "one" }), /MAKEABLE_TRUSTED_PROXY_HOPS/);
 });

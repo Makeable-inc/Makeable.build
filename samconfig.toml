@@ -14,3 +14,5 @@ capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
 fail_on_empty_changeset = false
+# TrustedProxyHops=0 until we see real headers through Amplify; set it before cutover.
+parameter_overrides = "TrustedProxyHops=0"
