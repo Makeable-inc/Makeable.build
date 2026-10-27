@@ -31,6 +31,8 @@
     "ws": "8.21.1"
   },
   "devDependencies": {
-    "@aws-sdk/client-cloudformation": "3.1090.0"
+    "@aws-sdk/client-amplify": "3.1090.0",
+    "@aws-sdk/client-cloudformation": "3.1090.0",
+    "fflate": "0.8.2"
   }
 }
