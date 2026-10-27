@@ -1,3 +1,8 @@
+import { loadSecretsIntoEnv } from "../../lib/aws/secrets.mjs";
+
+// Runs once per cold start, before any entry reads its settings.
+await loadSecretsIntoEnv();
+
 const DEPLOY_CONTEXTS = new Set(["production", "staging"]);
 // Off Netlify, lib/build-jobs.mjs draftCookieSecret() falls back to a dev
 // secret that is public in this repo, so these must be set for real.
