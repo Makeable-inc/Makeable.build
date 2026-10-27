@@ -34,15 +34,6 @@ test("Netlify redirects come first, unchanged", () => {
   );
 });
 
-test("the short link Netlify served from a function becomes a 302, without duplicating the netlify.toml ones", () => {
-  const all = rules();
-  const tiktok = all.filter((rule) => rule.source === "/r/tiktok/trymakeable-build");
-  assert.equal(tiktok.length, 1);
-  assert.equal(tiktok[0].status, "302");
-  assert.match(tiktok[0].target, /^\/\?utm_source=tiktok&.*social_account=trymakeable_build/);
-  assert.equal(all.filter((rule) => rule.source === "/r/ig/makeable-build").length, 1);
-});
-
 test("/api/* and /config.local.js are proxied to the API Lambda", () => {
   const all = rules();
   assert.deepEqual(all.find((rule) => rule.source === "/api/<*>"), {
@@ -85,4 +76,11 @@ test("Netlify path patterns become Amplify globs", () => {
   for (const pattern of ["**", "/ember/**", "/_next/static/**", "/dashboard", "/dashboard/**", "/hologram/sw.js", "/r/fb/makeable"]) {
     assert.ok(yaml.includes(`- pattern: ${JSON.stringify(pattern)}\n`), pattern);
   }
+});
+
+test("every /r/* path goes to the API Lambda after the netlify.toml short links", () => {
+  const all = rules();
+  const proxy = all.findIndex((rule) => rule.source === "/r/<*>");
+  assert.deepEqual(all[proxy], { source: "/r/<*>", target: `${API}/r/<*>`, status: "200" });
+  assert.ok(proxy > all.findIndex((rule) => rule.source === "/r/ig/makeable-build"));
 });

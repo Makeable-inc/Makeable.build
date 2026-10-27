@@ -1,6 +1,5 @@
-// Turns netlify.toml (redirects, headers) and the /r/* short links into
+// Turns netlify.toml (redirects, headers) into
 // Amplify Hosting rules, so the site behaves on Amplify as it does on Netlify.
-import { socialLinkPaths, socialLinkRedirect } from "../lib/social-links.mjs";
 
 // Reads the [[redirects]] and [[headers]] blocks; nothing else in the file.
 export function parseNetlifyToml(text) {
@@ -30,14 +29,11 @@ export function parseNetlifyToml(text) {
 export function amplifyRules({ netlify, apiOrigin }) {
   const rule = (source, target, status) => ({ source, target, status });
   const rules = netlify.redirects.map(({ from, to, status }) => rule(from, to, status));
-  const taken = new Set(rules.map((entry) => entry.source));
 
-  // On Netlify the rest of /r/* ran in a function; here they are plain redirects.
-  for (const path of socialLinkPaths()) {
-    if (!taken.has(path)) rules.push(rule(path, socialLinkRedirect(path).location, "302"));
-  }
-
+  // The rest of /r/* (other accounts, per-post links, trailing slashes) ran in a
+  // Netlify function; the API Lambda serves it with the same code.
   const api = apiOrigin.replace(/\/$/, "");
+  rules.push(rule("/r/<*>", `${api}/r/<*>`, "200"));
   rules.push(rule("/api/<*>", `${api}/api/<*>`, "200"));
   rules.push(rule("/config.local.js", `${api}/config.local.js`, "200"));
 
