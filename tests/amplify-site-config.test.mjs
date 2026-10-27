@@ -1,0 +1,95 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import {
+  amplifyCustomHttp,
+  amplifyRules,
+  parseNetlifyToml,
+} from "../scripts/amplify-site-config.mjs";
+
+const toml = readFileSync(new URL("../netlify.toml", import.meta.url), "utf8");
+const API = "https://abc123.lambda-url.us-east-1.on.aws";
+const PAGE_DIRS = ["_not-found", "404", "app", "circuit-studio", "dashboard", "ember", "hologram", "privacy", "terms"];
+
+function rules() {
+  return amplifyRules({ netlify: parseNetlifyToml(toml), apiOrigin: API, pageDirs: PAGE_DIRS });
+}
+
+test("netlify.toml redirects are read in order with their status", () => {
+  const { redirects } = parseNetlifyToml(toml);
+  assert.equal(redirects.length, 10);
+  assert.deepEqual(redirects[0], { from: "/pilot", to: "/pilot-app.html", status: "200" });
+  assert.deepEqual(redirects.at(-1), {
+    from: "/ember/download",
+    to: "https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg",
+    status: "302",
+  });
+});
+
+test("Netlify redirects come first, unchanged", () => {
+  const { redirects } = parseNetlifyToml(toml);
+  assert.deepEqual(
+    rules().slice(0, 10).map(({ source, target, status }) => ({ from: source, to: target, status })),
+    redirects,
+  );
+});
+
+test("the short link Netlify served from a function becomes a 302, without duplicating the netlify.toml ones", () => {
+  const all = rules();
+  const tiktok = all.filter((rule) => rule.source === "/r/tiktok/trymakeable-build");
+  assert.equal(tiktok.length, 1);
+  assert.equal(tiktok[0].status, "302");
+  assert.match(tiktok[0].target, /^\/\?utm_source=tiktok&.*social_account=trymakeable_build/);
+  assert.equal(all.filter((rule) => rule.source === "/r/ig/makeable-build").length, 1);
+});
+
+test("/api/* and /config.local.js are proxied to the API Lambda", () => {
+  const all = rules();
+  assert.deepEqual(all.find((rule) => rule.source === "/api/<*>"), {
+    source: "/api/<*>",
+    target: `${API}/api/<*>`,
+    status: "200",
+  });
+  assert.deepEqual(all.find((rule) => rule.source === "/config.local.js"), {
+    source: "/config.local.js",
+    target: `${API}/config.local.js`,
+    status: "200",
+  });
+});
+
+test("folder pages are served without a trailing-slash redirect, like Netlify", () => {
+  const all = rules();
+  for (const dir of ["app", "circuit-studio", "privacy", "terms"]) {
+    assert.deepEqual(all.find((rule) => rule.source === `/${dir}`), {
+      source: `/${dir}`,
+      target: `/${dir}/index.html`,
+      status: "200",
+    });
+  }
+  assert.equal(all.filter((rule) => rule.source === "/dashboard").length, 1);
+  assert.equal(all.find((rule) => rule.source === "/_not-found"), undefined);
+  assert.equal(all.find((rule) => rule.source === "/404"), undefined);
+});
+
+test("unknown paths get the 404 page, as the last rule", () => {
+  assert.deepEqual(rules().at(-1), { source: "/<*>", target: "/404.html", status: "404" });
+});
+
+test("every netlify.toml header becomes an Amplify custom header with the same value", () => {
+  const yaml = amplifyCustomHttp(parseNetlifyToml(toml));
+  assert.match(yaml, /^customHeaders:\n/);
+  const { headers } = parseNetlifyToml(toml);
+  assert.equal(headers.length, 13);
+  for (const block of headers) {
+    for (const [key, value] of Object.entries(block.values)) {
+      assert.ok(yaml.includes(`key: ${JSON.stringify(key)}\n        value: ${JSON.stringify(value)}`), `${block.for} ${key}`);
+    }
+  }
+});
+
+test("Netlify path patterns become Amplify globs", () => {
+  const yaml = amplifyCustomHttp(parseNetlifyToml(toml));
+  for (const pattern of ["**", "/ember/**", "/_next/static/**", "/dashboard", "/dashboard/**", "/hologram/sw.js", "/r/fb/makeable"]) {
+    assert.ok(yaml.includes(`- pattern: ${JSON.stringify(pattern)}\n`), pattern);
+  }
+});
