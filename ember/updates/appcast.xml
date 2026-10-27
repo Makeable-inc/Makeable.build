@@ -1,19 +1,17 @@
-<?xml version="1.0" standalone="yes"?>
-<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-    <channel>
-        <title>Ember</title>
-        <link>https://makeable.build/ember/updates/appcast.xml</link>
-        <description>Signed automatic updates for Ember on macOS.</description>
-        <language>en</language>
-        <item>
-            <title>0.2.17 — Your display, securely paired</title>
-            <pubDate>Tue, 08 Sep 2026 13:28:00 -0700</pubDate>
-            <link>https://makeable.build/ember</link>
-            <sparkle:version>18</sparkle:version>
-            <sparkle:shortVersionString>0.2.17</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v0.2.17-developer-preview.20260908/Ember-0.2.17-Developer-Preview-arm64.dmg?build=18" length="30450363" type="application/octet-stream" sparkle:edSignature="pHTVC4efYCYpRgJz2nMB7N41w+56PKF+ZlDeaDu9RC9gMHEAb9y7JD+Av8yc5B4qXvP6V8LzcgkxhCtj1nVZBQ=="/>
-        </item>
-    </channel>
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Ember</title>
+    <link>https://makeable.build/ember/updates/appcast.xml</link>
+    <description>Ember updates</description>
+    <language>en</language>
+    <item>
+      <title>0.2.22 — Know why display setup stopped</title>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>0.2.22</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description>Shows the failed setup step and a specific USB diagnostic, with a copyable report. Allows future update restarts after failed setup has safely stopped, never during flashing. Pet progress and pairing are preserved. Developer Preview; not notarized.</description>
+      <enclosure url="https://dvy6bet209exg.cloudfront.net/ember/releases/0.2.22/Ember-0.2.22-Developer-Preview-arm64.dmg" length="30476685" type="application/octet-stream" sparkle:edSignature="riSVXQmzHB35lVssplNOz+ucuJK5PaayQg0KfOMwZ9sFh7y6QmyU5epDthm1Iz77E2ooxycl0ntK9viBqcafAw=="/>
+    </item>
+  </channel>
 </rss>
