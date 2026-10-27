@@ -8,6 +8,7 @@ Makeable turns a typed idea into an ESP32 build: a parts list and a 3D step-by-s
 
 - Work on a branch and open a PR. A maintainer approves the merge.
 - Deploy only through the workflow on `main`.
+- The move from Netlify to AWS happens on `staging`. Base new work on `staging` and open PRs into it. `staging` never deploys to Netlify.
 
 ## Layout
 
