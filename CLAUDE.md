@@ -45,6 +45,15 @@ Gotchas:
 - Check a deploy: `AWS_PROFILE=makeable node scripts/aws-smoke-build.mjs` runs one real build through the API URL, prints each stage and deletes its own test records. Exit 0 means ready. Each run calls OpenAI.
 - A build can fail on the AI's side (for example `planner_identity_echo_mismatch`); rerun once before treating it as a deploy problem.
 
+### When a deploy fails after a merge
+
+The workflow already put the live site back on `aws-last-good`, so users are fine. `staging` still holds the change that failed, and the next merge would deploy it again, so clean it up through a PR (`staging` takes no direct pushes):
+
+1. Read why: `gh run list --workflow deploy-aws.yml --limit 1`, then `gh run view <id> --log-failed`.
+2. Clear cause and a small fix (a missing permission, a typo): open a PR with the fix. Merging it deploys it.
+3. Unclear cause, or the fix will take a while: revert the merged PR (`gh pr view <n>` → "Revert" on GitHub, or `git revert -m 1 <merge-sha>` on a branch), merge the revert, and fix on a branch.
+4. Changes to `aws/github-deploy-role.yaml` do not deploy through the workflow: apply them by hand (`aws cloudformation deploy --template-file aws/github-deploy-role.yaml --stack-name makeable-github-deploy --capabilities CAPABILITY_NAMED_IAM`, after checking the change set) before merging the PR that needs them.
+
 ## Working rules
 
 - Reproduce a bug as a failing test before fixing it.
