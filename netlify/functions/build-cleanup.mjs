@@ -1,4 +1,4 @@
-import { getStore } from "@netlify/blobs";
+import { openStore } from "../../lib/storage/index.mjs";
 import {
   buildCommunityStoreNameForFunctionContext,
   buildJobImageStoreNameForFunctionContext,
@@ -30,15 +30,15 @@ export default async function handler(_req, context = {}) {
 
 function buildStateStore(context) {
   return createRoutedBuildStateStore({
-    jobStore: getStore({
+    jobStore: openStore({
       name: buildJobStateStoreNameForFunctionContext(context),
       consistency: "strong",
     }),
-    quotaStore: getStore({
+    quotaStore: openStore({
       name: buildJobQuotaStoreNameForFunctionContext(context),
       consistency: "strong",
     }),
-    communityStore: getStore({
+    communityStore: openStore({
       name: buildCommunityStoreNameForFunctionContext(context),
       consistency: "strong",
     }),
@@ -46,7 +46,7 @@ function buildStateStore(context) {
 }
 
 function buildImageStore(context) {
-  return getStore({
+  return openStore({
     name: buildJobImageStoreNameForFunctionContext(context),
     consistency: "strong",
   });

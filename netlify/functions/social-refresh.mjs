@@ -1,4 +1,4 @@
-import { getStore } from "@netlify/blobs";
+import { openStore } from "../../lib/storage/index.mjs";
 import { refreshSocialRecords } from "../../lib/social-refresh.mjs";
 import { persistSocialRecords, readSocialRecords, reconcileRefreshedSocialRecords, socialStoreNameForFunctionContext } from "../../lib/social-dashboard.mjs";
 import { loadTikTokAccessToken } from "../../lib/tiktok-oauth.mjs";
@@ -10,7 +10,7 @@ export default async function handler(_req, context = {}) {
   try {
     const metaAccessToken = value("META_ACCESS_TOKEN");
     const youtubeApiKey = globalThis.Netlify?.env?.get("YOUTUBE_API_KEY") || process.env.YOUTUBE_API_KEY || "";
-    const store = getStore({ name: socialStoreNameForFunctionContext(context), consistency: "strong" });
+    const store = openStore({ name: socialStoreNameForFunctionContext(context), consistency: "strong" });
     const tiktokAccessToken = await resolvedTikTokAccessToken(store);
     const youtubeAccessToken = await resolvedYouTubeAccessToken(store);
     const { records: incoming, failures, refreshedPlatforms } = await refreshSocialRecords({
