@@ -18,3 +18,21 @@ fail_on_empty_changeset = false
 # real client IP and drop any value the visitor sent (checked 27 Oct).
 # PublicOrigin is the Amplify test URL until cutover, then https://makeable.build.
 parameter_overrides = "TrustedProxyHops=1 PublicOrigin=https://main.d1pesirg786fm3.amplifyapp.com LogClientIp=0"
+
+# GitHub Actions (.github/workflows/deploy-aws.yml): logs in through the
+# makeable-github-deploy role, so no profile. Keep in step with [default];
+# tests/samconfig.test.mjs checks they match.
+[ci.global.parameters]
+stack_name = "makeable-prod"
+
+[ci.build.parameters]
+cached = false
+parallel = true
+
+[ci.deploy.parameters]
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+confirm_changeset = false
+fail_on_empty_changeset = false
+parameter_overrides = "TrustedProxyHops=1 PublicOrigin=https://main.d1pesirg786fm3.amplifyapp.com LogClientIp=0"
