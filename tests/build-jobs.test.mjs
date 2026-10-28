@@ -1289,3 +1289,45 @@ function requestWithCookie(cookie) {
 function cookiePair(cookie) {
   return String(cookie || "").split(";")[0];
 }
+
+test("a claimed build appears in My projects for a user whose builds were already indexed", async () => {
+  const stateStore = createMemoryBlobStore();
+  const imageStore = createMemoryBlobStore();
+  const user = { sub: "google-subject-atomic", email: "maker@example.com", name: "Maker" };
+  assert.deepEqual(await listAccountGalleryBuilds(stateStore, user.sub), []);
+  const started = await createAnonymousBuildJob({
+    request: requestWithIp("https://makeable.build/api/build-jobs", "203.0.113.77"),
+    stateStore,
+    env,
+    user,
+    idea: "Build a temperature and humidity comfort station",
+    revisionContext: {
+      catalogRevision: "ready78",
+      promptPackageRevision: "2026-09-02.3",
+      requireAtomicManifest: true,
+    },
+  });
+  await markBuildJobState(stateStore, started.job.id, BUILD_JOB_STATES.planning);
+  await completeBuildJob({
+    stateStore,
+    imageStore,
+    jobId: started.job.id,
+    build: fakeAtomicBuild(started.job.identity),
+  });
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).remaining, 10);
+
+  const claimed = await claimSuccessfulBuildJob({
+    request: requestWithCookie(started.cookie),
+    stateStore,
+    imageStore,
+    env,
+    jobId: started.job.id,
+    user,
+    galleryName: "Maker",
+  });
+  assert.equal(claimed.ok, true);
+  assert.deepEqual(
+    (await listAccountGalleryBuilds(stateStore, user.sub)).map((build) => build.id),
+    [started.job.identity.buildId],
+  );
+});
