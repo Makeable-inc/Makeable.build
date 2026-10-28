@@ -263,6 +263,34 @@ a {
   color: var(--coral);
 }
 
+.mk-nav-account {
+  position: relative;
+  display: flex;
+  justify-self: end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mk-nav-signout {
+  min-height: 3.25rem;
+  padding: 0 1.1rem;
+  border: 1px solid rgba(255, 248, 237, 0.45);
+  border-radius: 0.72rem;
+  background: rgba(11, 13, 16, 0.35);
+  color: #fff8ed;
+  font-size: 0.95rem;
+  font-weight: 750;
+}
+
+.mk-nav-signout-error {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: max-content;
+  max-width: 22rem;
+  margin: 0;
+}
+
 .mk-nav-cta {
   justify-self: end;
   min-height: 3.25rem;
@@ -1927,7 +1955,8 @@ img.mk-build-image-pending {
   }
 
   .mk-nav-links,
-  .mk-nav-cta {
+  .mk-nav-cta,
+  .mk-nav-signout {
     display: none;
   }
 

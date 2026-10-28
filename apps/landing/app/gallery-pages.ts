@@ -11,9 +11,16 @@ export function galleryPageUrl(cursor: string) {
   return `/api/builds?${query}`;
 }
 
-export async function loadGalleryPage<Build>(fetch: FetchLike, url: string, timeoutMs = 10000): Promise<GalleryPage<Build>> {
+export async function loadGalleryPage<Build>(
+  fetch: FetchLike,
+  url: string,
+  timeoutMs = 10000,
+  signal?: AbortSignal,
+): Promise<GalleryPage<Build>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener("abort", () => controller.abort());
   try {
     const response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
     if (!response.ok) return { ok: false };

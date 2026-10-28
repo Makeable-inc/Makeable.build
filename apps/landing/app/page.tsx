@@ -16,6 +16,7 @@ import {
   identifyMakeableAccount,
   makeableDistinctId,
   makeableReferringDomain,
+  resetMakeableAnalytics,
 } from "./analytics";
 import { advanceBuildProgress } from "./generation-progress";
 import {
@@ -651,6 +652,9 @@ export default function Home() {
   const [galleryMoreError, setGalleryMoreError] = useState("");
   const [galleryLoadFailed, setGalleryLoadFailed] = useState(false);
   const [galleryAttempt, setGalleryAttempt] = useState(0);
+  const [galleryRetrying, setGalleryRetrying] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const [detailBuild, setDetailBuild] = useState<BuildProject | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("loading");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -1254,15 +1258,20 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    setGalleryLoadFailed(false);
+    const controller = new AbortController();
     // A failed list is shown as a failure with Try again, never as "no builds".
-    void loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl(""))).then((page) => {
+    // The message stays up while a retry runs, until its result is known.
+    void loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl("")), undefined, controller.signal).then((page) => {
       if (cancelled) return;
       setGalleryLoadFailed(!page.ok);
+      setGalleryRetrying(false);
       setGeneratedBuilds(page.ok ? page.builds : []);
       setGalleryCursor(page.ok ? page.nextCursor : null);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [galleryAttempt]);
 
   useEffect(() => {
@@ -1392,6 +1401,32 @@ export default function Home() {
       return;
     }
     fetchAccount(true);
+  }
+
+  function retryGallery() {
+    setGalleryRetrying(true);
+    setGalleryAttempt((attempt) => attempt + 1);
+  }
+
+  async function logOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    generationAbortRef.current?.abort();
+    const ok = await signOut({
+      fetch,
+      url: apiUrl("/api/auth/session"),
+      storages: browserStorages(),
+      jobUrl: (jobId) => apiUrl(`/api/build-jobs/${encodeURIComponent(jobId)}`),
+      jobIds: [currentJobRef.current && !currentJobRef.current.claimedAt ? currentJobRef.current.id : ""],
+    });
+    if (ok) {
+      resetMakeableAnalytics();
+      window.location.assign("/");
+      return;
+    }
+    setSigningOut(false);
+    setSignOutError("Makeable could not log you out. You are still signed in, so try again.");
   }
 
   async function loadMoreBuilds() {
@@ -1539,12 +1574,9 @@ export default function Home() {
             generationAbortRef.current?.abort();
             window.location.assign(`/app?build=${encodeURIComponent(build.id)}`);
           }}
-          onSignOut={() => {
-            generationAbortRef.current?.abort();
-            // Reload either way: the page then shows whatever the server says.
-            void signOut({ fetch, url: apiUrl("/api/auth/session"), storages: browserStorages() })
-              .then(() => window.location.assign("/"));
-          }}
+          onSignOut={() => void logOut()}
+          signingOut={signingOut}
+          signOutError={signOutError}
           onCreateAnother={() => {
             setWorkspaceOpen(false);
             window.setTimeout(() => document.getElementById("make")?.scrollIntoView({ behavior: "smooth" }), 0);
@@ -1604,9 +1636,17 @@ export default function Home() {
             <a href="#make">Create</a>
             <a href="#community">Community</a>
           </div>
-          <button className="mk-nav-cta" type="button" onClick={openBuildLibrary}>
-            {!authResolved ? "Checking…" : authUser ? <><span>My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
-          </button>
+          <div className="mk-nav-account">
+            {authUser && (
+              <button className="mk-nav-signout" type="button" onClick={() => void logOut()} disabled={signingOut}>
+                {signingOut ? "Logging out..." : "Log out"}
+              </button>
+            )}
+            <button className="mk-nav-cta" type="button" onClick={openBuildLibrary}>
+              {!authResolved ? "Checking…" : authUser ? <><span>My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
+            </button>
+            {signOutError && <p className="mk-form-error mk-nav-signout-error" role="alert">{signOutError}</p>}
+          </div>
         </nav>
         <div
           className="mk-mobile-hero-media"
@@ -1714,7 +1754,9 @@ export default function Home() {
         {galleryLoadFailed && (
           <div className="mk-gallery-footer mk-gallery-load-error">
             <p className="mk-form-error" role="status">Makeable could not load the community builds. The examples below are still here.</p>
-            <button type="button" onClick={() => setGalleryAttempt((attempt) => attempt + 1)}>Try again</button>
+            <button type="button" onClick={retryGallery} disabled={galleryRetrying}>
+              {galleryRetrying ? "Loading..." : "Try again"}
+            </button>
           </div>
         )}
         <div className="mk-community-grid" ref={communityGridRef} onScroll={updateCommunityIndex}>
@@ -1866,6 +1908,8 @@ function BuildWorkspace({
   onBack,
   onSelectBuild,
   onSignOut,
+  signingOut,
+  signOutError,
   onCreateAnother,
   onDismiss,
   onCancel,
@@ -1892,6 +1936,8 @@ function BuildWorkspace({
   onBack: () => void;
   onSelectBuild: (build: BuildProject) => void;
   onSignOut: () => void;
+  signingOut: boolean;
+  signOutError: string;
   onCreateAnother: () => void;
   onDismiss: () => void;
   onCancel: () => void;
@@ -1931,6 +1977,8 @@ function BuildWorkspace({
           }
         }}
         onSignOut={onSignOut}
+        signingOut={signingOut}
+        signOutError={signOutError}
       />
 
       {!isLoading && !isClarifying && <WorkspaceContextBar
