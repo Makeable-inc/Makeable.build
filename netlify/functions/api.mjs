@@ -838,8 +838,10 @@ function normalizeSignupEmail(value) {
 
 async function communityBuilds(req, env, context) {
   if (req.method === "GET") {
+    // The same for every visitor, so the CDN may share it: 10 minutes fresh,
+    // then served stale while it refreshes. A new build can take that long to show.
     return jsonResponse({ builds: await listPublicGalleryBuilds(buildStateStore(context)) }, 200, {
-      "Cache-Control": "no-store",
+      "Cache-Control": "public, max-age=0, s-maxage=600, stale-while-revalidate=86400",
     });
   }
   if (req.method === "POST") {
