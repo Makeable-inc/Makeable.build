@@ -46,6 +46,7 @@ import {
   listAccountGalleryBuilds,
   listPublicGalleryBuilds,
   markBuildJobState,
+  pageGalleryBuilds,
   publicBuildJob,
   resolveBuildJobAccess,
 } from "../../lib/build-jobs.mjs";
@@ -842,7 +843,20 @@ async function communityBuilds(req, env, context) {
   if (req.method === "GET") {
     // The same for every visitor, so the CDN may share it: 10 minutes fresh,
     // then served stale while it refreshes. A new build can take that long to show.
-    return jsonResponse({ builds: await listPublicGalleryBuilds(buildStateStore(context)) }, 200, {
+    // ?limit=N&cursor=... returns one page and the cursor for the next.
+    const params = new URL(req.url).searchParams;
+    const limitParam = params.get("limit");
+    let page;
+    try {
+      page = pageGalleryBuilds(await listPublicGalleryBuilds(buildStateStore(context)), {
+        limit: limitParam === null ? undefined : /^\d+$/.test(limitParam) ? Number(limitParam) : Number.NaN,
+        cursor: params.get("cursor") || "",
+      });
+    } catch (error) {
+      if (error?.message !== "gallery_page_invalid") throw error;
+      return jsonResponse({ error: "Invalid limit or cursor." }, 400, { "Cache-Control": "no-store" });
+    }
+    return jsonResponse(limitParam === null ? { builds: page.builds } : page, 200, {
       "Cache-Control": "public, max-age=0, s-maxage=600, stale-while-revalidate=86400",
     });
   }
