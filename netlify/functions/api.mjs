@@ -1,6 +1,7 @@
 import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
 import { backgroundDispatchFetch } from "../../lib/aws/background-invoke.mjs";
 import { openStore } from "../../lib/storage/index.mjs";
+import { getGalleryThumbnail } from "../../lib/build-thumbnails.mjs";
 import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createGoogleWaitlistResult } from "../../lib/acquisition.mjs";
@@ -22,6 +23,7 @@ import {
   accountBuildQuota,
   buildCommunityStoreNameForFunctionContext,
   buildJobImageStoreNameForFunctionContext,
+  buildThumbnailStoreNameForFunctionContext,
   buildJobQuotaStoreNameForFunctionContext,
   buildJobStateStoreNameForFunctionContext,
   builderDisabled,
@@ -1041,6 +1043,20 @@ async function communityBuildImage(req, context, id) {
       "Cache-Control": "no-store",
     });
   }
+  // Gallery cards ask for ?size=card: a small JPEG made on first request.
+  // If it can't be made, they get the full image below.
+  if (new URL(req.url).searchParams.get("size") === "card") {
+    const thumbnail = await getGalleryThumbnail({
+      thumbnails: buildThumbnailStore(context),
+      fullImage: (buildId) => getGalleryImage(buildImageStore(context), buildId),
+      buildId: id,
+    });
+    if (thumbnail) {
+      return binaryResponse(thumbnail.bytes, thumbnail.contentType, {
+        "Cache-Control": "public, max-age=3600",
+      });
+    }
+  }
   const image = await getGalleryImage(buildImageStore(context), id);
   if (!image) {
     return jsonResponse({ error: "Build image not found" }, 404, {
@@ -1278,6 +1294,13 @@ function buildStateStore(context) {
       name: buildCommunityStoreNameForFunctionContext(context),
       consistency: "strong",
     }),
+  });
+}
+
+function buildThumbnailStore(context) {
+  return openStore({
+    name: buildThumbnailStoreNameForFunctionContext(context),
+    consistency: "strong",
   });
 }
 

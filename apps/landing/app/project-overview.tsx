@@ -204,7 +204,7 @@ export function PartThumbnail({ part }: { part: ProjectPart }) {
   </span>;
 }
 
-export function ProjectImage({ src, alt }: { src: string; alt: string }) {
+export function ProjectImage({ src, alt, size }: { src: string; alt: string; size?: "card" }) {
   const [loadedSrc, setLoadedSrc] = useState("");
   const [failedSrc, setFailedSrc] = useState("");
   if (!src || failedSrc === src) {
@@ -215,7 +215,7 @@ export function ProjectImage({ src, alt }: { src: string; alt: string }) {
   // constructor fetched every card's full image at once.)
   return (
     <img
-      src={projectAssetUrl(src)}
+      src={projectAssetUrl(size === "card" ? cardImageUrl(src) : src)}
       alt={alt}
       loading="lazy"
       decoding="async"
@@ -224,6 +224,12 @@ export function ProjectImage({ src, alt }: { src: string; alt: string }) {
       onError={() => setFailedSrc(src)}
     />
   );
+}
+
+// Build images served by the API have a small card version (?size=card);
+// other images (seed examples, data URLs) are used as they are.
+function cardImageUrl(value: string) {
+  return /^\/api\/builds\/[^/?]+\/image$/.test(value) ? `${value}?size=card` : value;
 }
 
 function projectAssetUrl(value: string) {

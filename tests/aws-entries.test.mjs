@@ -44,6 +44,29 @@ test("the public gallery list lets the CDN share it for 10 minutes and serve it 
   assert.equal(result.headers.vary, undefined);
 });
 
+test("a gallery card asks for ?size=card and gets a small JPEG; without it, the full image", async () => {
+  const { Jimp, JimpMime } = await import("jimp");
+  const { buildCommunityStoreName, buildJobImageStoreName } = await import("../lib/build-jobs.mjs");
+  const png = new Uint8Array(await new Jimp({ width: 1200, height: 800, color: 0x8899aaff }).getBuffer(JimpMime.png));
+  const buildId = "build_thumb-test_abc123";
+  await openStore({ name: buildCommunityStoreName("staging") }).setJSON(`gallery/${buildId}.json`, {
+    id: buildId, title: "Thumb test", summary: "s", createdAt: "2026-10-01T00:00:00.000Z",
+    claimedAt: "2026-10-01T00:00:00.000Z", ownerSub: "someone", publishState: "public", parts: [],
+    image: { url: `/api/builds/${buildId}/image`, source: "openai", status: "generated" },
+  });
+  await openStore({ name: buildJobImageStoreName("staging") }).set(`gallery-images/${buildId}`, new Blob([png], { type: "image/png" }), {
+    metadata: { contentType: "image/png" },
+  });
+  const { handler } = await import("../aws/functions/api.mjs");
+  const card = await handler(urlEvent({ rawPath: `/api/builds/${buildId}/image`, rawQueryString: "size=card" }));
+  assert.equal(card.statusCode, 200);
+  assert.equal(card.headers["content-type"], "image/jpeg");
+  assert.equal(card.headers["cache-control"], "public, max-age=3600");
+  const full = await handler(urlEvent({ rawPath: `/api/builds/${buildId}/image` }));
+  assert.equal(full.statusCode, 200);
+  assert.ok(Buffer.from(card.body, "base64").length < Buffer.from(full.body, "base64").length);
+});
+
 test("api entry answers GET /api/health", async () => {
   const { handler } = await import("../aws/functions/api.mjs");
   const result = await handler(urlEvent());

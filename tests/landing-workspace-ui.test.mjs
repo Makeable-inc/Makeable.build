@@ -194,3 +194,14 @@ test("build images load only when near the screen, not all at once on page load"
   const css = await readFile(new URL("../apps/landing/app/production.css", import.meta.url), "utf8");
   assert.match(css, /img\.mk-build-image-pending\s*\{[^}]*background/);
 });
+
+test("gallery cards ask for the small card image; the project view keeps the full image", async () => {
+  const [home, overview] = await Promise.all([readFile(homePath, "utf8"), readFile(overviewPath, "utf8")]);
+  const cardImages = home.match(/<ProjectImage [^>]*\/>/g) || [];
+  // Homepage strip card and full-gallery card ask for size="card"; the detail visual does not.
+  assert.equal(cardImages.filter((tag) => tag.includes('size="card"')).length, 2);
+  assert.equal(cardImages.filter((tag) => !tag.includes('size="card"')).length, 1);
+  const projectImage = overview.slice(overview.indexOf("export function ProjectImage"), overview.indexOf("function projectAssetUrl"));
+  assert.match(projectImage, /size\?: "card"/);
+  assert.match(overview, /size=card/);
+});

@@ -1683,7 +1683,7 @@ export default function Home() {
         <div className="mk-community-grid" ref={communityGridRef} onScroll={updateCommunityIndex}>
           {communityBuilds.map((build) => (
             <button className="mk-community-card" type="button" key={build.id} onClick={() => openProject(build)}>
-              <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
+              <ProjectImage src={build.image.url} alt={`${build.title} product render`} size="card" />
               <CreatorBadge build={build} />
               <span>{build.title}</span>
               <small>{build.image.source === "seed" ? "Makeable example" : build.status || "Concept"}</small>
@@ -2007,7 +2007,7 @@ function FullGallery({
           {builds.map((build) => (
             <button type="button" key={build.id} onClick={() => onSelect(build)}>
               <div>
-                <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
+                <ProjectImage src={build.image.url} alt={`${build.title} product render`} size="card" />
                 <CreatorBadge build={build} />
               </div>
               <span>{build.title}</span>
