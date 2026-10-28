@@ -180,3 +180,17 @@ test("safe recovery preserves identity and exposes every supported exit", async 
   assert.match(app, /onEdit=\{\(\) => router\.push\("\/#make"\)\}/);
   assert.match(app, /Makeable did not substitute a different build/);
 });
+
+test("build images load only when near the screen, not all at once on page load", async () => {
+  const overview = await readFile(overviewPath, "utf8");
+  const projectImage = overview.slice(overview.indexOf("export function ProjectImage"), overview.indexOf("function projectAssetUrl"));
+  // A preload with new Image() downloads every card's full image, visible or not
+  // (~180 MB on the homepage), and loading="lazy" cannot stop it.
+  assert.doesNotMatch(projectImage, /new Image\(\)/);
+  assert.match(projectImage, /<img[^>]*loading="lazy"/);
+  assert.match(projectImage, /<img[^>]*decoding="async"/);
+  assert.match(projectImage, /Preview unavailable/);
+  assert.match(projectImage, /mk-build-image-pending/);
+  const css = await readFile(new URL("../apps/landing/app/production.css", import.meta.url), "utf8");
+  assert.match(css, /img\.mk-build-image-pending\s*\{[^}]*background/);
+});

@@ -700,6 +700,12 @@ a {
   object-fit: cover;
 }
 
+/* A build image still loading (ProjectImage): same box, placeholder tint. */
+img.mk-build-image-pending {
+  background: linear-gradient(145deg, #eee8df, #ddd4c8);
+  color: transparent;
+}
+
 .mk-community-card > .mk-build-image-fallback {
   display: grid;
   width: calc(100% + 5.6rem);

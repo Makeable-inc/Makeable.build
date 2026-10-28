@@ -205,23 +205,25 @@ export function PartThumbnail({ part }: { part: ProjectPart }) {
 }
 
 export function ProjectImage({ src, alt }: { src: string; alt: string }) {
-  const [readySrc, setReadySrc] = useState("");
+  const [loadedSrc, setLoadedSrc] = useState("");
   const [failedSrc, setFailedSrc] = useState("");
-  useEffect(() => {
-    let active = true;
-    if (!src) return () => { active = false; };
-    const probe = new Image();
-    probe.onload = () => { if (active) setReadySrc(src); };
-    probe.onerror = () => { if (active) setFailedSrc(src); };
-    probe.src = projectAssetUrl(src);
-    return () => { active = false; };
-  }, [src]);
-  const state = !src || failedSrc === src ? "failed" : readySrc === src ? "ready" : "checking";
-  if (state !== "ready") {
-    const unavailable = state === "failed";
-    return <span className="mk-build-image-fallback" role="img" aria-label={unavailable ? `${alt} unavailable` : `Loading ${alt}`}><span>{unavailable ? "Preview unavailable" : "Loading preview"}</span></span>;
+  if (!src || failedSrc === src) {
+    return <span className="mk-build-image-fallback" role="img" aria-label={`${alt} unavailable`}><span>Preview unavailable</span></span>;
   }
-  return <img src={projectAssetUrl(src)} alt={alt} onError={() => setFailedSrc(src)} />;
+  // The <img> itself loads lazily, so only images near the screen download; a
+  // tinted box shows until it arrives. (Preloading through the Image
+  // constructor fetched every card's full image at once.)
+  return (
+    <img
+      src={projectAssetUrl(src)}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className={loadedSrc === src ? undefined : "mk-build-image-pending"}
+      onLoad={() => setLoadedSrc(src)}
+      onError={() => setFailedSrc(src)}
+    />
+  );
 }
 
 function projectAssetUrl(value: string) {
