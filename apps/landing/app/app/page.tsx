@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowIcon, BuildFailurePanel, FolderSkeleton, LockedCodePanel, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "../workspace-ui";
-import { buildLibrary } from "./build-library";
+import { buildLibrary, loadBuildLibrary } from "./build-library";
 import { ProjectOverview } from "../project-overview";
 import { projectDisplayIdentity } from "../project-identity.mjs";
 import { ProjectWiringGuide } from "../project-wiring-guide";
@@ -75,12 +75,6 @@ type BuildQuota = {
   used: number;
   reserved: number;
   remaining: number;
-};
-
-type AccountBuildsResponse = {
-  user: AuthUser;
-  builds: BuildProject[];
-  quota?: BuildQuota;
 };
 
 const DEFAULT_BUILD_QUOTA: BuildQuota = {
@@ -160,58 +154,40 @@ export default function BuildAppPage() {
       setAccountUnavailable(false);
       setAccountBuilds([]);
       setPublicBuilds([]);
-      try {
-        const [accountResult, publicResult] = await Promise.allSettled([
-          fetch(apiUrl("/api/account/builds"), {
-            headers: { Accept: "application/json" },
-            credentials: "include",
-          }),
-          fetch(apiUrl("/api/builds"), { headers: { Accept: "application/json" } }),
-        ]);
-
-        if (cancelled) return;
-
-        let loadedAnyBuilds = false;
-        if (accountResult.status === "fulfilled" && accountResult.value.ok) {
-          const accountResponse = accountResult.value;
-          const account = await accountResponse.json() as AccountBuildsResponse;
-          if (!cancelled) {
-            setUser(account.user);
-            setAccountBuilds(Array.isArray(account.builds) ? account.builds : []);
-            setQuota(normalizeQuota(account.quota));
-            setAccountUnavailable(false);
-            loadedAnyBuilds = Array.isArray(account.builds) && account.builds.length > 0;
-          }
-        } else if (accountResult.status === "fulfilled" && accountResult.value.status === 401) {
+      const { account, publicBuilds: publicLoad } = loadBuildLibrary<AuthUser, BuildProject, BuildQuota>({
+        fetch: (url, init) => fetch(url, init),
+        accountUrl: apiUrl("/api/account/builds"),
+        publicUrl: apiUrl("/api/builds"),
+      });
+      // The two requests settle independently: public builds show as soon as
+      // they arrive, whatever happens to the account request.
+      const publicDone = publicLoad.then((result) => {
+        if (cancelled) return result;
+        if (result.state === "ok") setPublicBuilds(result.builds);
+        setLoading(false);
+        return result;
+      });
+      const accountDone = account.then((result) => {
+        if (cancelled) return result;
+        if (result.state === "signed-in") {
+          setUser(result.user);
+          setAccountBuilds(result.builds);
+          setQuota(normalizeQuota(result.quota));
+        } else if (result.state === "signed-out") {
           setUser(null);
           setAccountBuilds([]);
           setQuota(DEFAULT_BUILD_QUOTA);
-          setAccountUnavailable(false);
         } else {
           setAccountUnavailable(true);
           setLoadError("Your projects could not be loaded. Try again to reconnect to your account.");
         }
-
-        if (publicResult.status === "fulfilled" && publicResult.value.ok) {
-          const publicResponse = publicResult.value;
-          const publicData = await publicResponse.json() as { builds?: BuildProject[] };
-          if (!cancelled) {
-            const nextPublicBuilds = Array.isArray(publicData.builds) ? publicData.builds : [];
-            setPublicBuilds(nextPublicBuilds);
-            loadedAnyBuilds = loadedAnyBuilds || nextPublicBuilds.length > 0;
-          }
-        }
-        if (!loadedAnyBuilds && accountResult.status === "rejected" && publicResult.status === "rejected") {
-          setAccountUnavailable(true);
-          setLoadError("Makeable could not load this project folder.");
-        }
-      } catch {
-        if (!cancelled) {
-          setAccountUnavailable(true);
-          setLoadError("Makeable could not load this project folder.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        return result;
+      });
+      const [publicResult, accountResult] = await Promise.all([publicDone, accountDone]);
+      if (cancelled) return;
+      // A failed public list is an error to retry, never an empty gallery.
+      if (publicResult.state === "failed" && accountResult.state !== "signed-in") {
+        setLoadError("Makeable could not load the community builds. Try again.");
       }
     }
 

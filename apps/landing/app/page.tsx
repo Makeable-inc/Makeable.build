@@ -30,6 +30,7 @@ import { projectDisplayIdentity, withProjectDisplayIdentity } from "./project-id
 import { RetailerBrand } from "./retailer-brand";
 import { ProjectWiringGuide } from "./project-wiring-guide";
 import { projectWiringReady } from "./project-wiring-data.mjs";
+import { appendGalleryPage, galleryPageUrl, loadGalleryPage } from "./gallery-pages";
 import { ArrowIcon, BuildClarificationPanel, GenerationWorkspace, LockedCodePanel, ProfileAvatar, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "./workspace-ui";
 
 declare global {
@@ -644,6 +645,9 @@ export default function Home() {
   const [generationError, setGenerationError] = useState("");
   const [buildClarification, setBuildClarification] = useState<BuildClarification | null>(null);
   const [generatedBuilds, setGeneratedBuilds] = useState<BuildProject[]>([]);
+  const [galleryCursor, setGalleryCursor] = useState<string | null>(null);
+  const [galleryMoreBusy, setGalleryMoreBusy] = useState(false);
+  const [galleryMoreError, setGalleryMoreError] = useState("");
   const [detailBuild, setDetailBuild] = useState<BuildProject | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("loading");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -1235,14 +1239,11 @@ export default function Home() {
     applyHeroFromUrl();
     window.addEventListener("popstate", applyHeroFromUrl);
 
-    fetch(apiUrl("/api/builds"), { headers: { Accept: "application/json" } })
-      .then((response) => response.ok ? response.json() : { builds: [] })
-      .then((data: { builds?: BuildProject[] }) => {
-        if (!cancelled && Array.isArray(data.builds)) setGeneratedBuilds(data.builds);
-      })
-      .catch(() => {
-        if (!cancelled) setGeneratedBuilds([]);
-      });
+    void loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl(""))).then((page) => {
+      if (cancelled) return;
+      setGeneratedBuilds(page.ok ? page.builds : []);
+      setGalleryCursor(page.ok ? page.nextCursor : null);
+    });
 
     const accountTimer = window.setTimeout(() => {
       if (!cancelled) void fetchAccount(false);
@@ -1381,6 +1382,20 @@ export default function Home() {
       return;
     }
     fetchAccount(true);
+  }
+
+  async function loadMoreBuilds() {
+    if (!galleryCursor || galleryMoreBusy) return;
+    setGalleryMoreBusy(true);
+    setGalleryMoreError("");
+    const page = await loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl(galleryCursor)));
+    if (page.ok) {
+      setGeneratedBuilds((shown) => appendGalleryPage(shown, page.builds));
+      setGalleryCursor(page.nextCursor);
+    } else {
+      setGalleryMoreError("Makeable could not load more builds. Try again.");
+    }
+    setGalleryMoreBusy(false);
   }
 
   function openProject(build: BuildProject) {
@@ -1683,7 +1698,7 @@ export default function Home() {
         <div className="mk-community-grid" ref={communityGridRef} onScroll={updateCommunityIndex}>
           {communityBuilds.map((build) => (
             <button className="mk-community-card" type="button" key={build.id} onClick={() => openProject(build)}>
-              <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
+              <ProjectImage src={build.image.url} alt={`${build.title} product render`} size="card" />
               <CreatorBadge build={build} />
               <span>{build.title}</span>
               <small>{build.image.source === "seed" ? "Makeable example" : build.status || "Concept"}</small>
@@ -1762,6 +1777,10 @@ export default function Home() {
       {galleryOpen && (
         <FullGallery
           builds={communityBuilds}
+          hasMore={Boolean(galleryCursor)}
+          loadingMore={galleryMoreBusy}
+          loadMoreError={galleryMoreError}
+          onLoadMore={() => void loadMoreBuilds()}
           onClose={() => setGalleryOpen(false)}
           onSelect={(build) => {
             setGalleryOpen(false);
@@ -1982,10 +2001,18 @@ function DetailTraitIcon({ kind }: { kind: "ready" | "time" | "gift" }) {
 
 function FullGallery({
   builds,
+  hasMore,
+  loadingMore,
+  loadMoreError,
+  onLoadMore,
   onClose,
   onSelect,
 }: {
   builds: BuildProject[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMoreError: string;
+  onLoadMore: () => void;
   onClose: () => void;
   onSelect: (build: BuildProject) => void;
 }) {
@@ -2007,7 +2034,7 @@ function FullGallery({
           {builds.map((build) => (
             <button type="button" key={build.id} onClick={() => onSelect(build)}>
               <div>
-                <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
+                <ProjectImage src={build.image.url} alt={`${build.title} product render`} size="card" />
                 <CreatorBadge build={build} />
               </div>
               <span>{build.title}</span>
@@ -2017,6 +2044,14 @@ function FullGallery({
             </button>
           ))}
         </div>
+        {hasMore && (
+          <div className="mk-gallery-footer mk-full-gallery-more">
+            {loadMoreError && <p className="mk-form-error" role="status">{loadMoreError}</p>}
+            <button type="button" onClick={onLoadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading..." : "Load more"}
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );
