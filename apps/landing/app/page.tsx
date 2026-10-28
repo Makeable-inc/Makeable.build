@@ -31,6 +31,7 @@ import { RetailerBrand } from "./retailer-brand";
 import { ProjectWiringGuide } from "./project-wiring-guide";
 import { projectWiringReady } from "./project-wiring-data.mjs";
 import { appendGalleryPage, galleryPageUrl, loadGalleryPage } from "./gallery-pages";
+import { browserStorages, signOut } from "./sign-out";
 import { ArrowIcon, BuildClarificationPanel, GenerationWorkspace, LockedCodePanel, ProfileAvatar, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "./workspace-ui";
 
 declare global {
@@ -1538,6 +1539,12 @@ export default function Home() {
             generationAbortRef.current?.abort();
             window.location.assign(`/app?build=${encodeURIComponent(build.id)}`);
           }}
+          onSignOut={() => {
+            generationAbortRef.current?.abort();
+            // Reload either way: the page then shows whatever the server says.
+            void signOut({ fetch, url: apiUrl("/api/auth/session"), storages: browserStorages() })
+              .then(() => window.location.assign("/"));
+          }}
           onCreateAnother={() => {
             setWorkspaceOpen(false);
             window.setTimeout(() => document.getElementById("make")?.scrollIntoView({ behavior: "smooth" }), 0);
@@ -1858,6 +1865,7 @@ function BuildWorkspace({
   clarification,
   onBack,
   onSelectBuild,
+  onSignOut,
   onCreateAnother,
   onDismiss,
   onCancel,
@@ -1883,6 +1891,7 @@ function BuildWorkspace({
   clarification: BuildClarification | null;
   onBack: () => void;
   onSelectBuild: (build: BuildProject) => void;
+  onSignOut: () => void;
   onCreateAnother: () => void;
   onDismiss: () => void;
   onCancel: () => void;
@@ -1921,6 +1930,7 @@ function BuildWorkspace({
             onSelectBuild(selected);
           }
         }}
+        onSignOut={onSignOut}
       />
 
       {!isLoading && !isClarifying && <WorkspaceContextBar

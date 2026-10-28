@@ -94,6 +94,7 @@ export function WorkspaceTopBar({
   selectedProjectId,
   projectsLabel = "My projects",
   onSelectProject,
+  onSignOut,
 }: {
   user: SafeUser | null;
   remaining: number;
@@ -112,6 +113,7 @@ export function WorkspaceTopBar({
   selectedProjectId?: string;
   projectsLabel?: string;
   onSelectProject?: (id: string) => void;
+  onSignOut?: () => void;
 }) {
   const switcherRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -163,6 +165,18 @@ export function WorkspaceTopBar({
                   {project.title}
                 </button>
               )) : <small>No saved builds yet.</small>}
+              {user && onSignOut && (
+                <button
+                  className="mk-build-switcher-signout"
+                  type="button"
+                  onClick={() => {
+                    if (switcherRef.current) switcherRef.current.open = false;
+                    onSignOut();
+                  }}
+                >
+                  Log out
+                </button>
+              )}
             </div>
           </details>
         )}

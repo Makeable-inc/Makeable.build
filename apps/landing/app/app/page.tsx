@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowIcon, BuildFailurePanel, FolderSkeleton, LockedCodePanel, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "../workspace-ui";
 import { buildLibrary, loadBuildLibrary } from "./build-library";
+import { browserStorages, signOut } from "../sign-out";
 import { ProjectOverview } from "../project-overview";
 import { projectDisplayIdentity } from "../project-identity.mjs";
 import { ProjectWiringGuide } from "../project-wiring-guide";
@@ -284,6 +285,11 @@ export default function BuildAppPage() {
         onSelectProject={(id) => {
           const selected = builds.find((build) => build.id === id);
           if (selected) selectBuild(selected);
+        }}
+        onSignOut={() => {
+          // Reload either way: the page then shows whatever the server says.
+          void signOut({ fetch, url: apiUrl("/api/auth/session"), storages: browserStorages() })
+            .then(() => window.location.assign("/app/"));
         }}
       />
 

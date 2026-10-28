@@ -1752,3 +1752,9 @@
   .mk-wiring-simulation-heading p { font-size: 11px; }
   .mk-wiring-artifact-parts[data-connected="true"] { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 28px; padding: 14px 24px; }
 }
+
+.mk-build-switcher .mk-build-switcher-signout {
+  margin-top: 4px;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 0;
+}
