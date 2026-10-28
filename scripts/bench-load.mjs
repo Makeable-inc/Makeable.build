@@ -10,7 +10,21 @@ const args = process.argv.slice(2);
 const runs = Number(args.includes("--runs") ? args[args.indexOf("--runs") + 1] : 10);
 const sites = args.filter((arg, i) => arg.startsWith("http") && args[i - 1] !== "--runs");
 
+// A dropped connection (seen from Netlify under parallel load) is retried once
+// and the timing restarts; a second failure still stops the run.
+let retries = 0;
+process.on("exit", () => { if (retries) console.log(`(${retries} dropped connection(s) retried once)`); });
+
 async function time(url) {
+  try {
+    return await timeOnce(url);
+  } catch {
+    retries += 1;
+    return timeOnce(url);
+  }
+}
+
+async function timeOnce(url) {
   const started = performance.now();
   const response = await fetch(url, { headers: { "Accept-Encoding": "gzip, br" } });
   const body = new Uint8Array(await response.arrayBuffer());
