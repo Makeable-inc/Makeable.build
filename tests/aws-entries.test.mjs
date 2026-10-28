@@ -36,6 +36,14 @@ for (const name of ["api", "pipeline", "cleanup", "social-refresh"]) {
   });
 }
 
+test("the public gallery list lets the CDN share it for 10 minutes and serve it stale while refreshing", async () => {
+  const { handler } = await import("../aws/functions/api.mjs");
+  const result = await handler(urlEvent({ rawPath: "/api/builds" }));
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.headers["cache-control"], "public, max-age=0, s-maxage=600, stale-while-revalidate=86400");
+  assert.equal(result.headers.vary, undefined);
+});
+
 test("api entry answers GET /api/health", async () => {
   const { handler } = await import("../aws/functions/api.mjs");
   const result = await handler(urlEvent());
