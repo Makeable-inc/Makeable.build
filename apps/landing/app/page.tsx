@@ -648,6 +648,8 @@ export default function Home() {
   const [galleryCursor, setGalleryCursor] = useState<string | null>(null);
   const [galleryMoreBusy, setGalleryMoreBusy] = useState(false);
   const [galleryMoreError, setGalleryMoreError] = useState("");
+  const [galleryLoadFailed, setGalleryLoadFailed] = useState(false);
+  const [galleryAttempt, setGalleryAttempt] = useState(0);
   const [detailBuild, setDetailBuild] = useState<BuildProject | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("loading");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -1239,12 +1241,6 @@ export default function Home() {
     applyHeroFromUrl();
     window.addEventListener("popstate", applyHeroFromUrl);
 
-    void loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl(""))).then((page) => {
-      if (cancelled) return;
-      setGeneratedBuilds(page.ok ? page.builds : []);
-      setGalleryCursor(page.ok ? page.nextCursor : null);
-    });
-
     const accountTimer = window.setTimeout(() => {
       if (!cancelled) void fetchAccount(false);
     }, 0);
@@ -1254,6 +1250,19 @@ export default function Home() {
       window.clearTimeout(accountTimer);
     };
   }, [fetchAccount, selectHeroBuild]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setGalleryLoadFailed(false);
+    // A failed list is shown as a failure with Try again, never as "no builds".
+    void loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl(""))).then((page) => {
+      if (cancelled) return;
+      setGalleryLoadFailed(!page.ok);
+      setGeneratedBuilds(page.ok ? page.builds : []);
+      setGalleryCursor(page.ok ? page.nextCursor : null);
+    });
+    return () => { cancelled = true; };
+  }, [galleryAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1695,6 +1704,12 @@ export default function Home() {
           </div>
           <button type="button" onClick={openBuildLibrary}>See my builds <ArrowIcon /></button>
         </div>
+        {galleryLoadFailed && (
+          <div className="mk-gallery-footer mk-gallery-load-error">
+            <p className="mk-form-error" role="status">Makeable could not load the community builds. The examples below are still here.</p>
+            <button type="button" onClick={() => setGalleryAttempt((attempt) => attempt + 1)}>Try again</button>
+          </div>
+        )}
         <div className="mk-community-grid" ref={communityGridRef} onScroll={updateCommunityIndex}>
           {communityBuilds.map((build) => (
             <button className="mk-community-card" type="button" key={build.id} onClick={() => openProject(build)}>

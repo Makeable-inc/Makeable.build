@@ -11,15 +11,19 @@ export function galleryPageUrl(cursor: string) {
   return `/api/builds?${query}`;
 }
 
-export async function loadGalleryPage<Build>(fetch: FetchLike, url: string): Promise<GalleryPage<Build>> {
+export async function loadGalleryPage<Build>(fetch: FetchLike, url: string, timeoutMs = 10000): Promise<GalleryPage<Build>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { headers: { Accept: "application/json" } });
+    const response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
     if (!response.ok) return { ok: false };
     const body = await response.json() as { builds?: unknown; nextCursor?: unknown } | null;
     if (!Array.isArray(body?.builds)) return { ok: false };
     return { ok: true, builds: body.builds as Build[], nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null };
   } catch {
     return { ok: false };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

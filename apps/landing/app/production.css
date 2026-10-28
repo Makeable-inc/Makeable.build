@@ -3274,3 +3274,18 @@ img.mk-build-image-pending {
   gap: 0.75rem;
   margin-top: 1.5rem;
 }
+
+.mk-gallery-load-error {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 auto 1.25rem;
+}
+
+/* .mk-form-error is pale for the dark hero; these sit on light paper. */
+.mk-gallery-load-error p,
+.mk-full-gallery-more p {
+  margin: 0;
+  color: #c51d4d;
+}

@@ -28,6 +28,29 @@ test("a failed, malformed or unreachable page is a failure, never an empty last 
   assert.deepEqual(await loadGalleryPage(() => Promise.reject(new TypeError("offline")), "u"), { ok: false });
 });
 
+test("a page that never answers fails after the time limit instead of waiting forever", async () => {
+  const hang = (_url, init) => new Promise((_, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+  });
+  const started = Date.now();
+  assert.deepEqual(await loadGalleryPage(hang, "u", 50), { ok: false });
+  assert.ok(Date.now() - started < 2000);
+});
+
+test("when the first page fails, the homepage says so and offers Try again instead of an empty gallery", async () => {
+  const home = await readFile(new URL("../apps/landing/app/page.tsx", import.meta.url), "utf8");
+  assert.match(home, /setGalleryLoadFailed\(!page\.ok\)/);
+  assert.match(home, /\{galleryLoadFailed && \(/);
+  assert.match(home, /Makeable could not load the community builds\./);
+  assert.match(home, /onClick=\{\(\) => setGalleryAttempt\(\(attempt\) => attempt \+ 1\)\}/);
+});
+
+test("/app offers Try again when the community list fails, and does not call it 'My builds' when signed out", async () => {
+  const app = await readFile(new URL("../apps/landing/app/app/page.tsx", import.meta.url), "utf8");
+  assert.match(app, /\{\(accountUnavailable \|\| publicFailed\) && <button/);
+  assert.match(app, /user \? "My builds" : "Community builds"/);
+});
+
 test("a loaded page is added after what is shown, without repeating a build", () => {
   assert.deepEqual(
     appendGalleryPage([{ id: "a" }, { id: "b" }], [{ id: "b" }, { id: "c" }]),
