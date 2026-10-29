@@ -28,6 +28,7 @@ The AI chooses and deterministic rules verify. AI calls pick parts and write wor
 1. `npm ci`, then `npm run dev:local`. It builds the site into `release-dist/` and serves it on http://localhost:3001, with `/api/*` and background builds running through the same Lambda adapter as AWS. Storage is in memory and resets on restart. `--skip-build` reuses the last build, `--port` picks another port.
 2. Sign in at http://localhost:3001/__local-login?next=/ (a test user; this route exists only in `scripts/dev-local.mjs`).
 3. `npm run dev:build -- "<idea>"` runs one real build against the running app and prints each stage, the parts and the artifact states.
+4. `npm run test:e2e` runs the browser tests in `tests/e2e` (Playwright) against the built site with fixed fixture data; build first. They also run on every PR (`e2e` in `.github/workflows/pr-check.yml`).
 
 How to verify a change end to end is in `.claude/skills/verify-setup/` and the `verify-*` skills next to it.
 

@@ -4,16 +4,20 @@
 // background builds through the pipeline Lambda's adapter, all in one process.
 // Storage is in memory, so nothing here reads or writes real data.
 //
-//   node scripts/dev-local.mjs [--port 3001] [--skip-build]
+//   node scripts/dev-local.mjs [--port 3001] [--skip-build] [--fixtures <module>]
+//
+// --fixtures loads a module whose default export seeds the in-memory storage
+// before the server starts (used by the browser tests in tests/e2e).
 //
 // Builds call OpenAI for real (OPENAI_API_KEY in .env), about 90 s each.
-// GET /__local-login signs in as a test user. It exists only in this script,
-// which no deploy ships, and the server listens on 127.0.0.1 only.
+// GET /__local-login signs in as a test user (?user=2 for a second one). It
+// exists only in this script, which no deploy ships, and the server listens on
+// 127.0.0.1 only.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = path.join(ROOT, "release-dist");
@@ -50,6 +54,13 @@ const { default: buildBackground } = await import("../netlify/functions/build-ba
 const { openStore } = await import("../lib/storage/index.mjs");
 const { builderSessionStoreNameForFunctionContext, createBuilderSession } = await import("../lib/builder-session.mjs");
 
+const fixtures = argValue("--fixtures");
+if (fixtures) {
+  const { default: seed } = await import(pathToFileURL(path.resolve(fixtures)).href);
+  await seed({ deployContext: DEPLOY_CONTEXT });
+  console.log(`[dev-local] fixtures loaded from ${fixtures}`);
+}
+
 const apiHandler = toLambdaHandler(api, { deployContext: DEPLOY_CONTEXT, publicOrigin: origin });
 const pipelineHandler = toBackgroundEventHandler(buildBackground, { deployContext: DEPLOY_CONTEXT });
 const redirects = readRedirects(path.join(ROOT, "netlify.toml"));
@@ -80,11 +91,10 @@ async function localLogin(url, res) {
     name: builderSessionStoreNameForFunctionContext({ deploy: { context: DEPLOY_CONTEXT } }),
     consistency: "strong",
   });
-  const session = await createBuilderSession(store, {
-    sub: "local-test-user",
-    email: "local-test@example.com",
-    name: "Local Test",
-  });
+  const user = url.searchParams.get("user") === "2"
+    ? { sub: "local-test-user-2", email: "local-test-2@example.com", name: "Second Tester" }
+    : { sub: "local-test-user", email: "local-test@example.com", name: "Local Test" };
+  const session = await createBuilderSession(store, user);
   const next = url.searchParams.get("next") || "";
   if (next.startsWith("/") && !next.startsWith("//")) {
     // Storage resets with this server, so drop the browser's saved active job
