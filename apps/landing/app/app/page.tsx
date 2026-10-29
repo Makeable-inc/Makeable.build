@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowIcon, BuildFailurePanel, FolderSkeleton, LockedCodePanel, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "../workspace-ui";
 import { buildLibrary, loadBuildLibrary } from "./build-library";
 import { browserStorages, signOut } from "../sign-out";
-import { resetMakeableAnalytics } from "../analytics";
+import { forgetEndedMakeableAccount, resetMakeableAnalytics } from "../analytics";
 import { ProjectOverview } from "../project-overview";
 import { projectDisplayIdentity } from "../project-identity.mjs";
 import { ProjectWiringGuide } from "../project-wiring-guide";
@@ -180,6 +180,7 @@ export default function BuildAppPage() {
           setAccountBuilds(result.builds);
           setQuota(normalizeQuota(result.quota));
         } else if (result.state === "signed-out") {
+          forgetEndedMakeableAccount();
           setUser(null);
           setAccountBuilds([]);
           setQuota(DEFAULT_BUILD_QUOTA);

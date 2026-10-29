@@ -29,6 +29,13 @@ export function resetMakeableAnalytics() {
   posthog.reset();
 }
 
+// A session that ended without log out (expired, or refused by the server) must
+// not keep counting this browser's events toward that account. Anonymous
+// visitors keep their id.
+export function forgetEndedMakeableAccount() {
+  if (posthog.get_property("$user_state") === "identified") posthog.reset();
+}
+
 export function makeableReferringDomain() {
   if (typeof document === "undefined" || !document.referrer) return "$direct";
   try {
