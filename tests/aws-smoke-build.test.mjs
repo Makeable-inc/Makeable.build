@@ -7,7 +7,8 @@ import { createMemoryStore } from "../lib/storage/memory-store.mjs";
 const OURS = "job_ourSmokeJob00000000001";
 const THEIRS = "job_someRealUserJob0000001";
 
-test("cleanup deletes only the smoke test's records, never another user's", async () => {
+for (const buildId of ["", "build-smoke"]) {
+test(`cleanup deletes only the smoke test's records (${buildId ? "saved build" : "partial failure"})`, async () => {
   const sessions = createMemoryStore();
   const jobs = createMemoryStore();
   const images = createMemoryStore();
@@ -39,7 +40,7 @@ test("cleanup deletes only the smoke test's records, never another user's", asyn
   await images.set("gallery-images/build-smoke", new Blob([new Uint8Array([3])]));
   await images.set("gallery-images/build-real", new Blob([new Uint8Array([4])]));
 
-  const deleted = await cleanupSmokeBuild({ sessions, jobs, images, community, quota }, { jobId: OURS, sub });
+  const deleted = await cleanupSmokeBuild({ sessions, jobs, images, community, quota }, { jobId: OURS, sub, buildId });
 
   assert.equal(deleted, 11);
   assert.deepEqual((await sessions.list()).blobs.map((b) => b.key), ["builder-session-bbb"]);
@@ -53,6 +54,7 @@ test("cleanup deletes only the smoke test's records, never another user's", asyn
   ]);
   assert.deepEqual((await quota.list()).blobs.map((b) => b.key), [`quota/${ownerHash}/2.json`, "quota/real-user/1.json"]);
 });
+}
 
 test("cleanup refuses a real account identity before deleting anything", async () => {
   await assert.rejects(cleanupSmokeBuild({}, { jobId: OURS, sub: "google-real-user" }), /smoke-test identity/);

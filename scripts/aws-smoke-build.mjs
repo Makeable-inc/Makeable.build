@@ -14,18 +14,19 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_IDEA = "A desk thermometer that shows room temperature and humidity on a small OLED screen";
 
 // Deletes only records that name this test's job id or test user.
-export async function cleanupSmokeBuild({ sessions, jobs, images, community, quota }, { jobId, sub }) {
+export async function cleanupSmokeBuild({ sessions, jobs, images, community, quota }, { jobId, sub, buildId = "" }) {
   if (!/^aws-smoke-test-[a-f0-9]+$/.test(sub || "")) throw new Error("Expected a smoke-test identity");
   let deleted = 0;
   const remove = async (store, key) => {
     await store.delete(key);
     deleted += 1;
   };
-  for (const { key } of (await sessions.list()).blobs) {
-    if ((await sessions.get(key, { type: "json" }))?.user?.sub === sub) await remove(sessions, key);
-  }
   const ownerHash = createHash("sha256").update(sub).digest("hex");
-  for (const { key } of (await community.list({ prefix: "gallery/" })).blobs) {
+  // Remove the public card first, before slower session/job cleanup. On a
+  // successful run its exact id is known; scan only after a partial failure.
+  const galleryEntries = buildId ? [{ key: `gallery/${buildId}.json` }]
+    : (await community.list({ prefix: "gallery/" })).blobs;
+  for (const { key } of galleryEntries) {
     const record = await community.get(key, { type: "json" });
     if (record?.ownerSub !== sub || record.sourceJobId !== jobId || key !== `gallery/${record.id}.json`) continue;
     await remove(images, `gallery-images/${record.id}`);
@@ -37,6 +38,9 @@ export async function cleanupSmokeBuild({ sessions, jobs, images, community, quo
   for (const { key } of (await quota.list({ prefix: `quota/${ownerHash}/` })).blobs) {
     const record = await quota.get(key, { type: "json" });
     if (record?.sub === sub && record.jobId === jobId) await remove(quota, key);
+  }
+  for (const { key } of (await sessions.list()).blobs) {
+    if ((await sessions.get(key, { type: "json" }))?.user?.sub === sub) await remove(sessions, key);
   }
   for (const { key } of (await jobs.list()).blobs) {
     if (key.includes(jobId)) await remove(jobs, key);
@@ -118,7 +122,7 @@ async function main() {
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
   } finally {
-    console.log(`cleanup: deleted ${await cleanupSmokeBuild(stores, { jobId: jobId || "no-job", sub })} test records`);
+    console.log(`cleanup: deleted ${await cleanupSmokeBuild(stores, { jobId: jobId || "no-job", sub, buildId: savedBuildId })} test records`);
   }
   process.exit(state === "ready" && savedBuildId ? 0 : 1);
 }
