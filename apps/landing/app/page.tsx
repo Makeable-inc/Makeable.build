@@ -13,6 +13,7 @@ import {
 } from "react";
 import {
   captureMakeableEvent,
+  forgetEndedMakeableAccount,
   identifyMakeableAccount,
   makeableDistinctId,
   makeableReferringDomain,
@@ -32,6 +33,7 @@ import { RetailerBrand } from "./retailer-brand";
 import { ProjectWiringGuide } from "./project-wiring-guide";
 import { projectWiringReady } from "./project-wiring-data.mjs";
 import { appendGalleryPage, galleryPageUrl, loadGalleryPage } from "./gallery-pages";
+import { savedBuildJobRefused, savedBuildJobToResume } from "./saved-build-job";
 import { browserStorages, signOut } from "./sign-out";
 import { ArrowIcon, BuildClarificationPanel, GenerationWorkspace, LockedCodePanel, ProfileAvatar, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "./workspace-ui";
 
@@ -542,6 +544,10 @@ async function loadPublicConfigWithRetry() {
   return config;
 }
 
+// The server refused a build job this browser saved: it belongs to another
+// account, or no longer exists.
+class SavedBuildJobRefusedError extends Error {}
+
 function abortableDelay(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     if (signal.aborted) {
@@ -823,6 +829,16 @@ export default function Home() {
   useDialogFocusTrap(loginOpen, loginDialogRef, closeLogin, authBusy);
   useDialogFocusTrap(preorderOpen, preorderDialogRef, () => setPreorderOpen(false), preorderBusy);
 
+  // The session ended (expired, or refused by the server): show this browser as
+  // signed out and stop counting its events toward that account.
+  const forgetSignedInAccount = useCallback(() => {
+    authUserRef.current = null;
+    setAuthUser(null);
+    setAccountBuilds([]);
+    setQuota(DEFAULT_BUILD_QUOTA);
+    forgetEndedMakeableAccount();
+  }, []);
+
   const fetchAccount = useCallback(async (openLibrary = false) => {
     setAuthUnavailable(false);
     try {
@@ -831,10 +847,7 @@ export default function Home() {
         credentials: "include",
       });
       if (response.status === 401) {
-        authUserRef.current = null;
-        setAuthUser(null);
-        setAccountBuilds([]);
-        setQuota(DEFAULT_BUILD_QUOTA);
+        forgetSignedInAccount();
         setAuthUnavailable(false);
         return null;
       }
@@ -862,7 +875,7 @@ export default function Home() {
     } finally {
       setAuthResolved(true);
     }
-  }, []);
+  }, [forgetSignedInAccount]);
 
   const claimReadyBuildJob = useCallback(async (jobId: string, signal?: AbortSignal) => {
     pendingClaimJobIdRef.current = jobId;
@@ -943,6 +956,7 @@ export default function Home() {
         throw new Error("Connection interrupted while checking this build. The build may still be running. Try again to reconnect to the same job.");
       }
       const result = await readJsonResponse<BuildJobStatusResponse>(response);
+      if (savedBuildJobRefused(response.status)) throw new SavedBuildJobRefusedError(result.error || "Makeable could not check this build job.");
       if (!response.ok || !result.job) {
         throw new Error(result.error || "Makeable could not check this build job.");
       }
@@ -973,7 +987,7 @@ export default function Home() {
     throw new DOMException("Aborted", "AbortError");
   }, [claimReadyBuildJob, openLogin]);
 
-  const resumeBuildJob = useCallback(async (jobId = currentJobRef.current?.id || "") => {
+  const resumeBuildJob = useCallback(async (jobId = currentJobRef.current?.id || "", { savedOnLoad = false } = {}) => {
     if (!jobId) return;
     generationAbortRef.current?.abort();
     const requestController = new AbortController();
@@ -984,6 +998,14 @@ export default function Home() {
       await runBuildJobPoll(jobId, requestController.signal);
     } catch (error) {
       if (requestController.signal.aborted) return;
+      if (savedOnLoad && error instanceof SavedBuildJobRefusedError) {
+        // Another account's leftover job (or one that is gone): drop it quietly.
+        clearSavedBuildJobId();
+        currentJobRef.current = null;
+        setCurrentJob(null);
+        setWorkspaceOpen(false);
+        return;
+      }
       setWorkspaceMode("loading");
       setGenerationError(error instanceof Error ? error.message : "Makeable could not resume this build.");
     } finally {
@@ -997,10 +1019,10 @@ export default function Home() {
 
   useEffect(() => {
     if (!authResolved || currentJobRef.current || jobFlowActiveRef.current) return;
-    const savedJobId = savedBuildJobId();
+    const savedJobId = savedBuildJobToResume(savedBuildJobId(), Boolean(authUserRef.current));
     if (!savedJobId) return;
     lastAutomaticResumeAtRef.current = Date.now();
-    void resumeBuildJob(savedJobId);
+    void resumeBuildJob(savedJobId, { savedOnLoad: true });
   }, [authResolved, resumeBuildJob]);
 
   useEffect(() => {
@@ -1009,12 +1031,12 @@ export default function Home() {
       if (document.visibilityState === "hidden" || navigator.onLine === false) return;
       const job = currentJobRef.current;
       if (job && ["ready", "failed", "cancelled"].includes(job.state)) return;
-      const jobId = job?.id || savedBuildJobId();
+      const jobId = job?.id || savedBuildJobToResume(savedBuildJobId(), Boolean(authUserRef.current));
       if (!jobId) return;
       const now = Date.now();
       if (now - lastAutomaticResumeAtRef.current < 1000) return;
       lastAutomaticResumeAtRef.current = now;
-      void resumeBuildJob(jobId);
+      void resumeBuildJob(jobId, { savedOnLoad: !job });
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") resumeSavedJob();
@@ -1104,6 +1126,14 @@ export default function Home() {
           signal: requestController.signal,
         });
       let response = await startBuild();
+      if (response.status === 401) {
+        forgetSignedInAccount();
+        pendingIdeaRef.current = nextIdea;
+        setGenerationProgress(0);
+        setWorkspaceOpen(false);
+        openLogin("generate");
+        return;
+      }
       let result = await readJsonResponse<StartBuildJobResponse>(response);
       if (response.ok && !result.job && !result.activeJob && !result.clarification) {
         captureMakeableEvent("makeable build start response recovery", { recovery_step: "active_job" });
@@ -1159,7 +1189,7 @@ export default function Home() {
         setGenerationBusy(false);
       }
     }
-  }, [openLogin, runBuildJobPoll]);
+  }, [forgetSignedInAccount, openLogin, runBuildJobPoll]);
 
   const handleGoogleCredential = useCallback(async (response: { credential?: string }) => {
     if (authInFlightRef.current) return;
