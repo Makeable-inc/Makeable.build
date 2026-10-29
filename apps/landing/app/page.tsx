@@ -1417,8 +1417,6 @@ export default function Home() {
       fetch,
       url: apiUrl("/api/auth/session"),
       storages: browserStorages(),
-      jobUrl: (jobId) => apiUrl(`/api/build-jobs/${encodeURIComponent(jobId)}`),
-      jobIds: [currentJobRef.current && !currentJobRef.current.claimedAt ? currentJobRef.current.id : ""],
     });
     if (ok) {
       resetMakeableAnalytics();

@@ -268,7 +268,6 @@ export default function BuildAppPage() {
       fetch,
       url: apiUrl("/api/auth/session"),
       storages: browserStorages(),
-      jobUrl: (jobId) => apiUrl(`/api/build-jobs/${encodeURIComponent(jobId)}`),
     });
     if (ok) {
       resetMakeableAnalytics();
