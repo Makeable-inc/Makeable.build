@@ -40,6 +40,10 @@ export default defineConfig({
       DASHBOARD_SESSION_SECRET,
       // Builds are never started by these tests; make sure none could call OpenAI.
       OPENAI_API_KEY: "",
+      // The dashboard's social report reads PostHog when these are set; keep
+      // it offline even if a local .env has them.
+      POSTHOG_PERSONAL_API_KEY: "",
+      POSTHOG_PROJECT_ID: "",
       // Makes the homepage load Google's sign-in script, as on the live site.
       // tests/e2e/test.mjs blocks that script, so no test reaches Google.
       GOOGLE_CLIENT_ID: "e2e-google-client-id",
