@@ -1,5 +1,6 @@
 # Docs
 
+- [aws-cutover.md](aws-cutover.md): checklist for moving makeable.build from Netlify to AWS (secrets, final data copy, DNS, checks, rollback).
 - [social-attribution-operations.md](social-attribution-operations.md): runbook for the social bio links and their tracking.
 - [torn-paper-effect.md](torn-paper-effect.md): the torn-paper grain effect as a portable snippet.
 - [specs/](specs/): design specs for shipped features.
