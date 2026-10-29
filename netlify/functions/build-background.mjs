@@ -117,6 +117,7 @@ export async function runBackgroundBuildJob({ jobId, env, stateStore, imageStore
     await completeBuildJob({
       stateStore,
       imageStore,
+      env,
       jobId,
       build: captureStore.saved || result.body,
     });

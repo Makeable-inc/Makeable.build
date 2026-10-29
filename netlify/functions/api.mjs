@@ -1425,6 +1425,7 @@ async function runCommunityBuildJob({ jobId, idea, env, stateStore, imageStore }
     await completeBuildJob({
       stateStore,
       imageStore,
+      env,
       jobId,
       build: captureStore.saved || result.body,
     });

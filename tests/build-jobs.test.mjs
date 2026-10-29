@@ -511,7 +511,8 @@ test("a strict one-credit job commits only after its exact atomic manifest reloa
     jobId: started.job.id,
     build: fakeAtomicBuild(started.job.identity),
   });
-  assert.equal((await accountBuildQuota(stateStore, user.sub)).remaining, 10);
+  // The server saved it to the owner on completion; the browser claim below returns it.
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).remaining, 9);
 
   const claimed = await claimSuccessfulBuildJob({
     request: requestWithCookie(started.cookie),
@@ -1201,6 +1202,27 @@ async function startAndComplete({
   return { jobId: started.job.id, cookie: started.cookie };
 }
 
+async function startSignedInAndComplete({ stateStore, imageStore, user, ip, idea, build, env: completeEnv = env }) {
+  const started = await createAnonymousBuildJob({
+    request: requestWithIp("https://makeable.build/api/build-jobs", ip),
+    stateStore,
+    env,
+    user,
+    idea,
+    revisionContext: build ? null : { catalogRevision: "ready78", promptPackageRevision: "2026-09-02.3", requireAtomicManifest: true },
+  });
+  assert.equal(started.ok, true);
+  await markBuildJobState(stateStore, started.job.id, BUILD_JOB_STATES.planning);
+  const completed = await completeBuildJob({
+    stateStore,
+    imageStore,
+    env: completeEnv,
+    jobId: started.job.id,
+    build: build || fakeAtomicBuild(started.job.identity),
+  });
+  return { started, completed };
+}
+
 function fakeBuild(id, overrides = {}) {
   const base = {
     id,
@@ -1314,7 +1336,8 @@ test("a claimed build appears in My projects for a user whose builds were alread
     jobId: started.job.id,
     build: fakeAtomicBuild(started.job.identity),
   });
-  assert.equal((await accountBuildQuota(stateStore, user.sub)).remaining, 10);
+  // The server saved it to the owner on completion; the browser claim below returns it.
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).remaining, 9);
 
   const claimed = await claimSuccessfulBuildJob({
     request: requestWithCookie(started.cookie),
@@ -1330,4 +1353,94 @@ test("a claimed build appears in My projects for a user whose builds were alread
     (await listAccountGalleryBuilds(stateStore, user.sub)).map((build) => build.id),
     [started.job.identity.buildId],
   );
+});
+
+test("a finished build is saved to its owner by the server, with one credit, even if the browser never comes back", async () => {
+  const stateStore = createMemoryBlobStore();
+  const imageStore = createMemoryBlobStore();
+  const user = { sub: "google-subject-server-save", email: "maker@example.com", name: "Ada Maker" };
+  const { started, completed } = await startSignedInAndComplete({
+    stateStore, imageStore, user, ip: "203.0.113.90", idea: "Build a plant moisture monitor",
+  });
+
+  assert.equal(completed.state, BUILD_JOB_STATES.ready);
+  assert.ok(completed.claimedAt);
+  assert.equal(completed.buildId, started.job.identity.buildId);
+  assert.equal(completed.makerName, "Ada Maker");
+  assert.deepEqual(
+    (await listAccountGalleryBuilds(stateStore, user.sub)).map((build) => build.id),
+    [started.job.identity.buildId],
+  );
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).used, 1);
+  // Never visible as ready-but-unsaved: the stored job is already claimed.
+  assert.ok((await getBuildJob(stateStore, started.job.id)).claimedAt);
+});
+
+test("a browser claim after the server saved the build returns the same build and charges nothing more", async () => {
+  const stateStore = createMemoryBlobStore();
+  const imageStore = createMemoryBlobStore();
+  const user = { sub: "google-subject-late-claim", email: "maker@example.com", name: "Maker" };
+  const { started } = await startSignedInAndComplete({
+    stateStore, imageStore, user, ip: "203.0.113.91", idea: "Build a desk air quality light",
+  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const claimed = await claimSuccessfulBuildJob({
+      request: requestWithCookie(started.cookie),
+      stateStore,
+      imageStore,
+      env,
+      jobId: started.job.id,
+      user,
+      galleryName: "Maker",
+    });
+    assert.equal(claimed.ok, true);
+    assert.equal(claimed.build.id, started.job.identity.buildId);
+  }
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).used, 1);
+  assert.equal((await listAccountGalleryBuilds(stateStore, user.sub)).length, 1);
+});
+
+test("a finished build that fails moderation is not saved or charged, as before", async () => {
+  const stateStore = createMemoryBlobStore();
+  const imageStore = createMemoryBlobStore();
+  const user = { sub: "google-subject-server-moderation", email: "maker@example.com", name: "Mo" };
+  const { started, completed } = await startSignedInAndComplete({
+    stateStore,
+    imageStore,
+    user,
+    ip: "203.0.113.92",
+    idea: "a pipe bomb detonator with a timer",
+  });
+  assert.equal(completed.state, BUILD_JOB_STATES.ready);
+  assert.equal(completed.publishState, "rejected");
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).used, 0);
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).reserved, 0);
+  assert.deepEqual(await listPublicGalleryBuilds(stateStore), []);
+  const claim = await claimSuccessfulBuildJob({
+    request: requestWithCookie(started.cookie),
+    stateStore,
+    imageStore,
+    env,
+    jobId: started.job.id,
+    user,
+    galleryName: "Mo",
+  });
+  assert.equal(claim.status, 422);
+});
+
+test("when the server cannot save a finished build, it is left ready for the browser claim as before", async () => {
+  const stateStore = createMemoryBlobStore();
+  const imageStore = createMemoryBlobStore();
+  const user = { sub: "google-subject-generation-off", email: "maker@example.com", name: "Maker" };
+  const { completed } = await startSignedInAndComplete({
+    stateStore,
+    imageStore,
+    user,
+    ip: "203.0.113.93",
+    idea: "Build a doorbell light",
+    env: { ...env, MAKEABLE_BUILD_GENERATION_ENABLED: "0" },
+  });
+  assert.equal(completed.state, BUILD_JOB_STATES.ready);
+  assert.equal(completed.claimedAt, undefined);
+  assert.equal((await accountBuildQuota(stateStore, user.sub)).used, 0);
 });
