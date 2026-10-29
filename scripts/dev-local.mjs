@@ -5,12 +5,15 @@
 // Storage is in memory, so nothing here reads or writes real data.
 //
 //   node scripts/dev-local.mjs [--port 3001] [--skip-build] [--fixtures <module>]
+//        [--ai-record <dir> | --ai-replay <dir> [--ai-replay-delay <ms>]] [--fake-stripe]
 //
 // --fixtures loads a module whose default export seeds the in-memory storage
 // before the server starts (used by the browser tests in tests/e2e).
 //
 // Builds call OpenAI for real (OPENAI_API_KEY in .env), about 90 s each.
-// GET /__local-login signs in as a test user (?user=2 for a second one;
+// --ai-replay answers them from a recording instead, --ai-record makes one,
+// and --fake-stripe fakes Stripe; see scripts/dev-local-outside.mjs.
+// GET /__local-login signs in as a test user (?user=2 or ?user=3 for others;
 // &keep=1 keeps the browser's saved data, like a real sign-in). It
 // exists only in this script, which no deploy ships, and the server listens on
 // 127.0.0.1 only.
@@ -19,6 +22,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { installOutsideServices, outsideServicesWanted } from "./dev-local-outside.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = path.join(ROOT, "release-dist");
@@ -48,6 +53,16 @@ if (!existsSync(path.join(SITE, "index.html"))) {
   process.exit(1);
 }
 
+// Before the app modules load: replay rewrites the AI settings it answers for.
+const outside = outsideServicesWanted(args)
+  ? installOutsideServices({
+      record: argValue("--ai-record"),
+      replay: argValue("--ai-replay"),
+      replayDelayMs: Number(argValue("--ai-replay-delay") || 0),
+      fakeStripe: args.includes("--fake-stripe"),
+    })
+  : null;
+
 // Imported after the env is set: some modules read it at load time.
 const { toBackgroundEventHandler, toLambdaHandler } = await import("../lib/aws/lambda-http.mjs");
 const { default: api } = await import("../netlify/functions/api.mjs");
@@ -70,6 +85,7 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, origin);
     if (url.pathname === "/__local-login") return await localLogin(url, res);
+    if (url.pathname === "/__outside-calls" && outside) return outsideCalls(req, res);
     if (url.pathname === "/.netlify/functions/build-background") return await startPipeline(req, res);
     if (url.pathname === "/config.local.js" || url.pathname.startsWith("/api/")) {
       return await callApi(req, url, res);
@@ -92,9 +108,7 @@ async function localLogin(url, res) {
     name: builderSessionStoreNameForFunctionContext({ deploy: { context: DEPLOY_CONTEXT } }),
     consistency: "strong",
   });
-  const user = url.searchParams.get("user") === "2"
-    ? { sub: "local-test-user-2", email: "local-test-2@example.com", name: "Second Tester" }
-    : { sub: "local-test-user", email: "local-test@example.com", name: "Local Test" };
+  const user = LOCAL_USERS[url.searchParams.get("user")] || LOCAL_USERS[1];
   const session = await createBuilderSession(store, user);
   const next = url.searchParams.get("next") || "";
   if (next.startsWith("/") && !next.startsWith("//")) {
@@ -111,6 +125,19 @@ async function localLogin(url, res) {
   }
   res.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": session.cookie });
   res.end(JSON.stringify({ ok: true }));
+}
+
+const LOCAL_USERS = {
+  1: { sub: "local-test-user", email: "local-test@example.com", name: "Local Test" },
+  2: { sub: "local-test-user-2", email: "local-test-2@example.com", name: "Second Tester" },
+  3: { sub: "local-test-user-3", email: "local-test-3@example.com", name: "Build Tester" },
+};
+
+// What the stand-ins for outside services were asked (see dev-local-outside.mjs).
+function outsideCalls(req, res) {
+  if (req.method === "DELETE") outside.clear();
+  res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  res.end(JSON.stringify(outside.report()));
 }
 
 // Same hand-off as AWS: the API's signed dispatch becomes a pipeline event.

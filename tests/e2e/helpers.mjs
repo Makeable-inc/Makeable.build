@@ -3,7 +3,7 @@ import { expect } from "@playwright/test";
 // Local test sign-in (scripts/dev-local.mjs only). It also clears the site's
 // browser storage, like a fresh browser.
 export async function signIn(page, { user = 1, next = "/" } = {}) {
-  await page.goto(`/__local-login?${user === 2 ? "user=2&" : ""}next=${encodeURIComponent(next)}`);
+  await page.goto(`/__local-login?${user > 1 ? `user=${user}&` : ""}next=${encodeURIComponent(next)}`);
 }
 
 // Clicks Log out and waits until the server ended the session and the page
