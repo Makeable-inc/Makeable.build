@@ -1752,3 +1752,17 @@
   .mk-wiring-simulation-heading p { font-size: 11px; }
   .mk-wiring-artifact-parts[data-connected="true"] { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 28px; padding: 14px 24px; }
 }
+
+.mk-topbar-utilities .mk-topbar-signout {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #3a3f42;
+  border-radius: 999px;
+  background: transparent;
+  color: #d7dbdd;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mk-topbar-utilities .mk-topbar-signout:hover { color: #fff; border-color: #5b6164; }
+.mk-topbar-signout-error { margin: 0; max-width: 16rem; color: #ffb4bd; font-size: 11px; }

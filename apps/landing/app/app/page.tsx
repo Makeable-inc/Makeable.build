@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowIcon, BuildFailurePanel, FolderSkeleton, LockedCodePanel, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "../workspace-ui";
 import { buildLibrary, loadBuildLibrary } from "./build-library";
+import { browserStorages, signOut } from "../sign-out";
+import { resetMakeableAnalytics } from "../analytics";
 import { ProjectOverview } from "../project-overview";
 import { projectDisplayIdentity } from "../project-identity.mjs";
 import { ProjectWiringGuide } from "../project-wiring-guide";
@@ -120,6 +122,9 @@ export default function BuildAppPage() {
   const [loadError, setLoadError] = useState("");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accountUnavailable, setAccountUnavailable] = useState(false);
+  const [publicFailed, setPublicFailed] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const [accountBuilds, setAccountBuilds] = useState<BuildProject[]>([]);
   const [publicBuilds, setPublicBuilds] = useState<BuildProject[]>([]);
   const [sharedProject, setSharedProject] = useState<BuildProject | null>(null);
@@ -152,6 +157,7 @@ export default function BuildAppPage() {
       setLoading(true);
       setLoadError("");
       setAccountUnavailable(false);
+      setPublicFailed(false);
       setAccountBuilds([]);
       setPublicBuilds([]);
       const { account, publicBuilds: publicLoad } = loadBuildLibrary<AuthUser, BuildProject, BuildQuota>({
@@ -187,6 +193,7 @@ export default function BuildAppPage() {
       if (cancelled) return;
       // A failed public list is an error to retry, never an empty gallery.
       if (publicResult.state === "failed" && accountResult.state !== "signed-in") {
+        setPublicFailed(true);
         setLoadError("Makeable could not load the community builds. Try again.");
       }
     }
@@ -253,6 +260,24 @@ export default function BuildAppPage() {
     router.push("/");
   }, [router]);
 
+  async function logOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    const ok = await signOut({
+      fetch,
+      url: apiUrl("/api/auth/session"),
+      storages: browserStorages(),
+    });
+    if (ok) {
+      resetMakeableAnalytics();
+      window.location.assign("/app/");
+      return;
+    }
+    setSigningOut(false);
+    setSignOutError("Makeable could not log you out. You are still signed in, so try again.");
+  }
+
   const openProjects = useCallback(() => {
     setSurface("overview");
     setWiringError("");
@@ -282,6 +307,9 @@ export default function BuildAppPage() {
           const selected = builds.find((build) => build.id === id);
           if (selected) selectBuild(selected);
         }}
+        onSignOut={() => void logOut()}
+        signingOut={signingOut}
+        signOutError={signOutError}
       />
 
       <WorkspaceContextBar
@@ -312,9 +340,9 @@ export default function BuildAppPage() {
               : <ProjectOverview key={activeBuild.id} build={activeBuild} onOpenWiring={() => void openWiring()} wiringLoading={wiringLoading} />
         ) : (
           <div className="mk-empty-library">
-            <h1 id="workspace-title">{accountUnavailable ? "Your projects are temporarily unavailable" : "My builds"}</h1>
+            <h1 id="workspace-title">{accountUnavailable ? "Your projects are temporarily unavailable" : user ? "My builds" : "Community builds"}</h1>
             <p>{loadError || "No build was found for this link yet. Sign in from the homepage to save new builds here."}</p>
-            {accountUnavailable && <button className="mk-button mk-button-dark" type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>}
+            {(accountUnavailable || publicFailed) && <button className="mk-button mk-button-dark" type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>}
             <button className="mk-button mk-button-dark" type="button" onClick={goHome}>Back to main page</button>
           </div>
         )}

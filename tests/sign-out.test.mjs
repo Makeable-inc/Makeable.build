@@ -1,0 +1,92 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+import { signOut } from "../apps/landing/app/sign-out.ts";
+
+function fakeStorage(entries) {
+  const map = new Map(Object.entries(entries));
+  return {
+    get length() { return map.size; },
+    key: (index) => [...map.keys()][index] ?? null,
+    getItem: (key) => map.get(key) ?? null,
+    removeItem: (key) => map.delete(key),
+    entries: () => Object.fromEntries(map),
+  };
+}
+
+function recordingFetch(statusFor = () => 200) {
+  const calls = [];
+  const fetch = (url, init) => {
+    calls.push({ url, method: init?.method, credentials: init?.credentials });
+    return Promise.resolve(new Response("{}", { status: statusFor(url) }));
+  };
+  return { fetch, calls };
+}
+
+test("log out ends the server session with a same-origin DELETE that sends the cookie", async () => {
+  const { fetch, calls } = recordingFetch();
+  assert.equal(await signOut({ fetch, url: "/api/auth/session", storages: [] }), true);
+  assert.deepEqual(calls, [{ url: "/api/auth/session", method: "DELETE", credentials: "include" }]);
+});
+
+test("log out leaves a running build alone; it belongs to the account, not the browser", async () => {
+  const { fetch, calls } = recordingFetch();
+  const local = fakeStorage({ "makeable:active-build-job:v1": "job_saved1" });
+  assert.equal(await signOut({ fetch, url: "/api/auth/session", storages: [local] }), true);
+  assert.deepEqual(calls.map((call) => `${call.method} ${call.url}`), ["DELETE /api/auth/session"]);
+});
+
+test("after log out, Makeable's saved data is forgotten and nothing else is touched", async () => {
+  const local = fakeStorage({ "makeable:active-build-job:v1": "job_1", ph_posthog: "x" });
+  const session = fakeStorage({ "makeable:open-project": "{}", "makeable:active-build-job:v1": "job_1", other: "y" });
+  await signOut({ fetch: recordingFetch().fetch, url: "/api/auth/session", storages: [local, session] });
+  assert.deepEqual(local.entries(), { ph_posthog: "x" });
+  assert.deepEqual(session.entries(), { other: "y" });
+});
+
+test("a failed or unreachable log out reports failure and keeps the saved data of the still signed-in user", async () => {
+  const local = fakeStorage({ "makeable:open-project": "{}" });
+  assert.equal(await signOut({ fetch: recordingFetch(() => 403).fetch, url: "u", storages: [local] }), false);
+  assert.deepEqual(local.entries(), { "makeable:open-project": "{}" });
+  assert.equal(await signOut({ fetch: () => Promise.reject(new TypeError("offline")), url: "u", storages: [local] }), false);
+  assert.deepEqual(local.entries(), { "makeable:open-project": "{}" });
+});
+
+test("analytics forgets the signed-in person on log out", async () => {
+  const analytics = await readFile(new URL("../apps/landing/app/analytics.ts", import.meta.url), "utf8");
+  assert.match(analytics, /export function resetMakeableAnalytics\(\) \{\s*posthog\.reset\(\);/);
+});
+
+test("Log out sits next to the profile on /app and in the homepage nav, resets analytics, and says so when it fails", async () => {
+  const [ui, home, app] = await Promise.all([
+    readFile(new URL("../apps/landing/app/workspace-ui.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../apps/landing/app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../apps/landing/app/app/page.tsx", import.meta.url), "utf8"),
+  ]);
+  // Outside the projects menu, beside the profile chip.
+  assert.match(ui, /<\/details>\s*\)\}\s*<ProfileChip[\s\S]*?\/>\s*\{user && onSignOut && !building && \(/);
+  assert.match(ui, /\{signOutError && <p className="mk-topbar-signout-error" role="alert">\{signOutError\}<\/p>\}/);
+  assert.match(home, /\{authUser && \(\s*<button className="mk-nav-signout" type="button" onClick=\{\(\) => void logOut\(\)\}/);
+  for (const page of [home, app]) {
+    assert.match(page, /if \(ok\) \{\s*resetMakeableAnalytics\(\);\s*window\.location\.assign\(/);
+    assert.match(page, /setSignOutError\("Makeable could not log you out\. You are still signed in, so try again\."\)/);
+  }
+});
+
+test("the homepage Log out stays visible on tablets and phones", async () => {
+  const [home, production, workspace] = await Promise.all([
+    readFile(new URL("../apps/landing/app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../apps/landing/app/production.css", import.meta.url), "utf8"),
+    readFile(new URL("../apps/landing/app/workspace.css", import.meta.url), "utf8"),
+  ]);
+  // No narrow-screen rule hides it.
+  for (const css of [production, workspace]) {
+    for (const [, selectors] of css.matchAll(/([^{}]*)\{\s*display:\s*none;?\s*\}/g)) {
+      assert.doesNotMatch(selectors, /\.mk-nav-signout\b/);
+    }
+  }
+  // On small phones "My builds" shrinks to the avatar, keeping its label for screen readers.
+  assert.match(home, /<span className="mk-nav-cta-label">My builds<\/span><ProfileAvatar user=\{authUser\} \/>/);
+  assert.match(workspace, /@media \(max-width: 480px\) \{[\s\S]*?\.mk-nav-cta-label \{[^}]*clip-path: inset\(50%\);/);
+});
