@@ -14,6 +14,7 @@
     "build:production": "npm run build",
     "check": "node --check app.js && node --check pilot/app.js && node --check dashboard/app.js && node --check dashboard/overview.js && node --check dashboard/waitlist.js && node --check dashboard/social.js && node --check dashboard/social-content.js && node --check dashboard/social-chart.js && node --check dashboard/social-account-table.js && node --check dashboard/social-model.js && node --check hologram/hologram.js && node --check hologram/ble-client.js && node --check hologram/ble-protocol.js && node --check hologram/frame-codec.js && node --check hologram/sw.js && node --check lib/acquisition.mjs && node --check lib/build-jobs.mjs && node --check lib/builder-session.mjs && node --check lib/dashboard-auth.mjs && node --check lib/dashboard-report.mjs && node --check lib/posthog-social.mjs && node --check lib/social-dashboard.mjs && node --check lib/social-links.mjs && node --check lib/social-refresh.mjs && node --check lib/tiktok-oauth.mjs && node --check lib/youtube-oauth.mjs && node --check lib/geometry-contract.mjs && node --check lib/makeable-builds.mjs && node --check lib/waitlist-report.mjs && node --check lib/waitlist-storage.mjs && node --check lib/waitlist-session.mjs && node --check scripts/waitlist-admin.mjs && node --check server.mjs && node --check netlify/functions/api.mjs && node --check netlify/functions/build-background.mjs && node --check netlify/functions/build-cleanup.mjs && node --check netlify/functions/social-link.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "test:e2e": "playwright test",
     "test:compiler": "MAKEABLE_TEST_ARDUINO_CLI=$PWD/.makeable/toolchain/bin/arduino-cli node --test tests/compiler.integration.test.mjs",
     "toolchain:install": "bash scripts/install-arduino-toolchain.sh",
     "waitlist:admin": "node scripts/waitlist-admin.mjs"
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@aws-sdk/client-amplify": "3.1090.0",
     "@aws-sdk/client-cloudformation": "3.1090.0",
+    "@playwright/test": "1.56.1",
     "fflate": "0.8.2"
   }
 }
