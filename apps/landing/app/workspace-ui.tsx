@@ -94,6 +94,9 @@ export function WorkspaceTopBar({
   selectedProjectId,
   projectsLabel = "My projects",
   onSelectProject,
+  onSignOut,
+  signingOut = false,
+  signOutError = "",
 }: {
   user: SafeUser | null;
   remaining: number;
@@ -112,6 +115,9 @@ export function WorkspaceTopBar({
   selectedProjectId?: string;
   projectsLabel?: string;
   onSelectProject?: (id: string) => void;
+  onSignOut?: () => void;
+  signingOut?: boolean;
+  signOutError?: string;
 }) {
   const switcherRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -174,6 +180,12 @@ export function WorkspaceTopBar({
           unavailable={accountUnavailable}
           showBalance={showBalance}
         />
+        {user && onSignOut && !building && (
+          <button className="mk-topbar-signout" type="button" onClick={onSignOut} disabled={signingOut}>
+            {signingOut ? "Logging out..." : "Log out"}
+          </button>
+        )}
+        {signOutError && <p className="mk-topbar-signout-error" role="alert">{signOutError}</p>}
       </div>
     </header>
   );

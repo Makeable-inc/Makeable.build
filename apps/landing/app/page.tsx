@@ -13,9 +13,11 @@ import {
 } from "react";
 import {
   captureMakeableEvent,
+  forgetEndedMakeableAccount,
   identifyMakeableAccount,
   makeableDistinctId,
   makeableReferringDomain,
+  resetMakeableAnalytics,
 } from "./analytics";
 import { advanceBuildProgress } from "./generation-progress";
 import {
@@ -30,6 +32,9 @@ import { projectDisplayIdentity, withProjectDisplayIdentity } from "./project-id
 import { RetailerBrand } from "./retailer-brand";
 import { ProjectWiringGuide } from "./project-wiring-guide";
 import { projectWiringReady } from "./project-wiring-data.mjs";
+import { appendGalleryPage, galleryPageUrl, loadGalleryPage } from "./gallery-pages";
+import { savedBuildJobRefused, savedBuildJobToResume } from "./saved-build-job";
+import { browserStorages, signOut } from "./sign-out";
 import { ArrowIcon, BuildClarificationPanel, GenerationWorkspace, LockedCodePanel, ProfileAvatar, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "./workspace-ui";
 
 declare global {
@@ -539,6 +544,10 @@ async function loadPublicConfigWithRetry() {
   return config;
 }
 
+// The server refused a build job this browser saved: it belongs to another
+// account, or no longer exists.
+class SavedBuildJobRefusedError extends Error {}
+
 function abortableDelay(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     if (signal.aborted) {
@@ -644,6 +653,14 @@ export default function Home() {
   const [generationError, setGenerationError] = useState("");
   const [buildClarification, setBuildClarification] = useState<BuildClarification | null>(null);
   const [generatedBuilds, setGeneratedBuilds] = useState<BuildProject[]>([]);
+  const [galleryCursor, setGalleryCursor] = useState<string | null>(null);
+  const [galleryMoreBusy, setGalleryMoreBusy] = useState(false);
+  const [galleryMoreError, setGalleryMoreError] = useState("");
+  const [galleryLoadFailed, setGalleryLoadFailed] = useState(false);
+  const [galleryAttempt, setGalleryAttempt] = useState(0);
+  const [galleryRetrying, setGalleryRetrying] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const [detailBuild, setDetailBuild] = useState<BuildProject | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("loading");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -812,6 +829,16 @@ export default function Home() {
   useDialogFocusTrap(loginOpen, loginDialogRef, closeLogin, authBusy);
   useDialogFocusTrap(preorderOpen, preorderDialogRef, () => setPreorderOpen(false), preorderBusy);
 
+  // The session ended (expired, or refused by the server): show this browser as
+  // signed out and stop counting its events toward that account.
+  const forgetSignedInAccount = useCallback(() => {
+    authUserRef.current = null;
+    setAuthUser(null);
+    setAccountBuilds([]);
+    setQuota(DEFAULT_BUILD_QUOTA);
+    forgetEndedMakeableAccount();
+  }, []);
+
   const fetchAccount = useCallback(async (openLibrary = false) => {
     setAuthUnavailable(false);
     try {
@@ -820,10 +847,7 @@ export default function Home() {
         credentials: "include",
       });
       if (response.status === 401) {
-        authUserRef.current = null;
-        setAuthUser(null);
-        setAccountBuilds([]);
-        setQuota(DEFAULT_BUILD_QUOTA);
+        forgetSignedInAccount();
         setAuthUnavailable(false);
         return null;
       }
@@ -851,7 +875,7 @@ export default function Home() {
     } finally {
       setAuthResolved(true);
     }
-  }, []);
+  }, [forgetSignedInAccount]);
 
   const claimReadyBuildJob = useCallback(async (jobId: string, signal?: AbortSignal) => {
     pendingClaimJobIdRef.current = jobId;
@@ -932,6 +956,7 @@ export default function Home() {
         throw new Error("Connection interrupted while checking this build. The build may still be running. Try again to reconnect to the same job.");
       }
       const result = await readJsonResponse<BuildJobStatusResponse>(response);
+      if (savedBuildJobRefused(response.status)) throw new SavedBuildJobRefusedError(result.error || "Makeable could not check this build job.");
       if (!response.ok || !result.job) {
         throw new Error(result.error || "Makeable could not check this build job.");
       }
@@ -962,7 +987,7 @@ export default function Home() {
     throw new DOMException("Aborted", "AbortError");
   }, [claimReadyBuildJob, openLogin]);
 
-  const resumeBuildJob = useCallback(async (jobId = currentJobRef.current?.id || "") => {
+  const resumeBuildJob = useCallback(async (jobId = currentJobRef.current?.id || "", { savedOnLoad = false } = {}) => {
     if (!jobId) return;
     generationAbortRef.current?.abort();
     const requestController = new AbortController();
@@ -973,6 +998,14 @@ export default function Home() {
       await runBuildJobPoll(jobId, requestController.signal);
     } catch (error) {
       if (requestController.signal.aborted) return;
+      if (savedOnLoad && error instanceof SavedBuildJobRefusedError) {
+        // Another account's leftover job (or one that is gone): drop it quietly.
+        clearSavedBuildJobId();
+        currentJobRef.current = null;
+        setCurrentJob(null);
+        setWorkspaceOpen(false);
+        return;
+      }
       setWorkspaceMode("loading");
       setGenerationError(error instanceof Error ? error.message : "Makeable could not resume this build.");
     } finally {
@@ -986,10 +1019,10 @@ export default function Home() {
 
   useEffect(() => {
     if (!authResolved || currentJobRef.current || jobFlowActiveRef.current) return;
-    const savedJobId = savedBuildJobId();
+    const savedJobId = savedBuildJobToResume(savedBuildJobId(), Boolean(authUserRef.current));
     if (!savedJobId) return;
     lastAutomaticResumeAtRef.current = Date.now();
-    void resumeBuildJob(savedJobId);
+    void resumeBuildJob(savedJobId, { savedOnLoad: true });
   }, [authResolved, resumeBuildJob]);
 
   useEffect(() => {
@@ -998,12 +1031,12 @@ export default function Home() {
       if (document.visibilityState === "hidden" || navigator.onLine === false) return;
       const job = currentJobRef.current;
       if (job && ["ready", "failed", "cancelled"].includes(job.state)) return;
-      const jobId = job?.id || savedBuildJobId();
+      const jobId = job?.id || savedBuildJobToResume(savedBuildJobId(), Boolean(authUserRef.current));
       if (!jobId) return;
       const now = Date.now();
       if (now - lastAutomaticResumeAtRef.current < 1000) return;
       lastAutomaticResumeAtRef.current = now;
-      void resumeBuildJob(jobId);
+      void resumeBuildJob(jobId, { savedOnLoad: !job });
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") resumeSavedJob();
@@ -1093,6 +1126,14 @@ export default function Home() {
           signal: requestController.signal,
         });
       let response = await startBuild();
+      if (response.status === 401) {
+        forgetSignedInAccount();
+        pendingIdeaRef.current = nextIdea;
+        setGenerationProgress(0);
+        setWorkspaceOpen(false);
+        openLogin("generate");
+        return;
+      }
       let result = await readJsonResponse<StartBuildJobResponse>(response);
       if (response.ok && !result.job && !result.activeJob && !result.clarification) {
         captureMakeableEvent("makeable build start response recovery", { recovery_step: "active_job" });
@@ -1148,7 +1189,7 @@ export default function Home() {
         setGenerationBusy(false);
       }
     }
-  }, [openLogin, runBuildJobPoll]);
+  }, [forgetSignedInAccount, openLogin, runBuildJobPoll]);
 
   const handleGoogleCredential = useCallback(async (response: { credential?: string }) => {
     if (authInFlightRef.current) return;
@@ -1235,15 +1276,6 @@ export default function Home() {
     applyHeroFromUrl();
     window.addEventListener("popstate", applyHeroFromUrl);
 
-    fetch(apiUrl("/api/builds"), { headers: { Accept: "application/json" } })
-      .then((response) => response.ok ? response.json() : { builds: [] })
-      .then((data: { builds?: BuildProject[] }) => {
-        if (!cancelled && Array.isArray(data.builds)) setGeneratedBuilds(data.builds);
-      })
-      .catch(() => {
-        if (!cancelled) setGeneratedBuilds([]);
-      });
-
     const accountTimer = window.setTimeout(() => {
       if (!cancelled) void fetchAccount(false);
     }, 0);
@@ -1253,6 +1285,24 @@ export default function Home() {
       window.clearTimeout(accountTimer);
     };
   }, [fetchAccount, selectHeroBuild]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    // A failed list is shown as a failure with Try again, never as "no builds".
+    // The message stays up while a retry runs, until its result is known.
+    void loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl("")), undefined, controller.signal).then((page) => {
+      if (cancelled) return;
+      setGalleryLoadFailed(!page.ok);
+      setGalleryRetrying(false);
+      setGeneratedBuilds(page.ok ? page.builds : []);
+      setGalleryCursor(page.ok ? page.nextCursor : null);
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [galleryAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1381,6 +1431,44 @@ export default function Home() {
       return;
     }
     fetchAccount(true);
+  }
+
+  function retryGallery() {
+    setGalleryRetrying(true);
+    setGalleryAttempt((attempt) => attempt + 1);
+  }
+
+  async function logOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    generationAbortRef.current?.abort();
+    const ok = await signOut({
+      fetch,
+      url: apiUrl("/api/auth/session"),
+      storages: browserStorages(),
+    });
+    if (ok) {
+      resetMakeableAnalytics();
+      window.location.assign("/");
+      return;
+    }
+    setSigningOut(false);
+    setSignOutError("Makeable could not log you out. You are still signed in, so try again.");
+  }
+
+  async function loadMoreBuilds() {
+    if (!galleryCursor || galleryMoreBusy) return;
+    setGalleryMoreBusy(true);
+    setGalleryMoreError("");
+    const page = await loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl(galleryCursor)));
+    if (page.ok) {
+      setGeneratedBuilds((shown) => appendGalleryPage(shown, page.builds));
+      setGalleryCursor(page.nextCursor);
+    } else {
+      setGalleryMoreError("Makeable could not load more builds. Try again.");
+    }
+    setGalleryMoreBusy(false);
   }
 
   function openProject(build: BuildProject) {
@@ -1514,6 +1602,9 @@ export default function Home() {
             generationAbortRef.current?.abort();
             window.location.assign(`/app?build=${encodeURIComponent(build.id)}`);
           }}
+          onSignOut={() => void logOut()}
+          signingOut={signingOut}
+          signOutError={signOutError}
           onCreateAnother={() => {
             setWorkspaceOpen(false);
             window.setTimeout(() => document.getElementById("make")?.scrollIntoView({ behavior: "smooth" }), 0);
@@ -1573,9 +1664,17 @@ export default function Home() {
             <a href="#make">Create</a>
             <a href="#community">Community</a>
           </div>
-          <button className="mk-nav-cta" type="button" onClick={openBuildLibrary}>
-            {!authResolved ? "Checking…" : authUser ? <><span>My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
-          </button>
+          <div className="mk-nav-account">
+            {authUser && (
+              <button className="mk-nav-signout" type="button" onClick={() => void logOut()} disabled={signingOut}>
+                {signingOut ? "Logging out..." : "Log out"}
+              </button>
+            )}
+            <button className="mk-nav-cta" type="button" onClick={openBuildLibrary}>
+              {!authResolved ? "Checking…" : authUser ? <><span className="mk-nav-cta-label">My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
+            </button>
+            {signOutError && <p className="mk-form-error mk-nav-signout-error" role="alert">{signOutError}</p>}
+          </div>
         </nav>
         <div
           className="mk-mobile-hero-media"
@@ -1680,10 +1779,18 @@ export default function Home() {
           </div>
           <button type="button" onClick={openBuildLibrary}>See my builds <ArrowIcon /></button>
         </div>
+        {galleryLoadFailed && (
+          <div className="mk-gallery-footer mk-gallery-load-error">
+            <p className="mk-form-error" role="status">Makeable could not load the community builds. The examples below are still here.</p>
+            <button type="button" onClick={retryGallery} disabled={galleryRetrying}>
+              {galleryRetrying ? "Loading..." : "Try again"}
+            </button>
+          </div>
+        )}
         <div className="mk-community-grid" ref={communityGridRef} onScroll={updateCommunityIndex}>
           {communityBuilds.map((build) => (
             <button className="mk-community-card" type="button" key={build.id} onClick={() => openProject(build)}>
-              <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
+              <ProjectImage src={build.image.url} alt={`${build.title} product render`} size="card" />
               <CreatorBadge build={build} />
               <span>{build.title}</span>
               <small>{build.image.source === "seed" ? "Makeable example" : build.status || "Concept"}</small>
@@ -1762,6 +1869,10 @@ export default function Home() {
       {galleryOpen && (
         <FullGallery
           builds={communityBuilds}
+          hasMore={Boolean(galleryCursor)}
+          loadingMore={galleryMoreBusy}
+          loadMoreError={galleryMoreError}
+          onLoadMore={() => void loadMoreBuilds()}
           onClose={() => setGalleryOpen(false)}
           onSelect={(build) => {
             setGalleryOpen(false);
@@ -1824,6 +1935,9 @@ function BuildWorkspace({
   clarification,
   onBack,
   onSelectBuild,
+  onSignOut,
+  signingOut,
+  signOutError,
   onCreateAnother,
   onDismiss,
   onCancel,
@@ -1849,6 +1963,9 @@ function BuildWorkspace({
   clarification: BuildClarification | null;
   onBack: () => void;
   onSelectBuild: (build: BuildProject) => void;
+  onSignOut: () => void;
+  signingOut: boolean;
+  signOutError: string;
   onCreateAnother: () => void;
   onDismiss: () => void;
   onCancel: () => void;
@@ -1887,6 +2004,9 @@ function BuildWorkspace({
             onSelectBuild(selected);
           }
         }}
+        onSignOut={onSignOut}
+        signingOut={signingOut}
+        signOutError={signOutError}
       />
 
       {!isLoading && !isClarifying && <WorkspaceContextBar
@@ -1982,10 +2102,18 @@ function DetailTraitIcon({ kind }: { kind: "ready" | "time" | "gift" }) {
 
 function FullGallery({
   builds,
+  hasMore,
+  loadingMore,
+  loadMoreError,
+  onLoadMore,
   onClose,
   onSelect,
 }: {
   builds: BuildProject[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMoreError: string;
+  onLoadMore: () => void;
   onClose: () => void;
   onSelect: (build: BuildProject) => void;
 }) {
@@ -2007,7 +2135,7 @@ function FullGallery({
           {builds.map((build) => (
             <button type="button" key={build.id} onClick={() => onSelect(build)}>
               <div>
-                <ProjectImage src={build.image.url} alt={`${build.title} product render`} />
+                <ProjectImage src={build.image.url} alt={`${build.title} product render`} size="card" />
                 <CreatorBadge build={build} />
               </div>
               <span>{build.title}</span>
@@ -2017,6 +2145,14 @@ function FullGallery({
             </button>
           ))}
         </div>
+        {hasMore && (
+          <div className="mk-gallery-footer mk-full-gallery-more">
+            {loadMoreError && <p className="mk-form-error" role="status">{loadMoreError}</p>}
+            <button type="button" onClick={onLoadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading..." : "Load more"}
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );

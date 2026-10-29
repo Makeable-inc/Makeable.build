@@ -47,5 +47,5 @@ test('homepage confirms login before generation and can resume the same saved jo
  assert.match(start,/openLogin\("generate"\);\s+return;/);
  assert.match(source,/let account = await fetchAccount\(false\)/);
  for(const event of ['visibilitychange','pageshow','online'])assert.ok(source.includes(`addEventListener("${event}"`));
- assert.match(source,/void resumeBuildJob\(jobId\)/);
+ assert.match(source,/void resumeBuildJob\(jobId, \{ savedOnLoad: !job \}\)/);
 });

@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowIcon, BuildFailurePanel, FolderSkeleton, LockedCodePanel, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "../workspace-ui";
-import { buildLibrary } from "./build-library";
+import { buildLibrary, loadBuildLibrary } from "./build-library";
+import { browserStorages, signOut } from "../sign-out";
+import { forgetEndedMakeableAccount, resetMakeableAnalytics } from "../analytics";
 import { ProjectOverview } from "../project-overview";
 import { projectDisplayIdentity } from "../project-identity.mjs";
 import { ProjectWiringGuide } from "../project-wiring-guide";
@@ -77,12 +79,6 @@ type BuildQuota = {
   remaining: number;
 };
 
-type AccountBuildsResponse = {
-  user: AuthUser;
-  builds: BuildProject[];
-  quota?: BuildQuota;
-};
-
 const DEFAULT_BUILD_QUOTA: BuildQuota = {
   limit: 10,
   used: 0,
@@ -126,6 +122,9 @@ export default function BuildAppPage() {
   const [loadError, setLoadError] = useState("");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accountUnavailable, setAccountUnavailable] = useState(false);
+  const [publicFailed, setPublicFailed] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const [accountBuilds, setAccountBuilds] = useState<BuildProject[]>([]);
   const [publicBuilds, setPublicBuilds] = useState<BuildProject[]>([]);
   const [sharedProject, setSharedProject] = useState<BuildProject | null>(null);
@@ -158,60 +157,45 @@ export default function BuildAppPage() {
       setLoading(true);
       setLoadError("");
       setAccountUnavailable(false);
+      setPublicFailed(false);
       setAccountBuilds([]);
       setPublicBuilds([]);
-      try {
-        const [accountResult, publicResult] = await Promise.allSettled([
-          fetch(apiUrl("/api/account/builds"), {
-            headers: { Accept: "application/json" },
-            credentials: "include",
-          }),
-          fetch(apiUrl("/api/builds"), { headers: { Accept: "application/json" } }),
-        ]);
-
-        if (cancelled) return;
-
-        let loadedAnyBuilds = false;
-        if (accountResult.status === "fulfilled" && accountResult.value.ok) {
-          const accountResponse = accountResult.value;
-          const account = await accountResponse.json() as AccountBuildsResponse;
-          if (!cancelled) {
-            setUser(account.user);
-            setAccountBuilds(Array.isArray(account.builds) ? account.builds : []);
-            setQuota(normalizeQuota(account.quota));
-            setAccountUnavailable(false);
-            loadedAnyBuilds = Array.isArray(account.builds) && account.builds.length > 0;
-          }
-        } else if (accountResult.status === "fulfilled" && accountResult.value.status === 401) {
+      const { account, publicBuilds: publicLoad } = loadBuildLibrary<AuthUser, BuildProject, BuildQuota>({
+        fetch: (url, init) => fetch(url, init),
+        accountUrl: apiUrl("/api/account/builds"),
+        publicUrl: apiUrl("/api/builds"),
+      });
+      // The two requests settle independently: public builds show as soon as
+      // they arrive, whatever happens to the account request.
+      const publicDone = publicLoad.then((result) => {
+        if (cancelled) return result;
+        if (result.state === "ok") setPublicBuilds(result.builds);
+        setLoading(false);
+        return result;
+      });
+      const accountDone = account.then((result) => {
+        if (cancelled) return result;
+        if (result.state === "signed-in") {
+          setUser(result.user);
+          setAccountBuilds(result.builds);
+          setQuota(normalizeQuota(result.quota));
+        } else if (result.state === "signed-out") {
+          forgetEndedMakeableAccount();
           setUser(null);
           setAccountBuilds([]);
           setQuota(DEFAULT_BUILD_QUOTA);
-          setAccountUnavailable(false);
         } else {
           setAccountUnavailable(true);
           setLoadError("Your projects could not be loaded. Try again to reconnect to your account.");
         }
-
-        if (publicResult.status === "fulfilled" && publicResult.value.ok) {
-          const publicResponse = publicResult.value;
-          const publicData = await publicResponse.json() as { builds?: BuildProject[] };
-          if (!cancelled) {
-            const nextPublicBuilds = Array.isArray(publicData.builds) ? publicData.builds : [];
-            setPublicBuilds(nextPublicBuilds);
-            loadedAnyBuilds = loadedAnyBuilds || nextPublicBuilds.length > 0;
-          }
-        }
-        if (!loadedAnyBuilds && accountResult.status === "rejected" && publicResult.status === "rejected") {
-          setAccountUnavailable(true);
-          setLoadError("Makeable could not load this project folder.");
-        }
-      } catch {
-        if (!cancelled) {
-          setAccountUnavailable(true);
-          setLoadError("Makeable could not load this project folder.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        return result;
+      });
+      const [publicResult, accountResult] = await Promise.all([publicDone, accountDone]);
+      if (cancelled) return;
+      // A failed public list is an error to retry, never an empty gallery.
+      if (publicResult.state === "failed" && accountResult.state !== "signed-in") {
+        setPublicFailed(true);
+        setLoadError("Makeable could not load the community builds. Try again.");
       }
     }
 
@@ -277,6 +261,24 @@ export default function BuildAppPage() {
     router.push("/");
   }, [router]);
 
+  async function logOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    const ok = await signOut({
+      fetch,
+      url: apiUrl("/api/auth/session"),
+      storages: browserStorages(),
+    });
+    if (ok) {
+      resetMakeableAnalytics();
+      window.location.assign("/app/");
+      return;
+    }
+    setSigningOut(false);
+    setSignOutError("Makeable could not log you out. You are still signed in, so try again.");
+  }
+
   const openProjects = useCallback(() => {
     setSurface("overview");
     setWiringError("");
@@ -306,6 +308,9 @@ export default function BuildAppPage() {
           const selected = builds.find((build) => build.id === id);
           if (selected) selectBuild(selected);
         }}
+        onSignOut={() => void logOut()}
+        signingOut={signingOut}
+        signOutError={signOutError}
       />
 
       <WorkspaceContextBar
@@ -336,9 +341,9 @@ export default function BuildAppPage() {
               : <ProjectOverview key={activeBuild.id} build={activeBuild} onOpenWiring={() => void openWiring()} wiringLoading={wiringLoading} />
         ) : (
           <div className="mk-empty-library">
-            <h1 id="workspace-title">{accountUnavailable ? "Your projects are temporarily unavailable" : "My builds"}</h1>
+            <h1 id="workspace-title">{accountUnavailable ? "Your projects are temporarily unavailable" : user ? "My builds" : "Community builds"}</h1>
             <p>{loadError || "No build was found for this link yet. Sign in from the homepage to save new builds here."}</p>
-            {accountUnavailable && <button className="mk-button mk-button-dark" type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>}
+            {(accountUnavailable || publicFailed) && <button className="mk-button mk-button-dark" type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button>}
             <button className="mk-button mk-button-dark" type="button" onClick={goHome}>Back to main page</button>
           </div>
         )}

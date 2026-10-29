@@ -1,6 +1,7 @@
 import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
 import { backgroundDispatchFetch } from "../../lib/aws/background-invoke.mjs";
 import { openStore } from "../../lib/storage/index.mjs";
+import { getGalleryThumbnail } from "../../lib/build-thumbnails.mjs";
 import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createGoogleWaitlistResult } from "../../lib/acquisition.mjs";
@@ -22,6 +23,7 @@ import {
   accountBuildQuota,
   buildCommunityStoreNameForFunctionContext,
   buildJobImageStoreNameForFunctionContext,
+  buildThumbnailStoreNameForFunctionContext,
   buildJobQuotaStoreNameForFunctionContext,
   buildJobStateStoreNameForFunctionContext,
   builderDisabled,
@@ -44,6 +46,7 @@ import {
   listAccountGalleryBuilds,
   listPublicGalleryBuilds,
   markBuildJobState,
+  pageGalleryBuilds,
   publicBuildJob,
   resolveBuildJobAccess,
 } from "../../lib/build-jobs.mjs";
@@ -838,8 +841,23 @@ function normalizeSignupEmail(value) {
 
 async function communityBuilds(req, env, context) {
   if (req.method === "GET") {
-    return jsonResponse({ builds: await listPublicGalleryBuilds(buildStateStore(context)) }, 200, {
-      "Cache-Control": "no-store",
+    // The same for every visitor, so the CDN may share it: 10 minutes fresh,
+    // then served stale while it refreshes. A new build can take that long to show.
+    // ?limit=N&cursor=... returns one page and the cursor for the next.
+    const params = new URL(req.url).searchParams;
+    const limitParam = params.get("limit");
+    let page;
+    try {
+      page = pageGalleryBuilds(await listPublicGalleryBuilds(buildStateStore(context)), {
+        limit: limitParam === null ? undefined : /^\d+$/.test(limitParam) ? Number(limitParam) : Number.NaN,
+        cursor: params.get("cursor") || "",
+      });
+    } catch (error) {
+      if (error?.message !== "gallery_page_invalid") throw error;
+      return jsonResponse({ error: "Invalid limit or cursor." }, 400, { "Cache-Control": "no-store" });
+    }
+    return jsonResponse(limitParam === null ? { builds: page.builds } : page, 200, {
+      "Cache-Control": "public, max-age=0, s-maxage=600, stale-while-revalidate=86400",
     });
   }
   if (req.method === "POST") {
@@ -1038,6 +1056,20 @@ async function communityBuildImage(req, context, id) {
     return jsonResponse({ error: "Build image not found" }, 404, {
       "Cache-Control": "no-store",
     });
+  }
+  // Gallery cards ask for ?size=card: a small JPEG made on first request.
+  // If it can't be made, they get the full image below.
+  if (new URL(req.url).searchParams.get("size") === "card") {
+    const thumbnail = await getGalleryThumbnail({
+      thumbnails: buildThumbnailStore(context),
+      fullImage: (buildId) => getGalleryImage(buildImageStore(context), buildId),
+      buildId: id,
+    });
+    if (thumbnail) {
+      return binaryResponse(thumbnail.bytes, thumbnail.contentType, {
+        "Cache-Control": "public, max-age=3600",
+      });
+    }
   }
   const image = await getGalleryImage(buildImageStore(context), id);
   if (!image) {
@@ -1279,6 +1311,13 @@ function buildStateStore(context) {
   });
 }
 
+function buildThumbnailStore(context) {
+  return openStore({
+    name: buildThumbnailStoreNameForFunctionContext(context),
+    consistency: "strong",
+  });
+}
+
 function buildImageStore(context) {
   return openStore({
     name: buildJobImageStoreNameForFunctionContext(context),
@@ -1386,6 +1425,7 @@ async function runCommunityBuildJob({ jobId, idea, env, stateStore, imageStore }
     await completeBuildJob({
       stateStore,
       imageStore,
+      env,
       jobId,
       build: captureStore.saved || result.body,
     });
