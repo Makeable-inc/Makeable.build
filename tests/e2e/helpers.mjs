@@ -17,8 +17,32 @@ export async function logOutWith(page, button) {
   await reloaded;
 }
 
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The homepage's "Made with Makeable" section.
+export function communitySection(page) {
+  return page.getByRole("region", { name: "Made with Makeable" });
+}
+
+// A community card is a button whose name includes its title. The page dots
+// below the cards are named "Show <title>", so those are left out.
 export function communityCard(page, title) {
-  return page.locator(".mk-community-card", { hasText: title });
+  return communitySection(page).getByRole("button", { name: new RegExp(`^(?!Show ).*\\b${escapeRegExp(title)}\\b`) });
+}
+
+// The homepage nav: "Sign in" or "My builds", and Log out when signed in.
+export function primaryNav(page) {
+  return page.getByRole("navigation", { name: "Primary navigation" });
+}
+
+// The /app project switcher (a details element; its summary says "My projects").
+export async function openProjectSwitcher(page) {
+  const summary = page.locator("summary", { hasText: "My projects" });
+  await expect(summary).toBeVisible({ timeout: 15_000 });
+  await summary.click();
+  return page.locator("details", { has: summary });
 }
 
 export async function expectCommunityBuildsShown(page, title) {

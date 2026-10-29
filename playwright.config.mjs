@@ -1,6 +1,6 @@
 // Browser tests for the packaged site (release-dist), served by
 // scripts/dev-local.mjs with fixed fixture data and in-memory storage. No real
-// sign-in, no OpenAI calls, no real data. Build the site first (npm run build),
+// sign-in, no OpenAI calls, no real data, no requests to Google. Build the site first (npm run build),
 // then: npm run test:e2e
 import { defineConfig, devices } from "@playwright/test";
 
@@ -40,6 +40,9 @@ export default defineConfig({
       DASHBOARD_SESSION_SECRET,
       // Builds are never started by these tests; make sure none could call OpenAI.
       OPENAI_API_KEY: "",
+      // Makes the homepage load Google's sign-in script, as on the live site.
+      // tests/e2e/test.mjs blocks that script, so no test reaches Google.
+      GOOGLE_CLIENT_ID: "e2e-google-client-id",
     },
   },
 });

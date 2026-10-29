@@ -1,7 +1,7 @@
 // Brief Step 5: hidden, deleted and guessed builds stay private, and nobody can
 // change a build that is not theirs. @desktop-only: these check the server, so
 // one browser size is enough.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.mjs";
 
 import { HIDDEN_BUILD, TEST_USER_BUILDS } from "./fixture-data.mjs";
 import { sameOriginHeaders, signIn } from "./helpers.mjs";

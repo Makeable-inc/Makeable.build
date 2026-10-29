@@ -10,7 +10,8 @@
 // before the server starts (used by the browser tests in tests/e2e).
 //
 // Builds call OpenAI for real (OPENAI_API_KEY in .env), about 90 s each.
-// GET /__local-login signs in as a test user (?user=2 for a second one). It
+// GET /__local-login signs in as a test user (?user=2 for a second one;
+// &keep=1 keeps the browser's saved data, like a real sign-in). It
 // exists only in this script, which no deploy ships, and the server listens on
 // 127.0.0.1 only.
 import { spawnSync } from "node:child_process";
@@ -99,7 +100,13 @@ async function localLogin(url, res) {
   if (next.startsWith("/") && !next.startsWith("//")) {
     // Storage resets with this server, so drop the browser's saved active job
     // (localStorage) or the site reopens a job that no longer exists.
-    res.writeHead(302, { Location: next, "Set-Cookie": session.cookie, "Clear-Site-Data": '"storage"' });
+    // &keep=1 skips that, for tests of what a real sign-in finds left behind.
+    const keep = url.searchParams.get("keep") === "1";
+    res.writeHead(302, {
+      Location: next,
+      "Set-Cookie": session.cookie,
+      ...(keep ? {} : { "Clear-Site-Data": '"storage"' }),
+    });
     return res.end();
   }
   res.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": session.cookie });
