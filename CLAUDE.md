@@ -46,6 +46,8 @@ Gotchas:
 - Check a deploy: `AWS_PROFILE=makeable node scripts/aws-smoke-build.mjs` runs one real build through the API URL, prints each stage and deletes its own test records. Exit 0 means ready. Each run calls OpenAI.
 - A build can fail on the AI's side (for example `planner_identity_echo_mismatch`); rerun once before treating it as a deploy problem.
 
+The steps for moving makeable.build from Netlify to this stack (secrets, final data copy, DNS, checks, rollback) are in `docs/aws-cutover.md`.
+
 ### When a deploy fails after a merge
 
 The workflow already put the live site back on `aws-last-good`, so users are fine. `staging` still holds the change that failed, and the next merge would deploy it again, so clean it up through a PR (`staging` takes no direct pushes):
