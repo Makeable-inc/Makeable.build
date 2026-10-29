@@ -1643,7 +1643,7 @@ export default function Home() {
               </button>
             )}
             <button className="mk-nav-cta" type="button" onClick={openBuildLibrary}>
-              {!authResolved ? "Checking…" : authUser ? <><span>My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
+              {!authResolved ? "Checking…" : authUser ? <><span className="mk-nav-cta-label">My builds</span><ProfileAvatar user={authUser} /></> : "Sign in"}
             </button>
             {signOutError && <p className="mk-form-error mk-nav-signout-error" role="alert">{signOutError}</p>}
           </div>

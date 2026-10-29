@@ -2848,9 +2848,40 @@ button:active,
     font-size: 0.95rem;
   }
 
+  .mk-nav-account {
+    gap: 0.5rem;
+  }
+
+  .mk-nav-signout {
+    min-height: 2.85rem;
+    padding: 0 0.8rem;
+    font-size: 0.88rem;
+  }
+
   .mk-hero-builds {
     padding-top: 2.6rem;
     border-radius: 2rem 2rem 0 0;
+  }
+}
+
+/* Small phones: the signed-in button keeps only the avatar so Log out fits.
+   The label stays for screen readers. */
+@media (max-width: 480px) {
+  .mk-nav .mk-logo-link {
+    width: 7.25rem;
+  }
+
+  .mk-nav-cta:has(.mk-app-avatar-frame) {
+    padding: 0.32rem;
+  }
+
+  .mk-nav-cta-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 

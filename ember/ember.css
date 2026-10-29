@@ -380,7 +380,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 .makeable-mark--footer { min-height: 0; }
 .makeable-mark--footer img { width: var(--makeable-wordmark-footer-width); filter: brightness(0) invert(1); }
 .site-footer__brand p { width: 100%; margin: 6px 0 0; color: rgb(255 255 255 / 82%); font-size: 16px; line-height: 1.5; }
-.site-footer__social { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.site-footer__social { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
 .site-footer__social-link { display: grid; width: 32px; height: 32px; place-items: center; border-radius: var(--radius-pill); transition: color 180ms cubic-bezier(.32,.72,0,1), transform 180ms cubic-bezier(.32,.72,0,1); }
 .site-footer__social-link:hover { color: var(--color-orange-bright); transform: translateY(-2px); }
 .site-footer__social-link span { width: 19px; height: 19px; background: currentColor; mask: var(--footer-icon) center / contain no-repeat; -webkit-mask: var(--footer-icon) center / contain no-repeat; }

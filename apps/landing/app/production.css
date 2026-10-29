@@ -1955,8 +1955,7 @@ img.mk-build-image-pending {
   }
 
   .mk-nav-links,
-  .mk-nav-cta,
-  .mk-nav-signout {
+  .mk-nav-cta {
     display: none;
   }
 

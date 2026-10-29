@@ -89,3 +89,20 @@ test("Log out sits next to the profile on /app and in the homepage nav, resets a
   // The homepage also cancels the build it is following in memory.
   assert.match(home, /jobIds: \[currentJobRef\.current && !currentJobRef\.current\.claimedAt \? currentJobRef\.current\.id : ""\]/);
 });
+
+test("the homepage Log out stays visible on tablets and phones", async () => {
+  const [home, production, workspace] = await Promise.all([
+    readFile(new URL("../apps/landing/app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../apps/landing/app/production.css", import.meta.url), "utf8"),
+    readFile(new URL("../apps/landing/app/workspace.css", import.meta.url), "utf8"),
+  ]);
+  // No narrow-screen rule hides it.
+  for (const css of [production, workspace]) {
+    for (const [, selectors] of css.matchAll(/([^{}]*)\{\s*display:\s*none;?\s*\}/g)) {
+      assert.doesNotMatch(selectors, /\.mk-nav-signout\b/);
+    }
+  }
+  // On small phones "My builds" shrinks to the avatar, keeping its label for screen readers.
+  assert.match(home, /<span className="mk-nav-cta-label">My builds<\/span><ProfileAvatar user=\{authUser\} \/>/);
+  assert.match(workspace, /@media \(max-width: 480px\) \{[\s\S]*?\.mk-nav-cta-label \{[^}]*clip-path: inset\(50%\);/);
+});
