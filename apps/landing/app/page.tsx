@@ -31,6 +31,8 @@ import {
 import { projectDisplayIdentity, withProjectDisplayIdentity } from "./project-identity.mjs";
 import { RetailerBrand } from "./retailer-brand";
 import { ProjectWiringGuide } from "./project-wiring-guide";
+import { LandingHowItWorks } from "./landing-how-it-works";
+import { LandingWalkthrough } from "./landing-walkthrough";
 import { projectWiringReady } from "./project-wiring-data.mjs";
 import { appendGalleryPage, galleryPageUrl, loadGalleryPage } from "./gallery-pages";
 import { savedBuildJobRefused, savedBuildJobToResume } from "./saved-build-job";
@@ -1737,6 +1739,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <LandingHowItWorks />
+      <LandingWalkthrough />
 
       <section className="mk-builder" id="make" aria-labelledby="make-title">
         <div className="mk-builder-inner">

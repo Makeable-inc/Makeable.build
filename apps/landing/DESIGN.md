@@ -21,6 +21,7 @@ The gallery uses the existing `--featured-wash-blue` and `--featured-wash-pink` 
 ## 3. Typography
 
 - UI font: `--font-ui`
+- Landing (`.mk-page`): Fredoka (`--font-display`, 700) only on the big headlines: hero title, "Create your own build.", "Made with Makeable" and the how-it-works and walkthrough titles. Everything else on the landing page uses Figtree (`--font-sans`, self-hosted in `public/assets/fonts/figtree/`) at 400–600: nav, buttons, card titles, step titles. Rules live in `app/landing-sections.css`.
 - Featured card title: 1.08rem desktop, 1rem small screens, weight 700
 - Featured card secondary text: 0.9rem desktop, 0.8rem small screens
 
@@ -40,6 +41,17 @@ The gallery uses the existing `--featured-wash-blue` and `--featured-wash-pink` 
 - **Hover:** ring becomes more saturated in place, an inset colored bezel appears, and a soft glass reflection sweeps over the media; card geometry does not move.
 - **Selected:** uses the same shadow-free treatment with a stronger ring.
 - **Accessibility:** native button, visible perimeter color, scroll-snap rail.
+
+### How it works (`landing-how-it-works.tsx`)
+
+- Paper section after the hero: title, three numbered steps, and an animated isometric drawing (`iso-build-scene.mjs`) of a prompt flowing into four parts and a finished device.
+- The drawing uses ink outlines, three flat tones per object and pink only on things that are active. It animates only while on screen, and reduced motion shows one still frame.
+
+### Product walkthrough (`landing-walkthrough.tsx`)
+
+- Step list on the left; a copy of the app (create, building, parts, wiring) on the right.
+- Steps advance every 6 s while the section is on screen. The active step's rail fills over that time. Clicks and arrow keys jump to a step and restart its timer.
+- Part prices in the demo are examples, not live quotes.
 
 ## 6. Motion & Interaction
 
