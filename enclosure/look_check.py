@@ -9,7 +9,7 @@ from pathlib import Path
 from agent import MODEL, api_key, send_with_retries
 
 PROMPT = """The first image is the concept picture for a 3D-printed case. The second shows the real design from four angles: front, straight on, side and back.
-Green and brown only mark separate parts, and the dark green area is the real screen board. Ignore colours and whatever is drawn on the screen. The real screen's shape may differ from the picture, so ignore that too.
+Different shades of cream only mark separate parts, and the dark area is the real screen board. Ignore colours and whatever is drawn on the screen. The real screen's shape may differ from the picture, so ignore that too.
 Judge only the body: silhouette, proportions, how soft the edges are, and whether it reads as one object. Reply with only JSON:
 {"score": <0 to 10, where 10 is a clear match>, "differences": ["<up to 3 short, concrete changes that would bring it closer, most important first>"]}"""
 

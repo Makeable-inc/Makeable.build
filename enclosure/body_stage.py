@@ -61,7 +61,7 @@ def render(mesh, out):
     for i, (label, direction) in enumerate(VIEWS.items()):
         plotter.subplot(0, i)
         plotter.add_text(label, font_size=11)
-        plotter.add_mesh(surface, color="#d9d2c5", smooth_shading=True, split_sharp_edges=True, feature_angle=30)
+        plotter.add_mesh(surface, color="#efe6d2", smooth_shading=True, split_sharp_edges=True, feature_angle=30)
         d = np.array(direction, dtype=float)
         d /= np.linalg.norm(d)
         plotter.camera_position = [tuple(center + d * span * 3.2), tuple(center), (0, 0, 1)]

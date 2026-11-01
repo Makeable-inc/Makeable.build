@@ -10,7 +10,7 @@ import trimesh
 from card import build_card, load_nodes
 from parts import ensure_part
 
-COLOURS = {"PRINT_Shell": "#8fb39a", "PRINT_Base": "#c98f6b", "PRINT_Carrier": "#e4dccb"}
+COLOURS = {"PRINT_Shell": "#efe6d2", "PRINT_Base": "#dccfb6", "PRINT_Carrier": "#c9bda6"}
 PART_COLOURS = ["#1f5f46", "#2f6fb4", "#7a5ea8"]
 
 

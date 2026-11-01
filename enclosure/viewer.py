@@ -10,7 +10,7 @@ import trimesh
 from card import DIRECTIONS, build_card, load_nodes
 from parts import ensure_part
 
-COLOURS = {"PRINT_Shell": "#8fb39a", "PRINT_Base": "#c98f6b", "PRINT_Carrier": "#e4dccb"}
+COLOURS = {"PRINT_Shell": "#efe6d2", "PRINT_Base": "#dccfb6", "PRINT_Carrier": "#c9bda6"}
 PART_COLOUR = "#1f5f46"
 LABELS = {"PRINT_Shell": "Shell (printed)", "PRINT_Base": "Base (printed)", "PRINT_Carrier": "Holder (printed)"}
 
@@ -135,7 +135,7 @@ const G=new THREE.Group();S.add(G);const plane=new THREE.Plane(new THREE.Vector3
 for(const m of D.meshes){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(dec(m.v,Float32Array),3));g.setIndex(new THREE.BufferAttribute(dec(m.f,Uint32Array),1));
  const mat=new THREE.MeshStandardMaterial({color:m.colour,flatShading:true,side:THREE.DoubleSide,roughness:.8,metalness:0,clippingPlanes:clip,clipShadows:false});const o=new THREE.Mesh(g,mat);o.castShadow=o.receiveShadow=true;G.add(o);
  let f=null;if(m.smooth){const q=new THREE.BufferGeometry();q.setAttribute('position',new THREE.BufferAttribute(dec(m.smooth.v,Float32Array),3));q.setAttribute('normal',new THREE.BufferAttribute(dec(m.smooth.n,Float32Array),3));q.setIndex(new THREE.BufferAttribute(dec(m.smooth.f,Uint32Array),1));
-  f=new THREE.Mesh(q,new THREE.MeshStandardMaterial({color:'#a9bfa4',side:THREE.DoubleSide,roughness:.65,metalness:0,clippingPlanes:clip}));f.castShadow=f.receiveShadow=true;f.visible=false;G.add(f)}
+  f=new THREE.Mesh(q,new THREE.MeshStandardMaterial({color:'#efe6d2',side:THREE.DoubleSide,roughness:.65,metalness:0,clippingPlanes:clip}));f.castShadow=f.receiveShadow=true;f.visible=false;G.add(f)}
  const item={m,o,f,on:true};items.push(item);
  const l=document.createElement('label');const x=document.createElement('input');x.type='checkbox';x.checked=true;x.onchange=e=>{item.on=e.target.checked;show();draw()};const w=document.createElement('span');w.className='sw';w.style.background=m.colour;l.append(x,w,m.label);$('parts').appendChild(l)}
 const groundMat=new THREE.ShadowMaterial({opacity:.22});const ground=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),groundMat);ground.position.set(c.x,c.y,lo.z-.05);ground.receiveShadow=true;ground.visible=false;S.add(ground);
