@@ -221,7 +221,17 @@ PICTURE_BRIEF = """The attached concept picture shows the look to aim for. Match
 The picture is only a look. Sizes and the screen's real shape come from the part card, so where they differ the part card wins, and the body proportions adapt around the real screen. Ignore the colours and the picture on the screen."""
 
 
-def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None):
+def base_brief(base):
+    """The decided design. The AI's job is to make the parts fit it, not to redesign it."""
+    import layout_checks as l
+    limits = [f"Width / height of the case front: {base['width_to_height'][0]} to {base['width_to_height'][1]}.", f"Depth: at most {base['max_depth']} mm."]
+    for name, rule in base["place"].items():
+        limits.append(f"{name} {rule['feature']}: its centre from {rule['across'][0]} to {rule['across'][1]} across the front, measured from the -x side.")
+    return "\n".join([f"THE BASE DESIGN IS DECIDED: {base['name']}. It overrides every layout suggestion above, including where the knob goes. Do not redesign it. Your job is to make all the parts, wires and screws fit inside it. Everything else in this brief still has to pass.", *[f"- {line}" for line in base["sheet"]], "These are checked on your files:", *[f"- {line}" for line in limits],
+                      f"- Wires: at least {l.WIRE_RADIUS * 2} mm between wire centres, so none cross, and no point on a wire can see straight out of the case."])
+
+
+def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None, base=None):
     """Runs tries until the design passes or a stop rule fires. Every try is saved. continue_from is an earlier try's folder, to pick up where it left off."""
     folder = Path(folder)
     history, tokens, started = [], 0, time.time()
@@ -239,6 +249,9 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
         tokens += usage.get("total_tokens", 0)
         code = extract_code(reply)
         ran, message = run_design(code, attempt)
+        if base:
+            # Written after the code runs, so the design cannot replace the rules it is checked against.
+            (attempt / "base_design.json").write_text(json.dumps(base, indent=1), encoding="utf-8")
         report = checks.check_design(attempt, stage) if ran else {"passed": False, "failed": [], "results": []}
         (attempt / "report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
         if ran and stage == "case":
@@ -266,6 +279,13 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
     folder = HERE / "runs" / "agent" / name
     source = HERE / "runs" / "agent" / (earlier_run or name)
     continue_from = None
+    base = None
+    if parts.endswith(".json"):
+        from concepts import base_picture
+        base = json.loads(Path(parts).read_text(encoding="utf-8"))
+        parts, look = base["parts"], base["look"]
+        picture = base_picture(base)
+        print(f"base design: {base['name']}, picture: {picture}", flush=True)
     part_ids = parts.split(",")
     part_id = part_ids[0]
     if picture == "auto":
@@ -285,7 +305,9 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
     brief = case_brief(part_ids, look, code)
     if picture:
         brief = "\n\n".join([brief, PICTURE_BRIEF])
-    return design_part(brief, folder / "case", min(MAX_CASE_TRIES, MAX_TOTAL_TRIES - carrier["tries"]), stage="case", continue_from=continue_from, picture=picture)
+    if base:
+        brief = "\n\n".join([brief, base_brief(base)])
+    return design_part(brief, folder / "case", min(MAX_CASE_TRIES, MAX_TOTAL_TRIES - carrier["tries"]), stage="case", continue_from=continue_from, picture=picture, base=base)
 
 
 if __name__ == "__main__":

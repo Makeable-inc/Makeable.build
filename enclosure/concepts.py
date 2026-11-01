@@ -27,7 +27,14 @@ def picture_prompt(part_id, look, landscape=True):
 
 
 def concept(part_id, look, landscape=True):
-    prompt = picture_prompt(part_id, look, landscape)
+    return generate(picture_prompt(part_id, look, landscape))
+
+
+def base_picture(base):
+    return generate(base["picture_prompt"])
+
+
+def generate(prompt):
     path = FOLDER / f"{hashlib.sha256((MODEL + prompt).encode()).hexdigest()[:12]}.png"
     if path.exists():
         return path

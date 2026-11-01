@@ -265,6 +265,8 @@ def check_design(folder, stage="carrier"):
             results.extend(check_holder(holder, meshes[holder], name, purchased[name], cards[name], transforms[name], hold["insert_from"]))
     if stage == "case":
         from case_checks import check_case
+        base_file = folder / "base_design.json"
+        design["base_design"] = json.loads(base_file.read_text(encoding="utf-8")) if base_file.exists() else None
         results.extend(check_case(design, meshes, purchased, cards, transforms))
     return finish()
 

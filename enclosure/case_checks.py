@@ -153,9 +153,13 @@ def check_window_view(name, card, transform, union, others, axis, side):
     vs = np.arange(frame["min"][others[1]] - 1, frame["max"][others[1]] + 1, spacing)
     grid = np.zeros((len(us) * len(vs), 3))
     grid[:, others[0]], grid[:, others[1]] = [c.ravel() for c in np.meshgrid(us, vs, indexing="ij")]
-    grid[:, axis] = card["envelope"]["max" if side else "min"][axis] + (20 if side else -20)
-    origins = apply(transform, grid)
+    # Start outside the whole case, because a raised panel can stand further forward than the screen.
+    face_level = card["features"]["glass"]["max" if side else "min"][axis]
+    grid[:, axis] = face_level + (1 if side else -1)
     inward = transform[:3, :3] @ (AXES[axis] * (-1 if side else 1))
+    start_distance = float(np.max((union.vertices - apply(transform, grid[:1])[0]) @ -inward)) + 5
+    origins = apply(transform, grid) - inward * start_distance
+    face_distance = start_distance + 1
     rays = np.tile(inward, (len(origins), 1))
     locations, indexes, _ = union.ray.intersects_location(origins, rays, multiple_hits=False)
     plastic = np.full(len(origins), np.inf)
@@ -164,7 +168,7 @@ def check_window_view(name, card, transform, union, others, axis, side):
     board = np.full(len(origins), np.inf)
     board[indexes] = np.linalg.norm(locations - origins[indexes], axis=1)
     # A ray that reaches the board first sees the board, and one stopped by plastic ahead of the board's face is the bezel. Plastic further in is a view into the case.
-    seen_inside = ~(board <= plastic) & (plastic > 20)
+    seen_inside = ~(board <= plastic) & (plastic > face_distance)
     area = float(seen_inside.sum()) * spacing ** 2
     where = rounded(origins[seen_inside].mean(axis=0)) if seen_inside.any() else None
     return result("window_view", name, area <= MAX_VISIBLE_INSIDE, measured=round(area, 2), limit=f"at most {MAX_VISIBLE_INSIDE} mm2 of the case's inside visible through the window", where=where,
@@ -287,4 +291,6 @@ def check_case(design, meshes, purchased, cards, transforms):
     results.extend(check_screws(case.get("screws") or [], meshes, part_points))
     from wiring_checks import check_wiring
     results.extend(check_wiring(design, meshes, purchased, cards, transforms))
+    from layout_checks import check_layout
+    results.extend(check_layout(design, cards, transforms, union))
     return results

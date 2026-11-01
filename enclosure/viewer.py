@@ -113,6 +113,7 @@ output{font-variant-numeric:tabular-nums;font-weight:600}
 <aside>
 <div><h1>__TITLE__</h1><p class="s" id="size"></p><p class="s">__CHECKS__ Shown exactly as exported, with flat facets. Not printed.</p><ul>__FAILS__</ul></div>
 <section><h2>Look</h2><div class="row"><button id="exact" aria-pressed="true">Exact parts</button><button id="finish" aria-pressed="false">Finished</button></div><div class="row" id="tones" style="margin-top:6px"><button data-tone="#a9bfa4">Sage</button><button data-tone="#efe6d6">Cream</button><button data-tone="#34383c">Charcoal</button></div><p class="s">Finished is one colour with soft light and smooth shading, to judge the look. The shape is unchanged. Use Exact parts to check the fit.</p></section>
+<section><h2>Show</h2><label><input type="checkbox" id="see"> Transparent</label><label><input type="checkbox" id="dims"> Dimensions</label><label><input type="checkbox" id="ref"> Size reference (apple)</label></section>
 <section><h2>Parts</h2><div id="parts"></div></section>
 <section><h2>Pull apart</h2><input id="ex" type="range" min="0" max="1" step="0.01" value="0" aria-label="Pull apart"></section>
 <section><h2>Cut through</h2><div class="row" id="axes"><button data-a="">Off</button><button data-a="0">Left-right</button><button data-a="1">Front-back</button><button data-a="2">Top-bottom</button></div>
@@ -166,6 +167,21 @@ function pick(e){const b=el.getBoundingClientRect();ray.setFromCamera({x:(e.clie
  const hits=ray.intersectObjects(items.flatMap(i=>[i.o,i.f]).filter(o=>o&&o.visible)).filter(h=>clip.length==0||clip[0].distanceToPoint(h.point)>=0);if(!hits.length)return;
  if(pts.length==2){pts=[];marks.clear()}pts.push(hits[0].point.clone());const s=new THREE.Mesh(new THREE.SphereGeometry(sz.length()*.006),new THREE.MeshBasicMaterial({color:0xd0021b,depthTest:false}));s.position.copy(hits[0].point);s.renderOrder=9;marks.add(s);
  if(pts.length==2){const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xd0021b,depthTest:false}));l.renderOrder=9;marks.add(l);const a=pts[0],z=pts[1];$('r').textContent=`${a.distanceTo(z).toFixed(2)} mm  (x ${Math.abs(a.x-z.x).toFixed(2)}, y ${Math.abs(a.y-z.y).toFixed(2)}, z ${Math.abs(a.z-z.z).toFixed(2)})`;$('r').hidden=false}draw()}
+function label(text,colour){const k=document.createElement('canvas');k.width=512;k.height=96;const x=k.getContext('2d');x.font='bold 54px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';x.lineWidth=10;x.strokeStyle='#ffffff';x.strokeText(text,256,48);x.fillStyle=colour;x.fillText(text,256,48);
+ const t=new THREE.CanvasTexture(k);const m=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));const h=sz.length()*.05;m.scale.set(h*512/96,h,1);m.renderOrder=11;return m}
+function line(a,b,colour){const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:colour,depthTest:false}));l.renderOrder=10;return l}
+const dims=new THREE.Group();dims.visible=false;S.add(dims);
+{const g=sz.length()*.06,col='#b5341c',V3=(x,y,z)=>new THREE.Vector3(x,y,z);
+ const add=(a,b,text,off)=>{dims.add(line(a,b,col));const tick=off.clone().normalize().multiplyScalar(g*.35);dims.add(line(a.clone().sub(tick),a.clone().add(tick),col));dims.add(line(b.clone().sub(tick),b.clone().add(tick),col));const t=label(text,col);t.position.copy(a).add(b).multiplyScalar(.5).add(off);dims.add(t)};
+ add(V3(lo.x,lo.y-g,lo.z),V3(hi.x,lo.y-g,lo.z),sz.x.toFixed(1)+' mm',V3(0,-g,0));
+ add(V3(hi.x+g,lo.y,lo.z),V3(hi.x+g,hi.y,lo.z),sz.y.toFixed(1)+' mm',V3(g,0,0));
+ add(V3(hi.x+g,lo.y,lo.z),V3(hi.x+g,lo.y,hi.z),sz.z.toFixed(1)+' mm',V3(g,0,0))}
+const ref=new THREE.Group();ref.visible=false;S.add(ref);
+{const r=37.5,body=new THREE.Mesh(new THREE.SphereGeometry(r,48,32),new THREE.MeshStandardMaterial({color:'#b5342a',roughness:.45}));body.scale.set(1,1,.9);body.position.set(hi.x+r+sz.length()*.18,c.y,lo.z+r*.9);body.castShadow=body.receiveShadow=true;ref.add(body);
+ const stem=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.6,11,12),new THREE.MeshStandardMaterial({color:'#5b3a21',roughness:.8}));stem.rotation.x=Math.PI/2;stem.position.set(body.position.x,c.y,lo.z+r*1.8+4);ref.add(stem);
+ const t=label('Apple, about 75 mm wide','#7c2219');t.position.set(body.position.x,c.y,lo.z+r*1.8+16);ref.add(t)}
+function setSee(on){for(const i of items){if(!i.f)continue;for(const m of [i.o.material,i.f.material]){m.transparent=on;m.opacity=on?.28:1;m.depthWrite=!on;m.needsUpdate=true}}draw()}
+$('see').onchange=e=>setSee(e.target.checked);$('dims').onchange=e=>{dims.visible=e.target.checked;draw()};$('ref').onchange=e=>{ref.visible=e.target.checked;draw()};
 setCut();view(.6,1.15);
 </script></html>"""
 
