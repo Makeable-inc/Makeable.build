@@ -1,0 +1,48 @@
+{
+ "part_id": "ky-040-rotary-encoder",
+ "sha256": "b1206502ca31670518143f7924eb074a31c02af9e8c3f603e7ade1c35869b372",
+ "role": "input",
+ "front": "+z",
+ "pins_point": "+z",
+ "pins_note": "The compiler lists these pins with normal +x. The AWS model's pins stand along +z, and the team decided they stay as in the model, so the model's direction is used.",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb:mtdele-b0d949dpr1-ky040"
+   ]
+  },
+  "can": {
+   "nodes": [
+    "encoder:metal-can"
+   ]
+  },
+  "bushing": {
+   "nodes": [
+    "encoder:threaded-bushing"
+   ]
+  },
+  "shaft": {
+   "nodes": [
+    "encoder:shaft"
+   ],
+   "points": "+z"
+  },
+  "knob": {
+   "nodes": [
+    "included-knob:body",
+    "included-knob:top",
+    "included-knob:index-mark"
+   ],
+   "fitted_last": true
+  },
+  "pin_rows": {
+   "nodes": [
+    "ky040-j1:pin:01:CLK:metal",
+    "ky040-j1:pin:02:DT:metal",
+    "ky040-j1:pin:03:SW:metal",
+    "ky040-j1:pin:04:PLUS:metal",
+    "ky040-j1:pin:05:GND:metal"
+   ]
+  }
+ }
+}

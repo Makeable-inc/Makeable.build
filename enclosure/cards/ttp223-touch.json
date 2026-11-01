@@ -1,0 +1,35 @@
+{
+ "part_id": "ttp223-touch",
+ "sha256": "1a476b7d8043b6bb41ca7b8e5f98cf27d76d5a666d354e1096496cd24d2a6845",
+ "role": "input",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb:diyables-b0bpg115t1:24x24"
+   ]
+  },
+  "touch": {
+   "nodes": [
+    "touch-electrode:ring:1",
+    "touch-electrode:ring:2",
+    "touch-electrode:ring:3",
+    "touch-electrode:ring:4",
+    "touch-electrode:ring:5",
+    "touch-electrode:ring:6"
+   ],
+   "may_face_out": [
+    "-z",
+    "+z"
+   ],
+   "note": "In the AWS model the electrode and the pins are both on +z. With -z facing out, the finger is on the back of the PCB. With +z facing out, the pins and plugs point at the same wall. Which side senses better is not known from the model, so a print must prove it."
+  },
+  "pin_rows": {
+   "nodes": [
+    "ttp223-j1:pin:01:SIG:metal",
+    "ttp223-j1:pin:02:VCC:metal",
+    "ttp223-j1:pin:03:GND:metal"
+   ]
+  }
+ }
+}
