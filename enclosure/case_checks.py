@@ -18,6 +18,9 @@ MAX_SCREEN_TILT_UP = 70
 MIN_BALANCE_MARGIN = 2.0
 MIN_SCREWS = 2
 REQUIRED_PARTS = ["PRINT_Carrier", "PRINT_Shell", "PRINT_Base"]
+MIN_COVER_FLAT = 0.9
+MIN_PART_CONTACT = 0.25
+BED_TOLERANCE = 0.1
 # Assumed M2 x 8 self-tapping screw, until a real one is chosen and measured.
 SCREW = {"length": 8.0, "grip": 3.0, "shank_radius": 1.1, "pilot_radius": 0.75, "post_radius": 2.3, "head_radius": 2.0, "driver_radius": 2.6, "driver_length": 40.0}
 
@@ -285,6 +288,42 @@ def check_standing(meshes):
                    fix="The case tips over or has no flat bottom. Give it a flat base at its lowest z, wide enough that its centre of weight sits well inside.")]
 
 
+def side_flat_share(mesh, axis, sign):
+    """How much of a part's outline touches the print bed when this side faces down, from 0 to 1."""
+    normal = np.zeros(3)
+    normal[axis] = sign
+    extreme = mesh.bounds[1 if sign > 0 else 0][axis]
+    on_bed = (mesh.face_normals @ normal > 0.999) & (np.abs(mesh.triangles_center[:, axis] - extreme) < BED_TOLERANCE)
+    across = [i for i in range(3) if i != axis]
+    try:
+        outline = float(ConvexHull(mesh.vertices[:, across]).volume)
+    except (QhullError, ValueError):
+        return 0.0
+    return float(mesh.area_faces[on_bed].sum()) / outline if outline > 0 else 0.0
+
+
+def back_flat_share(mesh, front):
+    """The same measure for the side opposite the front, which becomes the outside of the rear cover."""
+    axis, side = DIRECTIONS[front]
+    return side_flat_share(mesh, axis, -1 if side else 1)
+
+
+def check_flat_on_bed(meshes):
+    """A printer builds up from a flat bed, so every printed part needs a side that sits flat. The rear cover is a plate, so nearly all of its outline must touch."""
+    results = []
+    for name, mesh in meshes.items():
+        size = mesh.bounds[1] - mesh.bounds[0]
+        widest = max(float(np.prod(np.delete(size, axis))) for axis in range(3))
+        # A narrow edge would topple on the bed, so only broad sides count.
+        shares = {f"{'+' if sign > 0 else '-'}{'xyz'[axis]}": side_flat_share(mesh, axis, sign) for axis in range(3) for sign in (1, -1) if float(np.prod(np.delete(size, axis))) >= widest / 2}
+        side = max(shares, key=shares.get)
+        need = MIN_COVER_FLAT if name == "PRINT_Base" else MIN_PART_CONTACT
+        fix = f"{name} has no side that sits flat on the print bed. Its flattest side, {side}, touches only {shares[side]:.0%} of its outline, and it needs {need:.0%}. "
+        fix += "Make the rear cover a flat plate of even thickness, with its outside completely flat and only its outline rounded." if name == "PRINT_Base" else "Give it one flat face."
+        results.append(result("flat_on_bed", name, shares[side] >= need, measured=round(shares[side], 3), limit=f"at least {need:.0%} of the outline touches the bed", where=f"flattest side {side}", fix=fix))
+    return results
+
+
 def check_case(design, meshes, purchased, cards, transforms):
     case = design.get("case")
     if not isinstance(case, dict):
@@ -295,6 +334,7 @@ def check_case(design, meshes, purchased, cards, transforms):
     if not all(m.is_watertight for m in meshes.values()) or set(transforms) != set(purchased):
         return []
     results = check_plastic_pairs(meshes)
+    results.extend(check_flat_on_bed(meshes))
     union = merged(meshes.values())
     part_points = {}
     for name, transform in transforms.items():

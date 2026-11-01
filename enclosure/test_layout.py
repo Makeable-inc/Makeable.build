@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 import trimesh
 
-from case_checks import allow_glue, check_assembly, check_screw_spread
+from case_checks import allow_glue, back_flat_share, check_assembly, check_flat_on_bed, check_screw_spread
 from severity import is_warning
 from layout_checks import check_base_design, check_wire_crossing, check_wire_hidden
 from space_checks import case_openness, points_seeing_out
@@ -75,6 +75,49 @@ class Openings(unittest.TestCase):
 
     def test_point_in_a_closed_case_does_not(self):
         self.assertFalse(points_seeing_out(self.INSIDE, hollow_box())[0])
+
+
+def rounded_plate():
+    """A plate whose whole back is curved, like a cover cut from a fully rounded body."""
+    return trimesh.creation.icosphere(subdivisions=4, radius=1.0).apply_scale((50, 5, 25))
+
+
+class FlatOnBed(unittest.TestCase):
+    def part(self, mesh, name="PRINT_Base"):
+        return [r for r in check_flat_on_bed({name: mesh}) if r["part"] == name][0]
+
+    def test_a_flat_cover_passes(self):
+        found = self.part(trimesh.creation.box(extents=(100, 10, 50)))
+        self.assertTrue(found["ok"])
+
+    def test_a_curved_cover_fails_and_is_a_must_pass(self):
+        found = self.part(rounded_plate())
+        self.assertFalse(found["ok"])
+        self.assertFalse(is_warning(found))
+        self.assertIn("flat", found["fix"])
+
+    def test_a_cover_flat_only_in_the_middle_fails(self):
+        plate = trimesh.creation.box(extents=(100, 4, 50), transform=trimesh.transformations.translation_matrix((0, 2, 0)))
+        middle = trimesh.creation.box(extents=(70, 2, 30), transform=trimesh.transformations.translation_matrix((0, 4.5, 0)))
+        hollow = trimesh.creation.box(extents=(96, 4, 46), transform=trimesh.transformations.translation_matrix((0, 1, 0)))
+        cover = trimesh.boolean.difference([trimesh.boolean.union([plate, middle], engine="manifold"), hollow], engine="manifold")
+        self.assertFalse(self.part(cover)["ok"])
+
+    def test_a_flat_narrow_edge_does_not_count(self):
+        slab = trimesh.creation.icosphere(subdivisions=4, radius=1.0).apply_scale((50, 6, 25))
+        edge_cut = trimesh.creation.box(extents=(4, 40, 80), transform=trimesh.transformations.translation_matrix((49.5, 0, 0)))
+        trimmed = trimesh.boolean.difference([slab, edge_cut], engine="manifold")
+        self.assertFalse(self.part(trimmed)["ok"])
+
+    def test_a_frame_shaped_holder_can_pass_with_less_contact(self):
+        outer = trimesh.creation.box(extents=(30, 4, 30))
+        inner = trimesh.creation.box(extents=(20, 6, 20))
+        found = self.part(trimesh.boolean.difference([outer, inner], engine="manifold"), "PRINT_Carrier")
+        self.assertTrue(found["ok"])
+
+    def test_the_body_stage_refuses_a_curved_back_before_any_engineering(self):
+        self.assertLess(back_flat_share(rounded_plate(), "-y"), 0.5)
+        self.assertGreater(back_flat_share(trimesh.creation.box(extents=(100, 10, 50)), "-y"), 0.99)
 
 
 class MoRules(unittest.TestCase):

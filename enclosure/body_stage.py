@@ -10,7 +10,7 @@ import trimesh
 
 import agent
 from card import build_card
-from case_checks import MIN_SCREEN_SHARE_OTHER, MIN_SCREEN_SHARE_WIDEST
+from case_checks import MIN_SCREEN_SHARE_OTHER, MIN_SCREEN_SHARE_WIDEST, back_flat_share
 from checks import load_stl, unsealed_result
 from look_check import look_check
 from sandbox import run_design
@@ -18,6 +18,7 @@ from sandbox import run_design
 MAX_BODY_TRIES = 3
 MAX_BODY_CRASHES = 4
 GOOD_ENOUGH_SCORE = 8
+MIN_BACK_FLAT = 0.93
 VIEWS = {"front": (0.5, -1, 0.35), "straight on": (0, -1, 0.02), "side": (1, -0.2, 0.2), "back": (-0.5, 1, 0.35)}
 
 BODY_SYSTEM = """You are an industrial designer who models in code. Write one complete Python script using build123d 0.13. Reply with only the script, in one ```python block. Allowed imports: build123d, math, json, pathlib.
@@ -50,6 +51,7 @@ def body_brief(base):
         lines.append(f"The parts need at least this much room: width {minimum['width']} mm, height {minimum['height']} mm, depth {minimum['depth']} mm. Keep the body at or above these. Sizes are real, so do not shrink below them for looks.")
     limit = screen_limits(base)
     lines.append(f"The real screen is {limit['screen_width']:.1f} mm wide and {limit['screen_height']:.1f} mm tall and cannot change. It must be the main feature of the front, so the front is at most {limit['max_width']:.1f} mm wide and {limit['max_height']:.1f} mm tall, and also either at most {limit['tight_width']:.1f} mm wide or at most {limit['tight_height']:.1f} mm tall. Size the form from these numbers, not from how large it looks in the picture.")
+    lines.append(f"The back, opposite the front, becomes a printed cover that must lie flat on a print bed, because printers build layer by layer. Make the whole back one flat plane with only a small edge, so at least {MIN_BACK_FLAT:.0%} of the back's outline is flat. Keep the curves on the front, top and sides.")
     return "\n".join(lines)
 
 
@@ -90,6 +92,9 @@ def body_problems(mesh, base):
     limit = screen_limits(base)
     if size[0] > limit["max_width"] or size[2] > limit["max_height"] or not (size[0] <= limit["tight_width"] or size[2] <= limit["tight_height"]):
         problems.append(f"The front is {size[0]:.1f} mm wide and {size[2]:.1f} mm tall, too big for the real screen. It must be at most {limit['max_width']:.1f} wide and {limit['max_height']:.1f} tall, and also either at most {limit['tight_width']:.1f} wide or at most {limit['tight_height']:.1f} tall.")
+    back = back_flat_share(mesh, base.get("front", "-y"))
+    if back < MIN_BACK_FLAT:
+        problems.append(f"Only {back:.0%} of the back's outline is flat, and it needs at least {MIN_BACK_FLAT:.0%}, so the rear cover can lie flat on a print bed. Make the back one flat plane with only a small edge.")
     if abs(mesh.bounds[0][2]) > 0.1:
         problems.append(f"The base should sit at z = 0, and it is at {mesh.bounds[0][2]:.2f}.")
     return problems
