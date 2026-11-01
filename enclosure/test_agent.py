@@ -137,6 +137,19 @@ class Loop(unittest.TestCase):
                 agent.design_case("part", "look", f"run-{outcome}")
             self.assertEqual(stages, ["carrier", "case"])
 
+    def test_the_screen_can_be_a_separate_part(self):
+        import body_stage
+        base = {"parts": "seeed-xiao-esp32s3,ssd1309-242-oled,ky-040-rotary-encoder", "width_to_height": [1.6, 2.6]}
+        limits = body_stage.screen_limits(base)
+        self.assertAlmostEqual(limits["screen_width"], 55.02, places=1)
+        self.assertAlmostEqual(limits["screen_height"], 27.49, places=1)
+
+    def test_the_carrier_brief_uses_the_boards_own_front(self):
+        brief = agent.carrier_brief("seeed-xiao-esp32s3")
+        self.assertIn("from its front (+y)", brief)
+        self.assertIn("coming back out toward +y", brief)
+        self.assertIn("the closed case must still stop it", brief)
+
     def test_a_short_model_outage_is_retried(self):
         answers = [urllib.error.HTTPError("u", 520, "none", None, None), urllib.error.URLError("dropped"), io.BytesIO(b'{"ok": 1}')]
 

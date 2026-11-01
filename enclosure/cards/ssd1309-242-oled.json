@@ -1,0 +1,23 @@
+{
+ "part_id": "ssd1309-242-oled",
+ "sha256": "7eeea3fb93b0d8793bf2fc74dd6ed5b1617c0c6370f6284d71bcf0a38547c06d",
+ "role": "display",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": ["pcb"]
+  },
+  "frame": {
+   "nodes": ["pcb"]
+  },
+  "glass": {
+   "nodes": ["ssd1309-242-oled:glass"]
+  },
+  "screen": {
+   "nodes": ["ssd1309-242-oled:screen-art"]
+  },
+  "pin_rows": {
+   "nodes": ["header:pin:1", "header:pin:2", "header:pin:3", "header:pin:4"]
+  }
+ }
+}

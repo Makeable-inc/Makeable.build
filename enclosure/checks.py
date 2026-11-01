@@ -163,15 +163,20 @@ def sanding_depth(target, source, direction):
     return round(float(distances.max()), 2)
 
 
-def travel(carrier, origins, direction):
-    """How far the part can move in one direction before it hits the carrier."""
+def travel_ends(carrier, origins, direction):
+    """How far the part can move in one direction before it hits the carrier, the point on the part that hits, and where it lands."""
     near = origins[np.all((origins > carrier.bounds[0] - 60) & (origins < carrier.bounds[1] + 60), axis=1)]
     hits, rays, _ = carrier.ray.intersects_location(near, np.tile(direction, (len(near), 1)), multiple_hits=False)
     if not len(hits):
-        return np.inf, None
+        return np.inf, None, None
     distances = np.linalg.norm(hits - near[rays], axis=1)
     i = int(np.argmin(distances))
-    return float(distances[i]), near[rays[i]]
+    return float(distances[i]), near[rays[i]], hits[i]
+
+
+def travel(carrier, origins, direction):
+    distance, origin, _ = travel_ends(carrier, origins, direction)
+    return distance, origin
 
 
 def port_room_box(usb, transform):

@@ -1,0 +1,22 @@
+{
+ "part_id": "seeed-xiao-esp32s3",
+ "sha256": "89761a5afbebee2d27c6a3bf953558e6ade8bd8fe95f102134101bfd18f91f0f",
+ "role": "controller",
+ "front": "+y",
+ "features": {
+  "pcb": {
+   "nodes": ["0030"]
+  },
+  "usb": {
+   "nodes": ["0018"],
+   "connector": "usb-c",
+   "opens_toward": "+x"
+  },
+  "pin_rows": {
+   "nodes": [
+    "geometry:HEADER:pin:VBUS", "geometry:HEADER:pin:GND", "geometry:HEADER:pin:3V3", "geometry:HEADER:pin:D10", "geometry:HEADER:pin:D9", "geometry:HEADER:pin:D8", "geometry:HEADER:pin:D7",
+    "geometry:HEADER:pin:D6", "geometry:HEADER:pin:D5", "geometry:HEADER:pin:D4", "geometry:HEADER:pin:D3", "geometry:HEADER:pin:D2", "geometry:HEADER:pin:D1", "geometry:HEADER:pin:D0"
+   ]
+  }
+ }
+}

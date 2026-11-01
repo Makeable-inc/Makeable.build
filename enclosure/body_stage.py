@@ -35,7 +35,8 @@ BODY_SYSTEM = BODY_SYSTEM + "\n\n" + (Path(__file__).resolve().parent / "DESIGN_
 
 def screen_limits(base):
     """The largest front the screen-size check can ever pass, so a frozen body can never make it impossible."""
-    size = build_card(base["parts"].split(",")[0])["features"]["screen"]["size"]
+    cards = [build_card(part_id) for part_id in base["parts"].split(",")]
+    size = next(card["features"]["screen"]["size"] for card in cards if "screen" in card["features"])
     short, long = sorted(size[:2])
     wide = long if base["width_to_height"][0] >= 1 else short
     tall = short if base["width_to_height"][0] >= 1 else long

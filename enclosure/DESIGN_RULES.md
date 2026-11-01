@@ -78,6 +78,9 @@ The script has a time limit, and curved bodies are slow.
 - A wall strip left by a cut must be thick enough. Remove a thin strip completely.
 - Openings are closed holes fitted to their part, never slots running to the seam.
 - Parts slide straight in along the assembly direction, so the inside of a part must never get narrower along that path. On a curved body, make the cavity straight-sided along the assembly direction, and make it just big enough for the widest thing passing through. Check each part's width against the opening it has to pass.
+- Before placing a post, rib or stop, look along the assembly direction of the part it is on. That part sweeps its whole inside over everything already installed, so a feature that clears in the final position can still hit on the way in. Keep these features outside the outline of the installed parts as seen along that direction, and trim or move whichever one is cheaper.
+- In the closed case, every part must be stopped in every direction, including the one it went in from. A board whose front sits against the front wall is stopped by that wall. A small board with nothing in front of it, such as a controller behind a separate screen, is not. Give it a post, rib or clip within 0.5 mm of it on that side, usually on the part that closes over it, and keep that feature clear of the path everything travels on the way in.
+- Mating parts need at least 0.1 mm of gap everywhere. This is a must-pass, and it applies to printed parts and to the parts they hold.
 - Screws must work: a clear hole, a screwdriver path, plastic under the head, and a real post around the pilot hole.
 - Screws must fasten the whole cover. Put them near the corners, spread evenly, with at least one in each half of the cover's width and of its height. Two screws on one side leave the other side free to lift, so three or four is usual. Plan the posts for this early, because they need room inside.
 

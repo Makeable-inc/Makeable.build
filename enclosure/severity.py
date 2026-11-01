@@ -11,7 +11,6 @@ MAX_THIN_AREA = 0.05
 MIN_PRINTABLE_WALL = 1.0
 MAX_SANDING_DEPTH = 0.5
 MAX_LOOSE = 2.0
-MAX_PART_OVERLAP = 1.0
 MIN_SEAT = 0.5
 MIN_GRIP = 0.6
 MAX_SHANK_OVERLAP = 1.0
@@ -19,18 +18,15 @@ MAX_SHANK_OVERLAP = 1.0
 
 def is_warning(r):
     """True if a failed result can go on the print checklist. Anything not named here stays a must-pass."""
-    check, measured, where = r["check"], r.get("measured"), str(r.get("where") or "")
+    check, measured = r["check"], r.get("measured")
     if check in WARNING_ONLY:
         return True
     if check == "wall":
         return r.get("thin_below_minimum", 1.0) <= MAX_THIN_AREA
-    if check == "clearance":
-        return isinstance(measured, (int, float)) and measured >= 0
-    if check == "parts_gap":
-        match = re.search(r"overlap ([\d.]+) mm3", where)
-        return bool(match) and float(match.group(1)) <= MAX_PART_OVERLAP
     if check in ("assembly", "insertable"):
         return r.get("sanding_depth", math.inf) <= MAX_SANDING_DEPTH
+    if r.get("can_be_glued"):
+        return True
     if check in ("held", "retained"):
         return isinstance(measured, (int, float)) and measured <= MAX_LOOSE
     if check == "screw_seat":

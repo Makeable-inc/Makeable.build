@@ -113,8 +113,8 @@ def carrier_brief(part_id):
     card = build_card(part_id)
     plug = {k: {**v, "plug_room": checks.PLUG_ROOM[v["connector"]]} for k, v in card["features"].items() if "connector" in v}
     return "\n".join([
-        "Design PRINT_Carrier: a holder that locates this board from the sides and from behind. The board goes in from its front (+z).",
-        "A separate shell will close over it later, so nothing needs to stop it coming back out toward +z.",
+        f"Design PRINT_Carrier: a holder that locates this board from the sides and from behind. The board goes in from its front ({card['front']}).",
+        f"A separate shell will close over it later, so this holder does not need to stop it coming back out toward {card['front']}, but the closed case must still stop it there.",
         "Keep the screen and glass side open. The pins and parts behind the board need free room, so do not close the rear with a floor.",
         f"part_id: {part_id}",
         f"Part card, measured from the real model: {json.dumps(card['envelope'])} {json.dumps(card['features'])}",
@@ -191,7 +191,7 @@ List parts in the order they are put together. Directions are world axes: +x, -x
 The closed case must also pass these checks:
 - Shell and Base walls: at most {checks.THIN_AREA_ALLOWED:.0%} of the surface thinner than {checks.MIN_WALL_CASE} mm. Carrier: {checks.MIN_WALL_CARRIER} mm.
 - Every pair of printed parts at least {checks.MIN_GAP} mm apart with no overlap, and every printed part at least {checks.MIN_GAP} mm from the board.
-- In the closed case the board and the Carrier each move at most {checks.MAX_TRAVEL} mm in all six directions. Everything that holds them must be plastic.
+- In the closed case the board and the Carrier each move at most {checks.MAX_TRAVEL} mm in all six directions. Plastic should hold them. Only if a stop is not practical, a purchased board may be glued instead: list it in case.glued, for example "glued": ["PURCHASE_Board"]. It must still have plastic within that limit on at least one side to glue to. The Carrier can never be glued.
 - Each part reaches its place in a straight line past what is already placed.
 - The plug path stays clear through every printed part and stays above the desk.
 - Window: fits around the glass with at most {c.MAX_WINDOW_GAP} mm gap, measured at 0.1 mm below the glass face, so the plastic reaches that level all round. Nothing covers the screen from {c.VIEW_ANGLE} degrees off centre.

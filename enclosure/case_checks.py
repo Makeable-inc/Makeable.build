@@ -7,7 +7,7 @@ from scipy.spatial import ConvexHull, QhullError
 
 from card import DIRECTIONS, load_nodes
 from parts import ensure_part
-from checks import AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, sanding_depth, travel
+from checks import AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, sanding_depth, travel, travel_ends
 
 VIEW_ANGLE = 50
 MAX_WINDOW_GAP = 1.0
@@ -73,6 +73,20 @@ def check_retained(name, origins, others):
     return results
 
 
+def allow_glue(results, glued):
+    """A purchased part marked as glued may be loose in the closed case, if it has a surface to glue to: plastic within the limit on at least one side."""
+    results = [dict(r) for r in results]
+    for name in glued:
+        own = [r for r in results if r["part"] == name and r["check"] == "retained"]
+        if not any(r["ok"] for r in own):
+            continue
+        for r in own:
+            if not r["ok"]:
+                r["can_be_glued"] = True
+                r["fix"] = f"Glue {name} in place during assembly, because no plastic stops it {r['limit']}. Add a stop to avoid glue."
+    return results
+
+
 def check_assembly(steps, meshes, purchased, part_points):
     """Each part must reach its final place in a straight line, past everything already placed."""
     expected = set(meshes) | set(purchased)
@@ -83,25 +97,28 @@ def check_assembly(steps, meshes, purchased, part_points):
     placed = [steps[0]["add"]]
     for step in steps[1:]:
         moving, direction = step["add"], direction_vector(step["from"])
-        worst, where, blocker = np.inf, None, None
+        worst, where, blocker, moving_at, blocker_at = np.inf, None, None, None, None
         depth = 0.0
         for other in placed:
             pairs = []
             if moving in meshes:
                 source = plastic_points(meshes[other]) if other in meshes else part_points[other]
-                pairs.append((meshes[moving], source, -direction))
+                pairs.append((meshes[moving], source, -direction, True))
             if other in meshes:
                 source = plastic_points(meshes[moving]) if moving in meshes else part_points[moving]
-                pairs.append((meshes[other], source, direction))
-            for target, source, ray in pairs:
-                distance, point = travel(target, source, ray)
+                pairs.append((meshes[other], source, direction, False))
+            for target, source, ray, landed_on_moving in pairs:
+                distance, point, landed = travel_ends(target, source, ray)
                 depth = max(depth, sanding_depth(target, source, ray))
                 if distance < worst:
                     worst, where, blocker = distance, point, other
+                    moving_at, blocker_at = (landed, point) if landed_on_moving else (point, landed)
         place = None if where is None else rounded(where)
+        moving_place, blocker_place = (None, None) if where is None else (rounded(moving_at), rounded(blocker_at))
         results.append(result("assembly", moving, np.isinf(worst), measured=None if np.isinf(worst) else round(worst, 3), limit=f"clear path from {step['from']}", where=place,
-                              fix=f"{moving} cannot come in from {step['from']}: it hits {blocker} after {worst:.2f} mm of travel, near {place}, and about {depth:.1f} mm of material is in the way. Widen the path at that point, or move or reshape what it hits. Moving along {step['from']}, nothing on {moving} may be narrower than {blocker} at that height."))
+                              fix=f"{moving} cannot come in from {step['from']}: {moving} at {moving_place} hits {blocker} at {blocker_place} after {worst:.2f} mm of travel, and about {depth:.1f} mm of material is in the way. These two can clear each other in the final position and still collide on the way in. Move, shorten or trim the feature at one of those two points, so it sits outside the other's outline as seen along {step['from']}."))
         results[-1]["sanding_depth"] = depth
+        results[-1]["moving_at"], results[-1]["blocker_at"] = moving_place, blocker_place
         placed.append(moving)
     return results
 
@@ -288,7 +305,7 @@ def check_case(design, meshes, purchased, cards, transforms):
             place = rounded(where) if where is not None else None
             results.append(result("clearance", f"{mesh_name} / {name}", gap >= MIN_GAP - GAP_TOLERANCE and inside == 0, measured=None if np.isinf(gap) else round(gap, 3), limit=f"at least {MIN_GAP} mm", where=f"at {place}, {inside} points inside the plastic",
                                   fix=f"{mesh_name} is too close to {name} at {place}. Move that surface away until the gap is at least {MIN_GAP} mm."))
-        results.extend(check_retained(name, part_points[name], union))
+        results.extend(allow_glue(check_retained(name, part_points[name], union), set((design.get("case") or {}).get("glued") or [])))
         card = cards[name]
         if "usb" in card["features"]:
             room = port_room_box(card["features"]["usb"], transform)

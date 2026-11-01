@@ -4,7 +4,8 @@ import unittest
 import numpy as np
 import trimesh
 
-from case_checks import check_screw_spread
+from case_checks import allow_glue, check_assembly, check_screw_spread
+from severity import is_warning
 from layout_checks import check_base_design, check_wire_crossing, check_wire_hidden
 from space_checks import case_openness, points_seeing_out
 
@@ -74,6 +75,44 @@ class Openings(unittest.TestCase):
 
     def test_point_in_a_closed_case_does_not(self):
         self.assertFalse(points_seeing_out(self.INSIDE, hollow_box())[0])
+
+
+class MoRules(unittest.TestCase):
+    def test_a_gap_under_the_tolerance_is_a_must_pass(self):
+        self.assertFalse(is_warning({"check": "clearance", "measured": 0.04, "where": "at [0, 0, 0]"}))
+        self.assertFalse(is_warning({"check": "parts_gap", "measured": 0.04, "where": "closest at [0, 0, 0], overlap 0.000 mm3"}))
+
+    def retained(self, travels):
+        names = ("+x", "-x", "+y", "-y", "+z", "-z")
+        return [{"check": "retained", "part": "PURCHASE_Board", "ok": t <= 0.5, "measured": t, "limit": f"toward {n}", "fix": "Add a stop."} for n, t in zip(names, travels)]
+
+    def test_a_glued_board_with_a_face_to_glue_to_is_a_warning(self):
+        results = allow_glue(self.retained([0.2, 0.2, 7.0, 0.2, 0.2, 0.2]), {"PURCHASE_Board"})
+        loose = [r for r in results if not r["ok"]]
+        self.assertTrue(is_warning(loose[0]))
+        self.assertIn("Glue PURCHASE_Board", loose[0]["fix"])
+
+    def test_glue_needs_a_face_within_the_limit(self):
+        results = allow_glue(self.retained([3.0] * 6), {"PURCHASE_Board"})
+        self.assertFalse(any(is_warning(r) for r in results if not r["ok"]))
+
+    def test_a_part_not_marked_as_glued_still_fails(self):
+        results = allow_glue(self.retained([0.2, 0.2, 7.0, 0.2, 0.2, 0.2]), set())
+        self.assertFalse(any(is_warning(r) for r in results if not r["ok"]))
+
+
+class AssemblyPath(unittest.TestCase):
+    def test_the_error_names_both_things_that_collide(self):
+        carrier_rail = trimesh.creation.box(extents=(10, 1, 10), transform=trimesh.transformations.translation_matrix((0, 0.5, 0)))
+        shell_post = trimesh.creation.box(extents=(10, 2, 10), transform=trimesh.transformations.translation_matrix((0, 7, 0)))
+        steps = [{"add": "PRINT_Carrier"}, {"add": "PRINT_Shell", "from": "-y"}]
+        found = check_assembly(steps, {"PRINT_Carrier": carrier_rail, "PRINT_Shell": shell_post}, {}, {})[0]
+        self.assertFalse(found["ok"])
+        self.assertAlmostEqual(found["measured"], 5, places=2)
+        self.assertAlmostEqual(found["moving_at"][1], 6, places=2)
+        self.assertAlmostEqual(found["blocker_at"][1], 1, places=2)
+        self.assertIn("PRINT_Shell at", found["fix"])
+        self.assertIn("PRINT_Carrier at", found["fix"])
 
 
 class ScrewSpread(unittest.TestCase):
