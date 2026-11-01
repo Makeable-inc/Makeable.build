@@ -7,7 +7,7 @@ import checks
 for folder in sys.argv[1:]:
     started = time.time()
     report = checks.check_design(folder, "case")
-    print(folder, "PASSED" if report["passed"] else "FAILED", f"{len(report['results']) - len(report['failed'])} of {len(report['results'])}", f"{time.time() - started:.0f}s", flush=True)
+    print(folder, report["status"].upper(), f"{len(report['results']) - len(report['failed'])} of {len(report['results'])}", f"{time.time() - started:.0f}s", flush=True)
     for r in report["failed"]:
         print("  FAIL", r["check"], r["part"], r["measured"], str(r["where"])[:120], flush=True)
     for r in report["warnings"]:

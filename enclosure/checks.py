@@ -109,9 +109,11 @@ def check_mesh(name, mesh, min_wall):
     thickness[rays] = np.linalg.norm(hits - points[rays], axis=1)
     thin = thickness < min_wall
     worst = rounded(points[np.argmin(thickness)])
+    below_minimum = float((thickness < 1.0).mean())
     region = f"{rounded(points[thin].min(axis=0))} to {rounded(points[thin].max(axis=0))}" if thin.any() else "none"
     results.append(result("wall", name, thin.mean() <= THIN_AREA_ALLOWED, measured=round(float(thin.mean()), 4), limit=f"under {THIN_AREA_ALLOWED} of the surface thinner than {min_wall} mm",
                           where=f"thinnest {thickness.min():.2f} mm near {worst}; thin areas span {region}", fix=f"Thicken the plastic near {worst} and the rest of that area to at least {min_wall} mm, or remove slivers there. If the thin area runs around an opening, a chamfer or rim is tapering to a knife edge: keep at least {min_wall} mm of straight wall at the opening, or remove the chamfer."))
+    results[-1]["thin_below_minimum"] = round(below_minimum, 4)
     return results
 
 
@@ -146,6 +148,19 @@ def clearance(carrier, part_id, transform):
             i = int(np.argmin(back))
             gap, where = float(back[i]), apply(transform, local[i:i + 1])[0]
     return gap, int(inside.sum()), where
+
+
+def sanding_depth(target, source, direction):
+    """Roughly how far plastic must go for a part to pass: looking along its path, how deep the blocked area runs in from a clear edge."""
+    source = thin_out(source, 0.2)
+    blocked = target.ray.intersects_any(source, np.tile(direction, (len(source), 1)))
+    if not blocked.any():
+        return 0.0
+    if blocked.all():
+        return float("inf")
+    across = np.linalg.svd(direction[None])[2][1:]
+    distances, _ = cKDTree(source[~blocked] @ across.T).query(source[blocked] @ across.T)
+    return round(float(distances.max()), 2)
 
 
 def travel(carrier, origins, direction):
@@ -189,6 +204,7 @@ def check_holder(holder, carrier, part_name, part, card, transform, insert_from)
     distance, where = travel(carrier, world, insert_direction)
     results.append(result("insertable", holder, np.isinf(distance), measured=None if np.isinf(distance) else round(distance, 3), limit="no plastic in the way", where=None if where is None else rounded(where),
                           fix=f"Plastic blocks {part_name} going in from {insert_from} near {None if where is None else rounded(where)}. Remove the overhang."))
+    results[-1]["sanding_depth"] = sanding_depth(carrier, world, insert_direction)
 
     for axis in range(3):
         for sign in (1, -1):
@@ -215,9 +231,12 @@ def check_design(folder, stage="carrier"):
     results = report["results"]
 
     def finish():
-        report["failed"] = [r for r in results if not r["ok"] and r["check"] not in WARNING_ONLY]
-        report["warnings"] = [r for r in results if not r["ok"] and r["check"] in WARNING_ONLY]
+        from severity import is_warning
+        soft = (lambda r: is_warning(r)) if stage == "case" else (lambda r: r["check"] in WARNING_ONLY)
+        report["failed"] = [r for r in results if not r["ok"] and not soft(r)]
+        report["warnings"] = [r for r in results if not r["ok"] and soft(r)]
         report["passed"] = not report["failed"] and bool(results)
+        report["status"] = "fail" if not report["passed"] else "pass_with_warnings" if report["warnings"] else "pass"
         # These failures skip later checks, so this report's count of failures cannot be compared with a full one.
         report["complete"] = not any(r["check"] in ("design_file", "files", "sealed", "part", "not_rescaled", "holds", "case") for r in report["failed"])
         return report

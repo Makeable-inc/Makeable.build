@@ -1,5 +1,7 @@
 """Stop rule tests with a fake AI, so the loop can be tested for free. Run: .venv/Scripts/python -W ignore -m unittest test_agent"""
+import io
 import tempfile
+import urllib.error
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -99,6 +101,63 @@ class Loop(unittest.TestCase):
         result = self.run_loop([BANNED, "```python\nprint(1)\n```"], [[]])
         self.assertEqual(result["outcome"], "passed")
         self.assertIn("not allowed", self.prompts[1])
+
+    def test_crashes_do_not_use_up_real_tries(self):
+        replies = ["```python\nraise ValueError('one')\n```", "```python\nprint(1)\n```", "```python\nraise ValueError('two')\n```", "```python\nprint(2)\n```", "```python\nprint(3)\n```", "```python\nprint(4)\n```"]
+        result = self.run_loop(replies, [[("clearance", 0.01)], [("clearance", 0.02)], [("clearance", 0.03)]], max_tries=3)
+        self.assertEqual(result["outcome"], "stopped: used all 3 tries")
+        self.assertEqual(result["tries"], 5)
+
+    def test_same_crash_twice_stops(self):
+        result = self.run_loop([CRASHES, CRASHES, CRASHES], [], max_tries=6)
+        self.assertEqual(result["outcome"], "stopped: same crash twice")
+        self.assertEqual(result["tries"], 2)
+
+    def test_crash_budget_stops(self):
+        replies = [f"```python\nraise ValueError('{i}')\n```" for i in range(6)]
+        result = self.run_loop(replies, [], max_tries=6)
+        self.assertEqual(result["outcome"], f"stopped: code crashed or timed out {agent.MAX_CODE_FAILURES} times")
+
+    def test_next_try_starts_from_the_best_script(self):
+        replies = ["```python\nprint('best')\n```", "```python\nprint('worse')\n```", "```python\nprint('next')\n```"]
+        self.run_loop(replies, [[("clearance", 0.01)], [("clearance", 0.02), ("held", 1)], []], max_tries=6)
+        self.assertIn("print('best')", self.prompts[2])
+        self.assertNotIn("print('worse')", self.prompts[2])
+
+    def test_a_passing_holder_moves_on_to_the_case(self):
+        for outcome in ("pass", "pass_with_warnings", "passed"):
+            stages = []
+
+            def fake_part(_brief, folder, *_args, **kwargs):
+                stages.append(kwargs.get("stage", "carrier"))
+                Path(folder, "try-1").mkdir(parents=True, exist_ok=True)
+                Path(folder, "try-1", "design.py").write_text("print(1)", encoding="utf-8")
+                return {"outcome": outcome, "tries": 1}
+            with mock.patch.object(agent, "design_part", fake_part), mock.patch.object(agent, "carrier_brief", lambda _p: "brief"), mock.patch.object(agent, "case_brief", lambda *_a: "brief"), mock.patch.object(agent, "HERE", self.folder):
+                agent.design_case("part", "look", f"run-{outcome}")
+            self.assertEqual(stages, ["carrier", "case"])
+
+    def test_a_short_model_outage_is_retried(self):
+        answers = [urllib.error.HTTPError("u", 520, "none", None, None), urllib.error.URLError("dropped"), io.BytesIO(b'{"ok": 1}')]
+
+        def fake_open(_request, timeout=0):
+            answer = answers.pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent, "MODEL_RETRY_WAIT_SECONDS", 0):
+            self.assertEqual(agent.send_with_retries("request"), {"ok": 1})
+
+    def test_a_bad_request_is_not_retried(self):
+        calls = []
+
+        def fake_open(_request, timeout=0):
+            calls.append(1)
+            raise urllib.error.HTTPError("u", 400, "bad", None, None)
+        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent, "MODEL_RETRY_WAIT_SECONDS", 0):
+            with self.assertRaises(urllib.error.HTTPError):
+                agent.send_with_retries("request")
+        self.assertEqual(len(calls), 1)
 
     def test_every_try_is_saved(self):
         self.run_loop(["```python\nprint(1)\n```"] * 2, [[("clearance", 0.02)], []])

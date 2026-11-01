@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -22,6 +23,10 @@ MAX_TRIES_PER_PART = 3
 MAX_CASE_TRIES = 6
 MAX_TOTAL_TRIES = 8
 WORSE_BY = 3
+MODEL_RETRIES = 4
+MODEL_RETRY_WAIT_SECONDS = 20
+PASSING_OUTCOMES = {"passed", "pass", "pass_with_warnings"}
+MAX_CODE_FAILURES = 6
 NO_PROGRESS_TRIES = 2
 MAX_TOKENS = 400_000
 MAX_SECONDS = 1800
@@ -50,11 +55,31 @@ Use simple blocks and cut-outs. Look at the occupied boxes and leave room for al
 """.format(thin=checks.THIN_AREA_ALLOWED, wall=checks.MIN_WALL_CARRIER, gap=checks.MIN_GAP, travel=checks.MAX_TRAVEL)
 
 
+SYSTEM = SYSTEM + "\n\n" + (HERE / "DESIGN_RULES.md").read_text(encoding="utf-8")
+
+
 def api_key():
     for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
         if line.startswith("OPENAI_API_KEY="):
             return line.split("=", 1)[1].strip().strip("\"'")
     raise SystemExit("OPENAI_API_KEY is not in .env")
+
+
+def send_with_retries(request):
+    """A short outage at the model provider must not end a whole run. Only server and rate-limit errors and dropped connections retry."""
+    for attempt in range(MODEL_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=900) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            if error.code != 429 and error.code < 500 or attempt == MODEL_RETRIES:
+                raise
+            print(f"model error {error.code}, waiting to retry", flush=True)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            if attempt == MODEL_RETRIES:
+                raise
+            print(f"model connection problem: {error}, waiting to retry", flush=True)
+        time.sleep(MODEL_RETRY_WAIT_SECONDS * (attempt + 1))
 
 
 def ask_model(instructions, text, picture=None):
@@ -64,8 +89,7 @@ def ask_model(instructions, text, picture=None):
         content = [{"role": "user", "content": [{"type": "input_text", "text": text}, {"type": "input_image", "image_url": f"data:image/png;base64,{image}"}]}]
     body = json.dumps({"model": MODEL, "instructions": instructions, "input": content, "reasoning": {"effort": "medium"}}).encode()
     request = urllib.request.Request("https://api.openai.com/v1/responses", data=body, headers={"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=900) as response:
-        data = json.load(response)
+    data = send_with_retries(request)
     reply = "".join(c.get("text", "") for item in data["output"] if item["type"] == "message" for c in item["content"])
     return reply, data.get("usage", {})
 
@@ -180,7 +204,8 @@ The closed case must also pass these checks:
 def failure_text(ok, message, report):
     if not ok:
         return message
-    return json.dumps([{k: r[k] for k in ("check", "part", "measured", "limit", "where", "fix")} for r in report["failed"]], indent=1, default=str)
+    fields = ("check", "part", "measured", "limit", "where", "fix")
+    return json.dumps({"must_fix": [{k: r[k] for k in fields} for r in report["failed"]], "improve_if_you_can": [{k: r[k] for k in fields} for r in report.get("warnings", [])][:12]}, indent=1, default=str)
 
 
 def signature(report):
@@ -237,20 +262,32 @@ def base_brief(base):
                       "- Wires: side by side where you can, and no point on a wire can see straight out of the case except through a fitted opening."])
 
 
+def crash_key(message):
+    """The last line of a crash or timeout, so the same failure repeating can be spotted."""
+    lines = [line for line in message.strip().splitlines() if line.strip()]
+    return lines[-1] if lines else ""
+
+
 def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None, base=None, body_stl=None):
-    """Runs tries until the design passes or a stop rule fires. Every try is saved. continue_from is an earlier try's folder, to pick up where it left off."""
+    """Runs tries until the design passes or a stop rule fires. Every try is saved. continue_from is an earlier try's folder, to pick up where it left off.
+    Only code that ran counts against max_tries; crashes and timeouts have their own small budget. Each new try starts from the best script so far, so one bad rewrite cannot lose what worked."""
     folder = Path(folder)
     history, tokens, started = [], 0, time.time()
     text = brief
+    best = None
     if continue_from:
         earlier = Path(continue_from)
         report = checks.check_design(earlier, stage)
-        text = retry_text(brief, (earlier / "design.py").read_text(encoding="utf-8"), failure_text(True, "", report))
+        best = {"code": (earlier / "design.py").read_text(encoding="utf-8"), "report": report, "failed": len(report["failed"])}
+        text = retry_text(brief, best["code"], failure_text(True, "", report))
     while True:
         attempt = folder / f"try-{len(history) + 1}"
         attempt.mkdir(parents=True, exist_ok=True)
         (attempt / "prompt.txt").write_text(text, encoding="utf-8")
         began = time.time()
+        if body_stl:
+            # Ready before the code runs, so the script can load the frozen body rather than rebuild it.
+            shutil.copy(Path(body_stl).with_suffix(".step"), attempt / "BODY.step")
         reply, usage = ask_model(SYSTEM, text, picture) if picture else ask_model(SYSTEM, text)
         tokens += usage.get("total_tokens", 0)
         code = extract_code(reply)
@@ -265,17 +302,46 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
         if ran and stage == "case":
             draw(attempt)
         history.append({"try": len(history) + 1, "ran": ran, "message": message, "report": report, "usage": usage, "seconds": round(time.time() - began, 1)})
-        print(f"try {len(history)}: ran={ran} passed={report['passed']} failed={[r['check'] for r in report['failed']]} tokens={usage.get('total_tokens')} {history[-1]['seconds']}s", flush=True)
+        print(f"try {len(history)}: ran={ran} passed={report['passed']} status={report.get('status')} failed={[r['check'] for r in report['failed']]} tokens={usage.get('total_tokens')} {history[-1]['seconds']}s", flush=True)
         if report["passed"]:
-            return summary(folder, history, tokens, started, "passed")
-        reason = f"used all {max_tries} tries" if len(history) >= max_tries else stop_reason(history, tokens, started)
+            return summary(folder, history, tokens, started, report.get("status") or "passed")
+        real = [h for h in history if h["ran"]]
+        code_failures = [h for h in history if not h["ran"]]
+        if ran and report.get("complete", True) and (best is None or len(report["failed"]) < best["failed"]):
+            best = {"code": code, "report": report, "failed": len(report["failed"]), "try": len(history)}
+        elif ran and best is None:
+            best = {"code": code, "report": report, "failed": 10 ** 6, "try": len(history)}
+        reason = None
+        if len(real) >= max_tries:
+            reason = f"used all {max_tries} tries"
+        elif len(code_failures) >= MAX_CODE_FAILURES:
+            reason = f"code crashed or timed out {MAX_CODE_FAILURES} times"
+        elif not ran and len(history) >= 2 and not history[-2]["ran"] and crash_key(history[-2]["message"]) == crash_key(message):
+            reason = "same crash twice"
+        elif real:
+            reason = stop_reason(real, tokens, started) if ran else None
+        if not reason and tokens >= MAX_TOKENS:
+            reason = f"used {tokens} tokens, limit {MAX_TOKENS}"
+        if not reason and time.time() - started >= MAX_SECONDS:
+            reason = f"ran past {MAX_SECONDS} seconds"
         if reason:
-            return summary(folder, history, tokens, started, f"stopped: {reason}")
-        text = retry_text(brief, code, failure_text(ran, message, report))
+            return summary(folder, history, tokens, started, f"stopped: {reason}", best.get("try") if best else None)
+        if ran:
+            base_code = best["code"] if best else code
+            base_report = best["report"] if best else report
+            text = retry_text(brief, base_code, failure_text(True, "", base_report))
+            if best and best["code"] is not code:
+                text += "\n\nThat is your best script so far. Your newest try had more problems, so it was set aside. Do not lose what this one gets right."
+        else:
+            advice = "It ran too long. Build fewer details, make cuts on simple solids before fillets, avoid repeated booleans on filleted shapes, and keep the script fast." if "second limit" in message else "Fix this error. Use only build123d calls you are sure of."
+            if best:
+                text = retry_text(brief, best["code"], failure_text(True, "", best["report"])) + f"\n\nYour newest try did not finish, so it was set aside: {message[-1500:]}\n{advice} Make smaller changes to the script above."
+            else:
+                text = retry_text(brief, code, f"{message}\n{advice}")
 
 
-def summary(folder, history, tokens, started, outcome):
-    result = {"outcome": outcome, "tries": len(history), "tokens": tokens, "seconds": round(time.time() - started, 1), "model": MODEL,
+def summary(folder, history, tokens, started, outcome, best_try=None):
+    result = {"outcome": outcome, "tries": len(history), "best_try": best_try or len(history), "tokens": tokens, "seconds": round(time.time() - started, 1), "model": MODEL,
               "history": [{k: h[k] for k in ("try", "ran", "message", "usage", "seconds")} | {"failed": [r["check"] for r in h["report"]["failed"]]} for h in history]}
     (Path(folder) / "summary.json").write_text(json.dumps(result, indent=1, default=str), encoding="utf-8")
     print(outcome, f"tries={len(history)} tokens={tokens} seconds={result['seconds']}", flush=True)
@@ -307,7 +373,7 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
         continue_from = checked[-1] if checked else None
     else:
         carrier = design_part(carrier_brief(part_id), folder / "carrier")
-    if carrier["outcome"] != "passed":
+    if carrier["outcome"] not in PASSING_OUTCOMES:
         return carrier
     code = (source / "carrier" / f"try-{carrier['tries']}" / "design.py").read_text(encoding="utf-8")
     brief = case_brief(part_ids, look, code)

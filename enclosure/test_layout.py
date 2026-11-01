@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 import trimesh
 
+from case_checks import check_screw_spread
 from layout_checks import check_base_design, check_wire_crossing, check_wire_hidden
 from space_checks import case_openness, points_seeing_out
 
@@ -73,6 +74,22 @@ class Openings(unittest.TestCase):
 
     def test_point_in_a_closed_case_does_not(self):
         self.assertFalse(points_seeing_out(self.INSIDE, hollow_box())[0])
+
+
+class ScrewSpread(unittest.TestCase):
+    def failed(self, heads):
+        cover = trimesh.creation.box(extents=(80, 10, 40), transform=trimesh.transformations.translation_matrix((0, 20, 20)))
+        screws = [{"head_at": h, "drive_from": "+y", "through": "PRINT_Base", "into": "PRINT_Shell"} for h in heads]
+        return [r["part"] for r in check_screw_spread(screws, {"PRINT_Base": cover}) if not r["ok"]]
+
+    def test_screws_at_the_corners_pass(self):
+        self.assertEqual(self.failed([[-30, 25, 5], [30, 25, 5], [-30, 25, 35], [30, 25, 35]]), [])
+
+    def test_two_screws_on_one_side_fail(self):
+        self.assertEqual(self.failed([[32, 25, 5], [32, 25, 30]]), ["along x"])
+
+    def test_two_screws_along_the_bottom_fail(self):
+        self.assertEqual(self.failed([[-30, 25, 4], [30, 25, 4]]), ["along z"])
 
 
 class Layout(unittest.TestCase):

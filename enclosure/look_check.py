@@ -6,7 +6,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from agent import MODEL, api_key
+from agent import MODEL, api_key, send_with_retries
 
 PROMPT = """The first image is the concept picture for a 3D-printed case. The second shows the real design from four angles: front, straight on, side and back.
 Green and brown only mark separate parts, and the dark green area is the real screen board. Ignore colours and whatever is drawn on the screen. The real screen's shape may differ from the picture, so ignore that too.
@@ -23,8 +23,7 @@ def look_check(picture, attempt):
     content = [{"type": "input_text", "text": PROMPT}, {"type": "input_image", "image_url": data_url(picture)}, {"type": "input_image", "image_url": data_url(attempt / "preview.png")}]
     body = json.dumps({"model": MODEL, "input": [{"role": "user", "content": content}], "reasoning": {"effort": "low"}}).encode()
     request = urllib.request.Request("https://api.openai.com/v1/responses", data=body, headers={"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=300) as response:
-        data = json.load(response)
+    data = send_with_retries(request)
     reply = "".join(c.get("text", "") for item in data["output"] if item["type"] == "message" for c in item["content"])
     match = re.search(r"\{.*\}", reply, re.S)
     result = json.loads(match.group(0)) if match else {"score": None, "differences": [], "unreadable_reply": reply[:500]}

@@ -16,12 +16,13 @@ from look_check import look_check
 from sandbox import run_design
 
 MAX_BODY_TRIES = 3
+MAX_BODY_CRASHES = 4
 GOOD_ENOUGH_SCORE = 8
 VIEWS = {"front": (0.5, -1, 0.35), "straight on": (0, -1, 0.02), "side": (1, -0.2, 0.2), "back": (-0.5, 1, 0.35)}
 
 BODY_SYSTEM = """You are an industrial designer who models in code. Write one complete Python script using build123d 0.13. Reply with only the script, in one ```python block. Allowed imports: build123d, math, json, pathlib.
 
-The script writes one file, BODY.stl: the solid outer shape of a product, in millimetres, with world +z up and the front facing -y, sitting on a flat base at z = 0. No cavity, no window, no holes, no seam and no internal parts yet. Assert it is one solid with assert len(body.solids()) == 1 before exporting. Export with tolerance=0.01.
+The script writes two files, BODY.stl and BODY.step, with export_stl(body, "BODY.stl", tolerance=0.01) and export_step(body, "BODY.step"): the solid outer shape of a product, in millimetres, with world +z up and the front facing -y, sitting on a flat base at z = 0. No cavity, no window, no holes, no seam and no internal parts yet. Assert it is one solid with assert len(body.solids()) == 1 before exporting.
 
 How to get a form that looks designed rather than like a box with rounded corners:
 - Think in surfaces first. Before writing code, decide in comments the silhouette from the front, the silhouette from the side, and how light should travel over the form.
@@ -29,6 +30,7 @@ How to get a form that looks designed rather than like a box with rounded corner
 - Where two volumes meet, such as a raised panel on a body, make them one form with a broad, continuous blend. A hard step or a visible crease is a failure.
 - Use generous radii. Keep every radius large relative to the part, and vary them on purpose. Fall back to a simpler blend only if an operation fails, and catch nothing silently.
 - The base must be flat so it stands on a desk, with its lower edge softened."""
+BODY_SYSTEM = BODY_SYSTEM + "\n\n" + (Path(__file__).resolve().parent / "DESIGN_RULES.md").read_text(encoding="utf-8")
 
 
 def screen_limits(base):
@@ -98,7 +100,9 @@ def design_body(base, picture, folder):
     brief = body_brief(base)
     text = brief
     best, tokens, started, tries = None, 0, time.time(), []
-    for number in range(1, MAX_BODY_TRIES + 1):
+    number, valid, crashes = 0, 0, 0
+    while valid < MAX_BODY_TRIES and crashes < MAX_BODY_CRASHES:
+        number += 1
         attempt = folder / f"try-{number}"
         attempt.mkdir(parents=True, exist_ok=True)
         (attempt / "prompt.txt").write_text(text, encoding="utf-8")
@@ -109,8 +113,8 @@ def design_body(base, picture, folder):
         note = {"try": number, "ran": ran, "tokens": usage.get("total_tokens")}
         feedback = message
         stl = attempt / "BODY.stl"
-        if ran and not stl.exists():
-            ran, feedback = False, "The script did not write BODY.stl."
+        if ran and not (stl.exists() and stl.with_suffix(".step").exists()):
+            ran, feedback = False, "The script did not write both BODY.stl and BODY.step."
         if ran:
             mesh = load_stl(stl)
             problems = body_problems(mesh, base)
@@ -130,6 +134,10 @@ def design_body(base, picture, folder):
                     break
                 feedback = f"A reviewer compared your render with the picture and scored it {score} out of 10. Make these changes, keeping the form valid:\n" + "\n".join(f"- {d}" for d in look.get("differences") or [])
         tries.append(note)
+        if ran:
+            valid += 1
+        else:
+            crashes += 1
         print(f"body try {number}: {json.dumps({k: note.get(k) for k in ('ran', 'score', 'problems', 'tokens')})[:400]}", flush=True)
         text = "\n\n".join([brief, "Your last script:\n```python\n" + code + "\n```", feedback, "Reply with the complete new script."])
     summary = {"tries": tries, "tokens": tokens, "seconds": round(time.time() - started, 1), "best_score": best[0] if best else None}
@@ -138,9 +146,10 @@ def design_body(base, picture, folder):
         return None, None, summary
     final = folder / "BODY.stl"
     shutil.copy(best[2], final)
+    shutil.copy(Path(best[2]).with_suffix(".step"), final.with_suffix(".step"))
     (folder / "body.py").write_text(best[1], encoding="utf-8")
     return best[1], final, summary
 
 
 def frozen_body_brief(code):
-    return "\n".join(["THE OUTER BODY IS DECIDED AND FROZEN. A designer already made it, and this is its code:", "```python", code, "```", "Reuse this code exactly to build the outer body inside your script. Shell plus Base together must keep this outside surface. You may only cut into it: the window, knob hole and recess, USB opening, screw holes and the seam. Do not add volume outside it or change its form. Make the cavity by offsetting inward, or by subtracting a simpler inner shape that keeps the walls within limits. If the parts truly cannot fit inside, keep the body and let the checks say so; do not quietly reshape it."])
+    return "\n".join(["THE OUTER BODY IS DECIDED AND FROZEN. A designer already made it. BODY.step is already in the folder, so load it at the start of your script, and do not rebuild it:", "```python", 'body = one_solid(import_step("BODY.step"), "body")', "```", "For reference only, this is how it was made:", "```python", code, "```", "Shell plus Base together must keep this outside surface. You may only cut into it: the window, knob hole and recess, USB opening, screw holes and the seam. Do not add volume outside it or change its form. Make the cavity with simple inner shapes that keep the walls within limits. If the parts truly cannot fit inside, keep the body and let the checks say so; do not quietly reshape it."])

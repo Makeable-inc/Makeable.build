@@ -7,7 +7,7 @@ from scipy.spatial import ConvexHull, QhullError
 
 from card import DIRECTIONS, load_nodes
 from parts import ensure_part
-from checks import AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, travel
+from checks import AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, sanding_depth, travel
 
 VIEW_ANGLE = 50
 MAX_WINDOW_GAP = 1.0
@@ -83,7 +83,8 @@ def check_assembly(steps, meshes, purchased, part_points):
     placed = [steps[0]["add"]]
     for step in steps[1:]:
         moving, direction = step["add"], direction_vector(step["from"])
-        worst, where = np.inf, None
+        worst, where, blocker = np.inf, None, None
+        depth = 0.0
         for other in placed:
             pairs = []
             if moving in meshes:
@@ -94,17 +95,39 @@ def check_assembly(steps, meshes, purchased, part_points):
                 pairs.append((meshes[other], source, direction))
             for target, source, ray in pairs:
                 distance, point = travel(target, source, ray)
+                depth = max(depth, sanding_depth(target, source, ray))
                 if distance < worst:
-                    worst, where = distance, point
+                    worst, where, blocker = distance, point, other
         place = None if where is None else rounded(where)
         results.append(result("assembly", moving, np.isinf(worst), measured=None if np.isinf(worst) else round(worst, 3), limit=f"clear path from {step['from']}", where=place,
-                              fix=f"{moving} cannot come in from {step['from']}: something is in its way near {place}. Change the assembly order, the direction or the shape."))
+                              fix=f"{moving} cannot come in from {step['from']}: it hits {blocker} after {worst:.2f} mm of travel, near {place}, and about {depth:.1f} mm of material is in the way. Widen the path at that point, or move or reshape what it hits. Moving along {step['from']}, nothing on {moving} may be narrower than {blocker} at that height."))
+        results[-1]["sanding_depth"] = depth
         placed.append(moving)
+    return results
+
+
+def check_screw_spread(screws, meshes):
+    """The cover must be fastened across the whole seam: a screw in each half of its width and of its height, so no side is left to lift."""
+    if not screws or any(not {"head_at", "drive_from", "through"} <= set(s) or s["through"] not in meshes for s in screws):
+        return []
+    cover = meshes[screws[0]["through"]]
+    axis = DIRECTIONS[screws[0]["drive_from"]][0]
+    across = [i for i in range(3) if i != axis]
+    heads = np.array([s["head_at"] for s in screws], dtype=float)
+    results = []
+    for i in across:
+        low, high = cover.bounds[0][i], cover.bounds[1][i]
+        middle = (low + high) / 2
+        lower, upper = int((heads[:, i] < middle).sum()), int((heads[:, i] > middle).sum())
+        name = "xyz"[i]
+        results.append(result("screw_spread", f"along {name}", lower > 0 and upper > 0, measured=f"{lower} below and {upper} above the middle", limit="at least one screw in each half of the cover", where=f"cover {low:.1f} to {high:.1f} on {name}, middle {middle:.1f}",
+                              fix=f"All the screws are on one side along {name}, so the other side of the cover can lift. Put at least one screw on each side of {name} = {middle:.1f}, near the corners."))
     return results
 
 
 def check_screws(screws, meshes, part_points):
     results = [result("screw_count", "case", len(screws) >= MIN_SCREWS, measured=len(screws), limit=f"at least {MIN_SCREWS}", fix=f"Hold the case shut with at least {MIN_SCREWS} screws.")]
+    results.extend(check_screw_spread(screws, meshes))
     for i, screw in enumerate(screws):
         label = f"screw {i + 1}"
         try:

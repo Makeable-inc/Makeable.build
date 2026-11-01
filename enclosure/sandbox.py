@@ -7,7 +7,7 @@ from pathlib import Path
 
 ALLOWED_IMPORTS = {"build123d", "math", "json", "pathlib"}
 BANNED_NAMES = {"eval", "exec", "compile", "__import__", "globals", "locals", "getattr", "setattr", "breakpoint", "input"}
-TIME_LIMIT_SECONDS = 180
+TIME_LIMIT_SECONDS = 300
 OUTPUT_LIMIT = 4000
 
 
