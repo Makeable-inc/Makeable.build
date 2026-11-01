@@ -126,13 +126,18 @@ The case must also pass these checks. All the sizes here are assumptions until r
     if any("touch" in c["features"] for c in cards):
         lines.append(f"""- Touch sensor opening: if a part has a touch feature, the case must have a real cut-out for it, planned from the start. Cut a clear {w.FINGER_WIDTH:.0f} mm wide opening over the middle of the touch feature's box, straight out from the side of the sensor that faces out, through every printed part. The finger touches the sensor itself through this opening; do not cover it with thin plastic. Put it where a person can see and reach it, on the front, top or a side, and not underneath or behind. Keep the opening inside the sensor's outline, so plastic stays all round it and still holds the sensor in. It must be shallow: at most {w.FINGER_MAX_DEPTH:.0f} mm from the sensor's face to the outside at the rim. may_face_out on the card lists the sides allowed to face out; read its note, because the pins matter here. Every plug must stay inside the case.""")
     if any("shaft" in c["features"] for c in cards):
+        knob_card = next(c for c in cards if "shaft" in c["features"])
+        if knob_card.get("pins_point") == knob_card["features"]["shaft"].get("points"):
+            pins_advice = f"""- This part's pins point the same way as the shaft. Those plugs are {w.PLUG['length']:.0f} mm long and reach above the bushing's top, so a flat wall low enough for the knob will hit them. Plan for this from the start: for example a raised hump over the pins, or a recess around the knob in a higher wall. Do not bend or turn the pins; they stay as in the model. The wire must then turn inside the case."""
+        else:
+            pins_advice = f"""- This part's pins point {knob_card.get('pins_point')} in its own coordinates, sideways in the board's plane and past the board's edge, not along the shaft. Each {w.PLUG['length']:.0f} mm plug continues that way, and the wire must then turn inside the case. So turn the part so that those plugs and the turn have room inside the body. Do not bend or turn the pins any further."""
         lines.append(f"""Knob on a shaft: the card's shaft, bushing and knob boxes are real, and the knob is fitted last, after the case is closed, so it does not need to pass through the hole during assembly. The checks:
 - The shaft comes out through a closed hole in a wall, with plastic all round the bushing, up to {w.KNOB_WALL_RING} mm from it, at a level below the knob's base. Nothing blocks the shaft's path. The hole may be split across a seam.
 - The knob's base sits outside or in a recess: the knob must clear the plastic by the usual gap.
 - Finger room, assumed: the top {w.KNOB_EXPOSED:.0f} mm of the knob stands clear with {w.KNOB_FINGER_ROOM:.0f} mm of free space all round, and {w.KNOB_ROOM_ABOVE:.0f} mm above it.
 - Not on the desk side and not on the far side from the screen. The top or a side works well.
 - Pressing the knob pushes the board straight back: plastic stops within {w.PRESS_MAX_GAP} mm behind its PCB, surrounding the shaft by at least {w.PRESS_SUPPORT_MARGIN:.0f} mm on all sides, avoiding its solder tails and pins. No wire within {w.PRESS_WIRE_DEPTH:.0f} mm behind that PCB. The board also must not rotate or move more than the limit.
-- This part's pins point the same way as the shaft. Those plugs are {w.PLUG['length']:.0f} mm long and reach above the bushing's top, so a flat wall low enough for the knob will hit them. Plan for this from the start: for example a raised hump over the pins, or a recess around the knob in a higher wall. Do not bend or turn the pins; they stay as in the model. The wire must then turn inside the case.""")
+{pins_advice}""")
     return "\n".join(lines)
 
 
@@ -231,7 +236,7 @@ def base_brief(base):
                       f"- Wires: at least {l.WIRE_RADIUS * 2} mm between wire centres, so none cross, and no point on a wire can see straight out of the case."])
 
 
-def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None, base=None):
+def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None, base=None, body_stl=None):
     """Runs tries until the design passes or a stop rule fires. Every try is saved. continue_from is an earlier try's folder, to pick up where it left off."""
     folder = Path(folder)
     history, tokens, started = [], 0, time.time()
@@ -252,6 +257,8 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
         if base:
             # Written after the code runs, so the design cannot replace the rules it is checked against.
             (attempt / "base_design.json").write_text(json.dumps(base, indent=1), encoding="utf-8")
+        if body_stl:
+            shutil.copy(body_stl, attempt / "BODY.stl")
         report = checks.check_design(attempt, stage) if ran else {"passed": False, "failed": [], "results": []}
         (attempt / "report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
         if ran and stage == "case":
@@ -307,7 +314,15 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
         brief = "\n\n".join([brief, PICTURE_BRIEF])
     if base:
         brief = "\n\n".join([brief, base_brief(base)])
-    return design_part(brief, folder / "case", min(MAX_CASE_TRIES, MAX_TOTAL_TRIES - carrier["tries"]), stage="case", continue_from=continue_from, picture=picture, base=base)
+    body_stl = None
+    if base and base.get("body_first"):
+        from body_stage import design_body, frozen_body_brief
+        body_code, body_stl, body_summary = design_body(base, picture, folder / "body")
+        print("body", json.dumps({k: body_summary[k] for k in ("best_score", "tokens", "seconds")}), flush=True)
+        if body_code is None:
+            return {"outcome": "stopped: no valid body", **body_summary}
+        brief = "\n\n".join([brief, frozen_body_brief(body_code)])
+    return design_part(brief, folder / "case", min(MAX_CASE_TRIES, MAX_TOTAL_TRIES - carrier["tries"]), stage="case", continue_from=continue_from, picture=picture, base=base, body_stl=body_stl)
 
 
 if __name__ == "__main__":

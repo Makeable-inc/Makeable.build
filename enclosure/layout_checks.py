@@ -3,11 +3,13 @@ import numpy as np
 import trimesh
 
 from card import DIRECTIONS
-from checks import apply, direction_vector, part_surface, port_room_box, result, rounded
+from checks import apply, direction_vector, load_stl, part_surface, port_room_box, result, rounded
 from wiring_checks import WIRE_RADIUS
 
 SAMPLE_STEP = 1.0
 TILT = 0.06
+BODY_TOLERANCE = 0.3
+MIN_BODY_KEPT = 0.75
 BUTTON_SIGHT_LENGTH = 80.0
 KNOB_HOLE_SIGHT_RADIUS = 8.0
 OUTWARD = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
@@ -136,11 +138,35 @@ def planned_openings(cards, transforms):
     return openings
 
 
+def check_body_kept(body_path, union):
+    """The case may cut into the frozen body but must not grow past it or lose its form."""
+    body = load_stl(body_path)
+    points = np.vstack([trimesh.sample.sample_surface(union, 20000, seed=4)[0], union.vertices])
+    outside = points[~body.contains(points)]
+    results = []
+    if len(outside):
+        _, distance, _ = trimesh.proximity.closest_point(body, outside)
+        worst = float(distance.max())
+        place = rounded(outside[int(np.argmax(distance))])
+    else:
+        worst, place = 0.0, None
+    results.append(result("body_no_growth", "case", worst <= BODY_TOLERANCE, measured=round(worst, 3), limit=f"nothing more than {BODY_TOLERANCE} mm outside the frozen body", where=place,
+                          fix=f"Plastic stands {worst:.2f} mm outside the frozen body near {place}. Remove it; the body cannot change."))
+    samples = trimesh.sample.sample_surface(body, 20000, seed=5)[0]
+    _, distance, _ = trimesh.proximity.closest_point(union, samples)
+    kept = float((distance <= BODY_TOLERANCE).mean())
+    results.append(result("body_kept", "case", kept >= MIN_BODY_KEPT, measured=round(kept, 3), limit=f"at least {MIN_BODY_KEPT} of the frozen body's surface kept", where=None,
+                          fix=f"Only {kept:.0%} of the frozen body's outside survives. Keep cuts to the window, knob, USB and screw holes and the seam."))
+    return results
+
+
 def check_layout(design, cards, transforms, union):
     # The parts block the view too: a wire behind the board is not visible through the window.
     parts = [part_surface(design["purchased"][n]["part_id"])[0].copy().apply_transform(transforms[n]) for n in transforms]
     walls = trimesh.util.concatenate([union] + parts + planned_openings(cards, transforms))
     results = check_wire_crossing(design) + check_wire_hidden(design, walls)
+    if design.get("body_stl"):
+        results.extend(check_body_kept(design["body_stl"], union))
     base = design.get("base_design")
     if base:
         results.extend(check_base_design(base, cards, transforms, union))

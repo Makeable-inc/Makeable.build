@@ -12,6 +12,8 @@
     "The wires run behind the board and behind the panel as one neat bundle, side by side, and do not show from outside.",
     "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover."
   ],
+  "body_first": true,
+  "min_body": {"width": 78, "height": 33, "depth": 46},
   "front": "-y",
   "width_to_height": [1.5, 2.6],
   "max_depth": 65,

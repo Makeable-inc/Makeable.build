@@ -19,6 +19,9 @@ def catalog_entry(part_id):
 
 def ensure_part(part_id):
     """Returns the path of the part's GLB, always hash-checked against the catalog."""
+    from part_variants import VARIANTS, build_variant
+    if part_id in VARIANTS:
+        return build_variant(part_id, ensure_part(VARIANTS[part_id]))
     entry = catalog_entry(part_id)
     path = FOLDER / f"{part_id}.glb"
     if path.exists():

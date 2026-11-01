@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
+from part_variants import base_hash_path
 from parts import ensure_part
 
 CARDS = Path(__file__).resolve().parent / "cards"
@@ -82,7 +83,7 @@ def measure(spec, nodes):
 def build_card(part_id):
     spec = json.loads((CARDS / f"{part_id}.json").read_text(encoding="utf-8"))
     path = ensure_part(part_id)
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    actual = hashlib.sha256(base_hash_path(part_id).read_bytes()).hexdigest()
     if actual != spec["sha256"]:
         raise CardError(f"card was reviewed for model {spec['sha256'][:8]}, catalog now has {actual[:8]}; review it again")
     nodes = load_nodes(path)

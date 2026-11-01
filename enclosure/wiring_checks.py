@@ -9,6 +9,7 @@ import numpy as np
 import trimesh
 from scipy.spatial import ConvexHull, QhullError, cKDTree
 
+from part_variants import BEND_HEIGHT, VARIANTS, base_of
 from card import DIRECTIONS, build_card
 from case_checks import cylinder, merged, overlap
 from checks import AXES, apply, direction_vector, part_surface, port_room_box, result, rounded, travel
@@ -41,10 +42,18 @@ def wires_for(part_ids):
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{hashlib.sha256(' '.join(part_ids).encode()).hexdigest()[:16]}.json"
     if not path.exists():
-        done = subprocess.run(["node", str(HERE / "wires.mjs"), *part_ids], capture_output=True, text=True, timeout=120, check=True)
+        done = subprocess.run(["node", str(HERE / "wires.mjs"), *[base_of(i) for i in part_ids]], capture_output=True, text=True, timeout=120, check=True)
         json.loads(done.stdout)
         path.write_text(done.stdout, encoding="utf-8")
-    return json.loads(path.read_text(encoding="utf-8"))
+    wires = json.loads(path.read_text(encoding="utf-8"))
+    named = {base_of(i): i for i in part_ids}
+    for wire in wires:
+        for end in (wire["from"], wire["to"]):
+            end["part_id"] = named.get(end["part_id"], end["part_id"])
+            if end["part_id"] in VARIANTS:
+                # The compiler's point is on the upright pin's tip; the bent pin runs at the bend height.
+                end["position"][2] = BEND_HEIGHT
+    return wires
 
 
 @lru_cache(maxsize=32)

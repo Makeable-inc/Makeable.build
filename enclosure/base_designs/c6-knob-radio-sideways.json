@@ -1,0 +1,45 @@
+{
+  "name": "Retro radio, sideways knob pins (test)",
+  "parts": "esp32-c6-1-47inch-ips-touch-display-development-board-with-pre-soldered-header,ky-040-rotary-encoder-sideways-test",
+  "look": "a small retro tabletop radio with soft rounded corners, a wide screen on the left and a chunky turn knob on a raised control panel on the right",
+  "picture_prompt": "Product concept render of a small 3D-printable desk device, a tiny retro tabletop radio, seen from the front and slightly to one side. It is wider than it is tall, with soft rounded corners and one smooth continuous body. On the left of the front is a flat wide rectangular screen, about 33 mm wide and 18 mm tall, in a slim even bezel. On the right, the front steps forward into a raised control panel running the full height of the case, with a clean curved transition, and one chunky round knob stands out of it. One matte plastic colour with a dark screen and a dark knob. Soft studio light, plain light background. Flat bottom, no text, no logos, no fake buttons, no speaker holes, no feet, no visible seams, no cables.",
+  "sheet": [
+    "Front faces -y and stands upright. World +z is up.",
+    "Left about 60% of the front: the screen, landscape, with the board turned so its long side runs along x.",
+    "Right about 40% of the front: a raised control panel with a soft, broad rounded transition. Sideways pins mean the plugs no longer force this panel, so keep it only as gentle as the look needs, and it must read as a deliberate part of the body, not a bump.",
+    "The knob comes straight out of that panel toward -y, in a shallow round recess if that is what gives it finger room. Its pins run sideways in its board's plane, so turn it so the plugs and their first turn fit inside the body.",
+    "USB opens on the left side (-x), away from the knob.",
+    "The wires run behind the board and behind the panel as one neat bundle, side by side, and do not show from outside.",
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover."
+  ],
+  "body_first": true,
+  "min_body": {
+    "width": 68,
+    "height": 31,
+    "depth": 33
+  },
+  "front": "-y",
+  "width_to_height": [
+    1.5,
+    2.6
+  ],
+  "max_depth": 65,
+  "usb_side": "-x",
+  "place": {
+    "PURCHASE_Board": {
+      "feature": "screen",
+      "across": [
+        0.15,
+        0.55
+      ]
+    },
+    "PURCHASE_Part2": {
+      "feature": "shaft",
+      "across": [
+        0.6,
+        0.95
+      ]
+    }
+  },
+  "min_body_note": "Floors from the part cards, with 2 mm walls and 1 mm of gaps: width 44.8 board + 18 knob board; height 26.4 knob board; depth 3.3 glass to board middle + 12.4 pins behind it + 8 plug past the tip + 4 wire turn + 4 walls + about 1. Plug and turn sizes are assumptions. These are minimums, not a target."
+}

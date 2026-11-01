@@ -224,6 +224,8 @@ def check_design(folder, stage="carrier"):
     try:
         design = json.loads((folder / "design.json").read_text(encoding="utf-8"))
         prints, purchased, holds = design["print"], design["purchased"], design["holds"]
+        if not all(isinstance(section, dict) for section in (prints, purchased, holds)):
+            raise TypeError("print, purchased and holds must each be an object keyed by part name")
     except (OSError, ValueError, KeyError, TypeError) as error:
         results.append(result("design_file", "design.json", False, measured=repr(error), fix="Write a design.json with print, purchased and holds."))
         return finish()
@@ -267,6 +269,8 @@ def check_design(folder, stage="carrier"):
         from case_checks import check_case
         base_file = folder / "base_design.json"
         design["base_design"] = json.loads(base_file.read_text(encoding="utf-8")) if base_file.exists() else None
+        body_file = folder / "BODY.stl"
+        design["body_stl"] = str(body_file) if body_file.exists() else None
         results.extend(check_case(design, meshes, purchased, cards, transforms))
     return finish()
 
