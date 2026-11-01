@@ -9,6 +9,8 @@ import pyvista as pv
 import trimesh
 
 import agent
+from card import build_card
+from case_checks import MIN_SCREEN_SHARE_OTHER, MIN_SCREEN_SHARE_WIDEST
 from checks import load_stl, unsealed_result
 from look_check import look_check
 from sandbox import run_design
@@ -29,11 +31,22 @@ How to get a form that looks designed rather than like a box with rounded corner
 - The base must be flat so it stands on a desk, with its lower edge softened."""
 
 
+def screen_limits(base):
+    """The largest front the screen-size check can ever pass, so a frozen body can never make it impossible."""
+    size = build_card(base["parts"].split(",")[0])["features"]["screen"]["size"]
+    short, long = sorted(size[:2])
+    wide = long if base["width_to_height"][0] >= 1 else short
+    tall = short if base["width_to_height"][0] >= 1 else long
+    return {"screen_width": wide, "screen_height": tall, "max_width": wide / MIN_SCREEN_SHARE_OTHER, "max_height": tall / MIN_SCREEN_SHARE_OTHER, "tight_width": wide / MIN_SCREEN_SHARE_WIDEST, "tight_height": tall / MIN_SCREEN_SHARE_WIDEST}
+
+
 def body_brief(base):
     lines = [f"The product: {base['look']}.", "The attached picture shows the look to aim for. Match its silhouette, proportions, softness and how the parts of the form blend. Ignore colours, and the screen and knob themselves, which are added later.", "The layout it must leave room for:", *[f"- {line}" for line in base["sheet"]], f"Width / height of the front: {base['width_to_height'][0]} to {base['width_to_height'][1]}. Depth at most {base['max_depth']} mm."]
     if base.get("min_body"):
         minimum = base["min_body"]
         lines.append(f"The parts need at least this much room: width {minimum['width']} mm, height {minimum['height']} mm, depth {minimum['depth']} mm. Keep the body at or above these. Sizes are real, so do not shrink below them for looks.")
+    limit = screen_limits(base)
+    lines.append(f"The real screen is {limit['screen_width']:.1f} mm wide and {limit['screen_height']:.1f} mm tall and cannot change. It must be the main feature of the front, so the front is at most {limit['max_width']:.1f} mm wide and {limit['max_height']:.1f} mm tall, and also either at most {limit['tight_width']:.1f} mm wide or at most {limit['tight_height']:.1f} mm tall. Size the form from these numbers, not from how large it looks in the picture.")
     return "\n".join(lines)
 
 
@@ -71,6 +84,9 @@ def body_problems(mesh, base):
         for label, value, need in (("width", size[0], minimum["width"]), ("depth", size[1], minimum["depth"]), ("height", size[2], minimum["height"])):
             if value < need:
                 problems.append(f"The {label} is {value:.1f} mm and the parts need at least {need} mm.")
+    limit = screen_limits(base)
+    if size[0] > limit["max_width"] or size[2] > limit["max_height"] or not (size[0] <= limit["tight_width"] or size[2] <= limit["tight_height"]):
+        problems.append(f"The front is {size[0]:.1f} mm wide and {size[2]:.1f} mm tall, too big for the real screen. It must be at most {limit['max_width']:.1f} wide and {limit['max_height']:.1f} tall, and also either at most {limit['tight_width']:.1f} wide or at most {limit['tight_height']:.1f} tall.")
     if abs(mesh.bounds[0][2]) > 0.1:
         problems.append(f"The base should sit at z = 0, and it is at {mesh.bounds[0][2]:.2f}.")
     return problems

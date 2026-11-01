@@ -10,8 +10,6 @@ SAMPLE_STEP = 1.0
 TILT = 0.06
 BODY_TOLERANCE = 0.3
 MIN_BODY_KEPT = 0.75
-BUTTON_SIGHT_LENGTH = 80.0
-KNOB_HOLE_SIGHT_RADIUS = 8.0
 OUTWARD = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
 
 
@@ -64,7 +62,7 @@ def check_wire_hidden(design, union):
             seen |= escapes
         place = rounded(points[seen].mean(axis=0)) if seen.any() else None
         results.append(result("wire_hidden", net, not seen.any(), measured=int(seen.sum()), limit="no point on a wire can see straight out of the case", where=place,
-                              fix=f"Wire {net} shows from outside near {place}. Close that opening or route the wire behind plastic. Only the USB, knob and button holes may be open, and they must not line up with a wire."))
+                              fix=f"Wire {net} shows from outside near {place}. Close that opening or route the wire behind plastic. Only the fitted USB, knob and button holes may be open."))
     return results
 
 
@@ -117,27 +115,6 @@ def check_base_design(base, cards, transforms, union):
     return results
 
 
-def planned_openings(cards, transforms):
-    """The holes a design is meant to have. Seeing a wire through one of these is normal, so they count as closed for the wire check."""
-    openings = []
-    for name, card in cards.items():
-        if name not in transforms:
-            continue
-        if "usb" in card["features"]:
-            openings.append(port_room_box(card["features"]["usb"], transforms[name]))
-        for button in card.get("buttons") or []:
-            center = (np.array(button["min"]) + np.array(button["max"])) / 2
-            direction = transforms[name][:3, :3] @ direction_vector(button["press_from"])
-            start = apply(transforms[name], center[None])[0]
-            openings.append(trimesh.creation.cylinder(radius=2.5, height=BUTTON_SIGHT_LENGTH, transform=trimesh.geometry.align_vectors([0, 0, 1], direction)).apply_translation(start + direction * BUTTON_SIGHT_LENGTH / 2))
-        if "shaft" in card["features"]:
-            shaft = card["features"]["shaft"]
-            direction = transforms[name][:3, :3] @ direction_vector(card["front"])
-            center = apply(transforms[name], ((np.array(shaft["min"]) + np.array(shaft["max"])) / 2)[None])[0]
-            openings.append(trimesh.creation.cylinder(radius=KNOB_HOLE_SIGHT_RADIUS, height=BUTTON_SIGHT_LENGTH, transform=trimesh.geometry.align_vectors([0, 0, 1], direction)).apply_translation(center))
-    return openings
-
-
 def check_body_kept(body_path, union):
     """The case may cut into the frozen body but must not grow past it or lose its form."""
     body = load_stl(body_path)
@@ -163,8 +140,13 @@ def check_body_kept(body_path, union):
 def check_layout(design, cards, transforms, union):
     # The parts block the view too: a wire behind the board is not visible through the window.
     parts = [part_surface(design["purchased"][n]["part_id"])[0].copy().apply_transform(transforms[n]) for n in transforms]
-    walls = trimesh.util.concatenate([union] + parts + planned_openings(cards, transforms))
+    from space_checks import check_openings, check_wire_room, opening_corridors
+    corridors = [mesh for _, mesh in opening_corridors(design, cards, transforms)]
+    walls = trimesh.util.concatenate([union] + parts + corridors)
     results = check_wire_crossing(design) + check_wire_hidden(design, walls)
+    purchased = design["purchased"]
+    results.extend(check_openings(design, cards, transforms, purchased, union))
+    results.extend(check_wire_room(design, cards, transforms, purchased, union))
     if design.get("body_stl"):
         results.extend(check_body_kept(design["body_stl"], union))
     base = design.get("base_design")

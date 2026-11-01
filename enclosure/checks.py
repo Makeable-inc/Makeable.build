@@ -24,7 +24,8 @@ MAX_TRAVEL = 0.5
 MIN_WALL_CARRIER = 1.2
 MIN_WALL_CASE = 1.6
 # Reported for a person to look at, but they do not fail a design: they are about looks or comfort, and the checks that matter for a working case cover the rest.
-WARNING_ONLY = {"viewing_angle", "screen_faces_viewer"}
+# Wires are floppy, so a drawn route only warns. The space checks decide whether they fit.
+WARNING_ONLY = {"viewing_angle", "screen_faces_viewer", "wire_bend", "wire_clear_plastic", "wire_clear_parts", "wire_clear_usb", "wire_crossing", "wire_inside"}
 THIN_AREA_ALLOWED = 0.01
 # Assumed, not in the AWS models: room for a chunky USB-C plug. Replace when a real cable is measured.
 PLUG_ROOM = {"usb-c": {"width": 12.5, "height": 7.5, "length": 30.0}}

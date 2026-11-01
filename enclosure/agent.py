@@ -101,6 +101,8 @@ def carrier_brief(part_id):
 
 def more_parts_brief(part_ids):
     """What a case with several wired parts adds: the other parts' real data, the compiler's wires, and the wiring checks' limits."""
+    import case_checks as c
+    import space_checks as s
     import wiring_checks as w
     lines = ["This case holds more than one part. PURCHASE_Board above is the controller. Add these to purchased and to the assembly list, each with its own transform. All are real, and their sizes cannot change."]
     for index, part_id in enumerate(part_ids[1:]):
@@ -118,9 +120,9 @@ A wire joins each pair of pins below. These come from the electrical compiler an
 
 The case must also pass these checks. All the sizes here are assumptions until real jumpers are measured:
 - Plug room: no plastic and no other part inside each {w.PLUG['width']} x {w.PLUG['width']} x {w.PLUG['length']} mm plug. So leave space beyond the pin tips, and allow for the wire turning after that.
-- Bends: every corner of a path, including where it leaves a plug along the pin, must hold a {w.WIRE_BEND_RADIUS} mm radius. A corner turning by angle A needs both neighbouring segments at least {w.WIRE_BEND_RADIUS} x tan(A / 2) mm long, so a right angle needs {w.WIRE_BEND_RADIUS} mm each side.
-- Clear space: the wire's centre stays at least {w.WIRE_RADIUS} mm from all plastic and all parts, stays out of the USB plug's path, and stays inside the case. At most {w.WIRE_MAX_LENGTH} mm long.
-- Side buttons listed as buttons on a card need a clear {w.BUTTON_POKE_RADIUS * 2} mm hole straight out through every printed part, from the button's face in its press_from direction. The buttons are on the controller: {json.dumps(build_card(part_ids[0])['buttons'])}. To keep Shell assembly clear, a notch from the seam works as well as a hole.
+- Wire room: real jumpers are floppy, so the path you draw is only a guide. Keep it inside the case, side by side, away from plastic where you can. What must pass is that one open space at least about 3 mm wide links each pair of plug backs, big enough to hold all the wires at real jumper lengths. Do not close the space behind the parts with ribs or posts that cut it in two. The path must start and end on the plug backs and be at most {w.WIRE_MAX_LENGTH} mm long.
+- Every opening is a closed hole fitted to its part, and nothing else may be open, including at the seam. Allowed: the window around the glass with at most the window gap; the USB plug room of {checks.PLUG_ROOM['usb-c']['width']} x {checks.PLUG_ROOM['usb-c']['height']} mm; the knob's bushing plus {w.KNOB_WALL_RING} mm; a {s.BUTTON_HOLE_DIAMETER} mm round pin hole for each button; and a {c.SCREW['driver_radius'] * 2} mm screwdriver path. If assembly truly needs the USB opening to reach the seam, keep that slot exactly plug-room wide and tall. Do not cut slots for buttons. A round hole across the wall does not block the Shell going on.
+- Side buttons listed as buttons on a card need that clear hole straight out through every printed part, from the button's face in its press_from direction. The buttons are on the controller: {json.dumps(build_card(part_ids[0])['buttons'])}.
 - The compact front rule still applies, but the case can grow in depth to fit the plugs. Most of the depth comes from the controller's pins plus the plugs and the turn after them.""")
     cards = [build_card(p) for p in part_ids]
     if any("touch" in c["features"] for c in cards):
@@ -154,7 +156,7 @@ How to build it so the parts stay valid:
 - Make one outer body first as a single solid. Make the cavity from the same outline, inset by the wall thickness, and leave {checks.MIN_GAP + 0.05:.2f} mm at the seam. Add posts, stops and ribs so each overlaps its wall by at least 1 mm, so nothing floats. Nothing on the inside of the Shell may overhang the path of the parts behind it.
 - Before exporting, the script must check each part with assert len(part.solids()) == 1. A failed assert is a quick, cheap error for you to fix.
 - Avoid slivers: every wall, rib and leftover strip of plastic must be at least {checks.MIN_WALL_CASE} mm thick on Shell and Base. When a cut leaves a thin strip, remove the strip completely.
-- Simplest reliable layout: the screen stands upright facing -y, the board is turned so the USB faces a side, and the plug path leaves through an opening in the side wall of the Shell. Use a notch from the seam so nothing blocks the Shell going on.
+- Simplest reliable layout: the screen stands upright facing -y, the board is turned so the USB faces a side, and the plug path leaves through a fitted opening in the side wall of the Shell.
 
 World +z is up and the case sits on a desk at its lowest z. Turn the board and Carrier together however you need; the transform in design.json must match. Export every part in its final assembled position.
 Add this to design.json, next to print, purchased and holds:
@@ -228,12 +230,11 @@ The picture is only a look. Sizes and the screen's real shape come from the part
 
 def base_brief(base):
     """The decided design. The AI's job is to make the parts fit it, not to redesign it."""
-    import layout_checks as l
     limits = [f"Width / height of the case front: {base['width_to_height'][0]} to {base['width_to_height'][1]}.", f"Depth: at most {base['max_depth']} mm."]
     for name, rule in base["place"].items():
         limits.append(f"{name} {rule['feature']}: its centre from {rule['across'][0]} to {rule['across'][1]} across the front, measured from the -x side.")
     return "\n".join([f"THE BASE DESIGN IS DECIDED: {base['name']}. It overrides every layout suggestion above, including where the knob goes. Do not redesign it. Your job is to make all the parts, wires and screws fit inside it. Everything else in this brief still has to pass.", *[f"- {line}" for line in base["sheet"]], "These are checked on your files:", *[f"- {line}" for line in limits],
-                      f"- Wires: at least {l.WIRE_RADIUS * 2} mm between wire centres, so none cross, and no point on a wire can see straight out of the case."])
+                      "- Wires: side by side where you can, and no point on a wire can see straight out of the case except through a fitted opening."])
 
 
 def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None, base=None, body_stl=None):

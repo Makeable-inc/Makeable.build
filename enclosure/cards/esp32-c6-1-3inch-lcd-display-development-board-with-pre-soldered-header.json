@@ -1,0 +1,19 @@
+{
+ "part_id": "esp32-c6-1-3inch-lcd-display-development-board-with-pre-soldered-header",
+ "sha256": "2deeb0b598e3b72555f219cc7241c899d518fa625580c34acb7fc542d7e110c3",
+ "role": "controller",
+ "front": "+z",
+ "features": {
+  "frame": {"nodes": ["lcd:metal-back"]},
+  "pcb": {"nodes": ["pcb:exact-26.25x30.00"]},
+  "glass": {"nodes": ["lcd:black-bezel"]},
+  "screen": {"nodes": ["lcd:240x240-active-area"]},
+  "usb": {"nodes": ["usb-c:metal-shell", "usb-c:black-opening"], "connector": "usb-c", "opens_toward": "+y"},
+  "pin_rows": {"nodes": ["header:right:1:pin", "header:right:6:pin", "header:left:1:pin", "header:left:6:pin"]},
+  "corner_posts": {"nodes": ["mount:m2-threaded-spacer:1", "mount:m2-threaded-spacer:2", "mount:m2-threaded-spacer:3", "mount:m2-threaded-spacer:4"]}
+ },
+ "buttons": [
+  {"nodes": ["button:reset:black-cap"], "press_from": "+x"},
+  {"nodes": ["button:boot:black-cap"], "press_from": "-x"}
+ ]
+}

@@ -5,6 +5,7 @@ import numpy as np
 import trimesh
 
 from layout_checks import check_base_design, check_wire_crossing, check_wire_hidden
+from space_checks import case_openness, points_seeing_out
 
 BOX = {"min": [-1, -1, -1], "max": [1, 1, 1], "size": [2, 2, 2]}
 USB = {**BOX, "opens_toward": "-y"}
@@ -39,6 +40,39 @@ class Wires(unittest.TestCase):
     def test_wire_under_an_opening_fails(self):
         design = {"wires": [{"net": "a", "path": [[-5, 0, 0], [5, 0, 0]]}]}
         self.assertFalse(check_wire_hidden(design, hollow_box(hole=True))[0]["ok"])
+
+
+class Openings(unittest.TestCase):
+    INSIDE = np.array([[0.0, 0.0, 0.0]])
+
+    def plug_room(self):
+        return trimesh.creation.box(extents=(12, 12, 30), transform=trimesh.transformations.translation_matrix((0, 0, 25)))
+
+    def test_closed_case_has_no_open_route(self):
+        self.assertIsNone(case_openness(hollow_box(), [], self.INSIDE))
+
+    def test_thin_seam_is_not_an_opening(self):
+        top = trimesh.creation.box(extents=(90, 30, 50), transform=trimesh.transformations.translation_matrix((0, 0, 25.15)))
+        split = trimesh.util.concatenate([hollow_box().intersection(top, engine="manifold"), hollow_box().difference(trimesh.creation.box(extents=(90, 30, 50), transform=trimesh.transformations.translation_matrix((0, 0, 25))), engine="manifold")])
+        self.assertIsNone(case_openness(split, [], self.INSIDE))
+
+    def test_oversized_hole_fails_and_points_at_it(self):
+        path = case_openness(hollow_box(hole=True), [], self.INSIDE)
+        self.assertIsNotNone(path)
+        self.assertGreater(path[-1][2], 15)
+
+    def test_hole_inside_its_allowed_size_passes(self):
+        self.assertIsNone(case_openness(hollow_box(hole=True), [self.plug_room()], self.INSIDE))
+
+    def test_hole_bigger_than_its_allowed_size_fails(self):
+        small = trimesh.creation.box(extents=(4, 4, 40), transform=trimesh.transformations.translation_matrix((0, 0, 30)))
+        self.assertIsNotNone(case_openness(hollow_box(hole=True), [small], self.INSIDE))
+
+    def test_point_under_a_hole_sees_out(self):
+        self.assertTrue(points_seeing_out(self.INSIDE, hollow_box(hole=True))[0])
+
+    def test_point_in_a_closed_case_does_not(self):
+        self.assertFalse(points_seeing_out(self.INSIDE, hollow_box())[0])
 
 
 class Layout(unittest.TestCase):
