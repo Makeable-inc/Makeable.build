@@ -85,7 +85,7 @@ def required_space(part_ids):
         controller = sorted(cards[0]["features"]["pcb"]["size"], reverse=True)
         height = max(height, controller[1] + 2 * (HOLDER_WALL + MIN_WALL) + 0.3)
         depth = max(depth, inside_depth(part_ids[0], cards[0]) + plug_past_pin + 4.0)
-    return {"width": round(width + 1), "height": round(height + 0.5), "depth": round(depth + MIN_WALL + COVER_THICKNESS + wire_room)}
+    return {"width": round(width + 1, 1), "height": round(height, 1), "depth": round(depth + MIN_WALL + COVER_THICKNESS + wire_room, 1)}
 
 
 def space_conflict(base, space, limits):
