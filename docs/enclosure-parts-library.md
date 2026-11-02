@@ -86,6 +86,8 @@ SIDE VIEW, left end of the case
   cover plate
 ```
 
+![Snap latch](../enclosure/examples/snap-latch.png)
+
 **When to use it.** The cover must be held across its whole width and height. Use screws where a post fits. Where a side has no room for a post, for example when the controller's holder fills that end, hold that side with a snap. One snap on the crowded side and screws on the other is a good pattern, and snaps count toward the spread of fasteners.
 
 **Sizes**, starting values to confirm with a test print:
