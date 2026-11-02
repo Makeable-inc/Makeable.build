@@ -7,11 +7,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from unittest import mock
+
+import numpy as np
+import trimesh
 from build123d import Box, Pos, export_stl, export_step
 
 import case_parts as c
 import checks
-from part_data import required_space, space_conflict, write_data
+from access import access_list, check_access
+from card import build_card
+from case_checks import glueable
+from part_data import build_data, required_space, space_conflict, write_data
 
 HERE = Path(__file__).resolve().parent
 
@@ -122,7 +129,89 @@ class Space(unittest.TestCase):
     def test_the_space_holds_the_screen_board(self):
         space = required_space(["seeed-xiao-esp32s3", "ssd1309-242-oled", "ky-040-rotary-encoder"])
         self.assertGreater(space["width"], 71 + 18)
+
+    def test_the_space_holds_a_long_controller(self):
+        space = required_space(["esp32-s3-devkit-n16r8", "tft-154-lcd-display-module", "ky-040-rotary-encoder"])
+        self.assertGreater(space["width"], 60)
         self.assertGreater(space["height"], 43.5)
+
+
+class HolderOnEveryBoard(unittest.TestCase):
+    """The holder must fit every controller we have, including what sticks out past its edges. Run on real models, so a new board is tested automatically."""
+
+    def controllers(self):
+        found = []
+        for path in sorted((HERE / "cards").glob("*.json")):
+            card = json.loads(path.read_text(encoding="utf-8"))
+            if card.get("role") == "controller" and "sideways" not in card["part_id"] and "pcb" in card["features"]:
+                found.append(card["part_id"])
+        return found
+
+    def test_the_board_goes_into_its_holder(self):
+        self.assertGreaterEqual(len(self.controllers()), 5)
+        for part_id in self.controllers():
+            with self.subTest(part_id):
+                data = {"parts": {"PURCHASE_Board": build_data([part_id])["parts"]["PURCHASE_Board"]}, "wires": [], "plug_room": {}}
+                card = build_card(part_id)
+                axes = [a for a in ("+x", "+y", "+z", "-x", "-y", "-z") if a[1] != card["front"][1]]
+                part = c.Part(data, "PURCHASE_Board", faces="+y", up="+z", local_up=axes[0], at=(0, 0, 40), anchor="pcb")
+                behind = max(b[1][1] for b in part.solids())
+                shape = c.tower(part, behind + 1.0)
+                with tempfile.TemporaryDirectory() as temp:
+                    path = Path(temp) / "holder.stl"
+                    export_stl(c.one_solid(shape, "holder") if len(shape.solids()) == 1 else shape, str(path), tolerance=0.05)
+                    holder = trimesh.load_mesh(path)
+                matrix = np.array(part.matrix, dtype=float)
+                gap, inside, where = checks.clearance(holder, part_id, matrix)
+                self.assertEqual(inside, 0, f"{inside} points of {part_id} are inside the holder near {where}")
+                self.assertGreaterEqual(gap, checks.MIN_GAP - checks.GAP_TOLERANCE)
+                world = checks.apply(matrix, checks.part_surface(part_id)[2])
+                distance, _ = checks.travel(holder, world, np.array([0, -1.0, 0]))
+                self.assertTrue(np.isinf(distance), f"{part_id} hits its holder after {distance} mm on the way in")
+
+
+class FreeSpots(unittest.TestCase):
+    def test_spots_stay_clear_of_a_part(self):
+        part = placed()
+        spots = c.free_spots([part], -40, 40, 0, 40, reach=c.POST_RADIUS)
+        self.assertTrue(spots)
+        x0, x1, z0, z1 = c.outline(part)
+        for x, z in spots:
+            self.assertFalse(x0 - c.POST_RADIUS < x < x1 + c.POST_RADIUS and z0 - c.POST_RADIUS < z < z1 + c.POST_RADIUS)
+
+    def test_a_listed_spot_is_accepted_by_the_screw(self):
+        part = placed()
+        x, z = c.free_spots([part], -40, 40, 0, 40, reach=c.POST_RADIUS)[0]
+        c.Screw(x, z, 30, 27, parts=[part])
+
+
+class AccessRules(unittest.TestCase):
+    def test_used_things_need_access(self):
+        items = {(n, f) for n, f, _ in access_list(["seeed-xiao-esp32s3", "ssd1309-242-oled", "ky-040-rotary-encoder"])}
+        self.assertEqual(items, {("PURCHASE_Board", "usb"), ("PURCHASE_Part2", "screen"), ("PURCHASE_Part3", "shaft")})
+
+    def test_a_battery_removes_the_power_opening(self):
+        with mock.patch("access.has_battery", return_value=True):
+            items = {f for _, f, _ in access_list(["seeed-xiao-esp32s3", "ssd1309-242-oled"])}
+        self.assertNotIn("usb", items)
+
+    def test_unused_ports_and_maintenance_buttons_are_left_out(self):
+        items = {f for _, f, _ in access_list(["waveshare-esp32-s3-eth-ov5640-camera-board", "ssd1309-242-oled", "ttp223-touch"])}
+        self.assertEqual(items, {"usb", "screen", "touch"})
+
+    def test_a_blocked_item_fails_and_a_clear_one_passes(self):
+        card = {"front": "+z", "features": {"screen": {"min": [-5, -5, 0], "max": [5, 5, 0]}}}
+        transforms = {"PURCHASE_Part2": np.eye(4)}
+        wall = trimesh.creation.box(extents=(30, 30, 2), transform=trimesh.transformations.translation_matrix((0, 0, 5)))
+        beside = trimesh.creation.box(extents=(4, 30, 2), transform=trimesh.transformations.translation_matrix((20, 0, 5)))
+        with mock.patch("access.access_list", return_value=[("PURCHASE_Part2", "screen", "you look at it")]):
+            self.assertFalse(check_access(["a"], {"PRINT_Shell": wall}, {"PURCHASE_Part2": card}, transforms)[0]["ok"])
+            self.assertTrue(check_access(["a"], {"PRINT_Shell": beside}, {"PURCHASE_Part2": card}, transforms)[0]["ok"])
+
+
+class GlueLimits(unittest.TestCase):
+    def test_a_part_you_press_cannot_be_glued(self):
+        self.assertEqual(glueable({"PURCHASE_Board", "PURCHASE_Part3"}, {"PURCHASE_Board": {"features": {}}, "PURCHASE_Part3": {"features": {"shaft": {}}}}), {"PURCHASE_Board"})
 
 
 class Conflict(unittest.TestCase):

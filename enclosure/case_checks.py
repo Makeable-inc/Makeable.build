@@ -76,6 +76,11 @@ def check_retained(name, origins, others):
     return results
 
 
+def glueable(glued, cards):
+    """Glue is for a board that just sits in place. A part you press or turn needs a real support."""
+    return {name for name in glued if not {"shaft", "touch"} & set(cards.get(name, {}).get("features", {}))}
+
+
 def allow_glue(results, glued):
     """A purchased part marked as glued may be loose in the closed case, if it has a surface to glue to: plastic within the limit on at least one side."""
     results = [dict(r) for r in results]
@@ -345,7 +350,7 @@ def check_case(design, meshes, purchased, cards, transforms):
             place = rounded(where) if where is not None else None
             results.append(result("clearance", f"{mesh_name} / {name}", gap >= MIN_GAP - GAP_TOLERANCE and inside == 0, measured=None if np.isinf(gap) else round(gap, 3), limit=f"at least {MIN_GAP} mm", where=f"at {place}, {inside} points inside the plastic",
                                   fix=f"{mesh_name} is too close to {name} at {place}. Move that surface away until the gap is at least {MIN_GAP} mm."))
-        results.extend(allow_glue(check_retained(name, part_points[name], union), set((design.get("case") or {}).get("glued") or [])))
+        results.extend(allow_glue(check_retained(name, part_points[name], union), glueable(set((design.get("case") or {}).get("glued") or []), cards)))
         card = cards[name]
         if "usb" in card["features"]:
             room = port_room_box(card["features"]["usb"], transform)
@@ -374,4 +379,7 @@ def check_case(design, meshes, purchased, cards, transforms):
     results.extend(check_wiring(design, meshes, purchased, cards, transforms))
     from layout_checks import check_layout
     results.extend(check_layout(design, cards, transforms, union))
+    if design.get("base_design", {}) and design["base_design"].get("use_library"):
+        from access import check_access
+        results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms))
     return results

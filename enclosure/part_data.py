@@ -82,7 +82,8 @@ def required_space(part_ids):
     height = max(heights) + 2 * MIN_WALL + 2 * POST_RADIUS + 1.0
     depth = max(stacks)
     if not has_own_screen:
-        controller = sorted(cards[0]["features"]["pcb"]["size"], reverse=True)
+        controller = sorted(cards[0]["envelope"]["size"], reverse=True)
+        width = max(width, controller[0] + 2 * (HOLDER_WALL + MIN_WALL) + 0.3)
         height = max(height, controller[1] + 2 * (HOLDER_WALL + MIN_WALL) + 0.3)
         depth = max(depth, inside_depth(part_ids[0], cards[0]) + plug_past_pin + 4.0)
     return {"width": round(width + 1, 1), "height": round(height, 1), "depth": round(depth + MIN_WALL + COVER_THICKNESS + wire_room, 1)}

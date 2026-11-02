@@ -258,16 +258,66 @@ def tower(part, cover_y, wall=HOLDER_WALL, data=None):
     hole = block([inner_low[0], front - 1, inner_low[1]], [inner_high[0], near + GAP, inner_high[1]])
     room_behind = block([inner_low[0] + 1.5, near + GAP - 0.1, inner_low[1] + 1.5], [inner_high[0] - 1.5, behind, inner_high[1] - 1.5])
     shape = outer - hole - room_behind
-    # Anything on the board that passes its edge, such as a USB socket, gets its own clearance.
+    # Everything that stands behind the board or passes its edge gets a straight clear path out the front, wherever it starts on the board.
     clearances = []
+    room_x0, room_z0, room_x1, room_z1 = inner_low[0] + 1.5, inner_low[1] + 1.5, inner_high[0] - 1.5, inner_high[1] - 1.5
     for low, high in part.solids():
-        if low[1] <= near + GAP and high[1] >= pcb_low[1] - 1.0:
-            sticks_out = low[0] < inner_low[0] or high[0] > inner_high[0] or low[2] < inner_low[1] or high[2] > inner_high[1]
-            if sticks_out or high[1] > near:
-                clearances.append(block([low[0] - GAP, front - 1, low[2] - GAP], [high[0] + GAP, max(high[1] + GAP, near + GAP), high[2] + GAP]))
+        passes_edge = low[0] < inner_low[0] or high[0] > inner_high[0] or low[2] < inner_low[1] or high[2] > inner_high[1]
+        behind_board = high[1] > near + 0.001
+        outside_room = low[0] < room_x0 or high[0] > room_x1 or low[2] < room_z0 or high[2] > room_z1
+        if high[1] >= front and (passes_edge or (behind_board and outside_room)):
+            clearances.append(block([low[0] - GAP, front - 1, low[2] - GAP], [high[0] + GAP, high[1] + GAP, high[2] + GAP]))
     if clearances:
-        shape = shape - joined(clearances)
+        shape = shape - joined(_merged_boxes(clearances, part, front, gap=GAP))
     return shape
+
+
+def _merged_boxes(clearances, part, front, gap):
+    """The same clearances, kept to a small number of cuts so the holder stays fast to build."""
+    return clearances[:60] if len(clearances) <= 60 else _grouped(part, front, gap)
+
+
+def _grouped(part, front, gap, cell=2.0):
+    """Many small solids, such as rows of pins, are joined into one cut per occupied patch."""
+    patches = {}
+    for low, high in part.solids():
+        if high[1] < front:
+            continue
+        key = (round(low[0] / cell), round(low[2] / cell))
+        current = patches.get(key)
+        patches[key] = [[min(low[i], current[0][i]) for i in range(3)], [max(high[i], current[1][i]) for i in range(3)]] if current else [list(low), list(high)]
+    return [block([low[0] - gap, front - 1, low[2] - gap], [high[0] + gap, high[1] + gap, high[2] + gap]) for low, high in patches.values()]
+
+
+def free_spots(parts, x0, x1, z0, z1, reach=POST_RADIUS, towers=(), step=2.0):
+    """Places a post or stop can go without blocking any part: every (x, z) in the area that is clear of each part's outline by reach. Ask this first, rather than guessing."""
+    outlines = [outline(p) for p in parts] + [outline(p, GAP + HOLDER_WALL) for p in towers]
+    spots = []
+    count_x, count_z = int((x1 - x0) / step), int((z1 - z0) / step)
+    for i in range(count_x + 1):
+        for j in range(count_z + 1):
+            x, z = x0 + i * step, z0 + j * step
+            if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines):
+                spots.append((round(x, 2), round(z, 2)))
+    return spots
+
+
+def stop_spots(part, clear_of=(), width=MIN_STOP_WIDTH, step=2.0):
+    """Places a stop can go behind a part: inside its outline, and clear of the other parts it must not run through."""
+    x0, x1, z0, z1 = outline(part)
+    half = width / 2 + GAP
+    reach = width / 2 * 1.6
+    outlines = [outline(p) for p in clear_of]
+    spots = []
+    x = x0 + half
+    while x <= x1 - half:
+        z = z0 + half
+        while z <= z1 - half:
+            if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines):
+                spots.append((round(x, 2), round(z, 2)))
+            z += step
+        x += step
+    return spots
 
 
 def tower_room(part, to_y, wall=HOLDER_WALL, gap=GAP):
