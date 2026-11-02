@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ALLOWED_IMPORTS = {"build123d", "math", "json", "pathlib"}
+ALLOWED_IMPORTS = {"build123d", "math", "json", "pathlib", "case_parts"}
 BANNED_NAMES = {"eval", "exec", "compile", "__import__", "globals", "locals", "getattr", "setattr", "breakpoint", "input"}
 TIME_LIMIT_SECONDS = 300
 OUTPUT_LIMIT = 4000
@@ -46,7 +46,7 @@ def run_design(code, folder):
     # build123d's libraries want a home folder; the attempt folder keeps the real one out of reach of the environment.
     environment.update(HOME=str(folder.resolve()), USERPROFILE=str(folder.resolve()))
     try:
-        done = subprocess.run([sys.executable, "-I", "design.py"], cwd=folder.resolve(), env=environment, capture_output=True, text=True, timeout=TIME_LIMIT_SECONDS)
+        done = subprocess.run([sys.executable, "-E", "-s", "design.py"], cwd=folder.resolve(), env=environment, capture_output=True, text=True, timeout=TIME_LIMIT_SECONDS)
     except subprocess.TimeoutExpired:
         return False, f"The code ran longer than the {TIME_LIMIT_SECONDS} second limit."
     (folder / "output.txt").write_text(done.stdout + done.stderr, encoding="utf-8")

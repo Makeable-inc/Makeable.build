@@ -4,14 +4,13 @@ The case goes together along world y: the screen faces -y, and the flat rear cov
 Each piece keeps its safe limits. A piece raises a clear error, rather than building something that cannot print or cannot be assembled.
 """
 import json
-import math
 
 from build123d import Box, Cylinder, Pos, Rot, export_stl
 
 # Limits, in mm. A real print may change these numbers; nothing else needs to.
 GAP = 0.15
 MIN_WALL = 1.6
-HOLDER_WALL = 3.0
+HOLDER_WALL = 2.4
 MIN_STOP_WIDTH = 4.0
 MAX_STOP_SLENDERNESS = 8.0
 POST_RADIUS = 2.8
@@ -318,7 +317,7 @@ def wire_paths(data, parts, lane_y, lane_step=0.6):
     return paths
 
 
-def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base"):
+def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base", insert_from="-y"):
     """Checks each printed part is one solid, exports it, and writes design.json with the build order. The cover and controller go first, and the Shell closes over everything last."""
     prints = {"PRINT_Shell": one_solid(shell, "PRINT_Shell"), "PRINT_Base": one_solid(base, "PRINT_Base")}
     for name, shape in prints.items():
@@ -328,7 +327,7 @@ def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), 
     design = {
         "print": {name: f"{name}.stl" for name in prints},
         "purchased": {p.name: {"part_id": p.part_id, "transform": p.matrix} for p in parts},
-        "holds": {holder: {"part": controller.name, "insert_from": "-y"}},
+        "holds": {holder: {"part": controller.name, "insert_from": insert_from}},
         "case": {
             "assembly": [{"add": "PRINT_Base"}, {"add": controller.name, "from": "-y"}] + [{"add": p.name, "from": "-y"} for p in screen_and_inputs] + [{"add": "PRINT_Shell", "from": "-y"}],
             "screws": [s.entry() for s in screws],
@@ -339,7 +338,3 @@ def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), 
     with open("design.json", "w", encoding="utf-8") as file:
         json.dump(design, file, indent=1)
     return design
-
-
-def distance_note(value):
-    return f"{math.floor(value * 100) / 100:.2f} mm"

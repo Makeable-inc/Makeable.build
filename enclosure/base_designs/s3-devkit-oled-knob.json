@@ -9,18 +9,12 @@
     "Right about 30% of the front: a raised control panel. The front steps forward here by as much as the knob's plugs need, across the full height of the case, with a rounded transition.",
     "The knob comes straight out of that panel toward -y. It is also the button: pressing it clicks. Its pins point -y too, and the plugs and their first turn sit inside the raised panel.",
     "The controller is a long separate board behind the screen, with its long side along x, so its USB reaches the left wall. Its top faces the back (+y) and its pins point forward (-y), with their plugs between it and the screen.",
-    "Build it from the back, in this order, each part coming in from +y: PRINT_Shell first, lying face down; then the screen; then the knob; then PRINT_Carrier holding the controller; then PRINT_Base last. Nothing on the Shell may have to pass the screen to reach the controller.",
-    "The Carrier stops the controller toward the front. A rib on PRINT_Base stops it toward the back.",
     "USB opens on the left side (-x).",
     "The wires run behind the screen board as one neat bundle, side by side, and do not show from outside.",
-    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover."
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover.",
+    "The controller sits on a holder built into the rear cover. The rear cover is a flat plate with holder and stops on it, and it closes from +y."
   ],
   "body_first": true,
-  "min_body": {
-    "width": 104,
-    "height": 50,
-    "depth": 56
-  },
   "front": "-y",
   "width_to_height": [
     1.6,
@@ -43,5 +37,6 @@
         0.95
       ]
     }
-  }
+  },
+  "use_library": true
 }
