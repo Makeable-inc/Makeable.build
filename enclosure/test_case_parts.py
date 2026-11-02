@@ -17,7 +17,8 @@ import case_parts as c
 import checks
 from access import access_list, check_access
 from card import build_card
-from case_checks import glueable
+from case_checks import check_outer_parts, glueable
+from severity import is_warning
 from part_data import build_data, required_space, space_conflict, write_data
 
 HERE = Path(__file__).resolve().parent
@@ -212,6 +213,54 @@ class AccessRules(unittest.TestCase):
 class GlueLimits(unittest.TestCase):
     def test_a_part_you_press_cannot_be_glued(self):
         self.assertEqual(glueable({"PURCHASE_Board", "PURCHASE_Part3"}, {"PURCHASE_Board": {"features": {}}, "PURCHASE_Part3": {"features": {"shaft": {}}}}), {"PURCHASE_Board"})
+
+
+class InsideTheBody(unittest.TestCase):
+    BODY = Pos(0, 0, 25) * Box(100, 60, 50)
+
+    def test_a_post_outside_the_body_is_refused(self):
+        with self.assertRaisesRegex(AssertionError, "stick out of the body"):
+            c.Screw(49.5, 25, 30, 27, body=self.BODY)
+
+    def test_a_post_inside_the_body_is_allowed(self):
+        c.Screw(40, 25, 30, 27, body=self.BODY)
+
+    def test_free_spots_stay_inside_the_body(self):
+        spots = c.free_spots([], -60, 60, -10, 60, body=self.BODY, y=27)
+        self.assertTrue(spots)
+        for x, z in spots:
+            self.assertLess(abs(x) + c.POST_RADIUS, 50)
+            self.assertGreater(z - c.POST_RADIUS, 0)
+
+    def test_holder_room_through_the_wall_is_refused(self):
+        part = placed((44, 0, 25))
+        with self.assertRaisesRegex(AssertionError, "cut through the outside"):
+            c.tower_room(part, 27, body=self.BODY)
+
+    def test_holder_room_well_inside_is_allowed(self):
+        c.tower_room(placed((0, 0, 25)), 27, body=self.BODY)
+
+
+class OuterParts(unittest.TestCase):
+    def body(self):
+        return trimesh.creation.box(extents=(100, 53.2, 50), transform=trimesh.transformations.translation_matrix((0, -3.5, 25)))
+
+    def meshes(self, patch):
+        shell = trimesh.creation.box(extents=(100, 50, 50), transform=trimesh.transformations.translation_matrix((0, -5, 25)))
+        cover = trimesh.creation.box(extents=(100, 3, 50), transform=trimesh.transformations.translation_matrix((0, 21.6, 25)))
+        if patch:
+            shell = trimesh.boolean.difference([shell, trimesh.creation.box(extents=(4, 20, 20), transform=trimesh.transformations.translation_matrix((-49, 5, 25)))], engine="manifold")
+            cover = trimesh.boolean.union([cover, trimesh.creation.box(extents=(4, 20, 20), transform=trimesh.transformations.translation_matrix((-48.9, 5, 25)))], engine="manifold")
+        return {"PRINT_Shell": shell, "PRINT_Base": cover}
+
+    def test_a_flat_cover_on_the_back_passes(self):
+        found = [r for r in check_outer_parts(self.meshes(False), "-y", self.body()) if r["part"] == "PRINT_Base"][0]
+        self.assertTrue(found["ok"])
+
+    def test_a_holder_showing_through_the_side_fails(self):
+        found = [r for r in check_outer_parts(self.meshes(True), "-y", self.body()) if r["part"] == "PRINT_Base"][0]
+        self.assertFalse(found["ok"])
+        self.assertFalse(is_warning(found))
 
 
 class Conflict(unittest.TestCase):

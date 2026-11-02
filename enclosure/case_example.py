@@ -17,11 +17,13 @@ controller = Part(data, "PURCHASE_Board", faces="+y", up="-z", local_up="+z", at
 shell, cover = split(body, seam_y)
 usb = usb_opening(controller, data)
 wire_room = block([knob.feature("pcb")[0][0], knob.feature("pcb")[1][1] + 1.0, 4.0], [50.5, seam_y + 1, 50.0])
-cuts = [pocket(screen, seam_y + 1, data), pocket(knob, seam_y + 1, data), pocket(controller, seam_y + 1, data), tower_room(controller, seam_y + 1), wire_room,
+cuts = [pocket(screen, seam_y + 1, data), pocket(knob, seam_y + 1, data), pocket(controller, seam_y + 1, data), tower_room(controller, seam_y + 1, body=body), wire_room,
         window(screen), shaft_hole(knob), knob_recess(knob, knob.feature("bushing")[0][1] + 1.0), usb]
 shell = one_solid(shell - joined(cuts), "hollow shell")
 
-screws = [Screw(x, z, back_y, seam_y, parts=[screen, knob], towers=[controller]) for x, z in ((-42.0, 50.5), (42.0, 50.5), (49.0, 8.0))]
+spots = free_spots([screen, knob], -50, 50, 3, 51, towers=[controller], body=body, y=seam_y)
+screws = [Screw(x, z, back_y, seam_y, parts=[screen, knob], towers=[controller], body=body) for x, z in ((-42.0, 50.5), (42.0, 50.5), (49.0, 8.0))]
+print(f"{len(spots)} places fit a screw post, for example {spots[:3]}")
 shell = one_solid(shell + (joined([s.post() for s in screws]) & body), "shell with posts")
 shell = one_solid(shell - joined([s.shell_cut() for s in screws]) - usb, "drilled shell")
 

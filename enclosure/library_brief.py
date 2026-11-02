@@ -19,10 +19,10 @@ The library, all in millimetres, with the screen facing -y and the rear cover cl
 - deepest_front(body, x0, x1, z0, z1), front_surface(body, x, z): the outside of a curved front at that spot.
 - pocket(part, to_y, data): the room for a part in the Shell, including its plugs. It only widens toward the back.
 - window(part), shaft_hole(part), knob_recess(part, depth_from_y), touch_opening(part), usb_opening(part, data): fitted openings. Cut usb_opening from every printed part.
-- tower(part, cover_y), tower_room(part, to_y): a holder for a small controller, built into the cover, and the room it needs in the Shell.
+- tower(part, cover_y), tower_room(part, to_y, body=body): a holder for a small controller, built into the cover, and the room it needs in the Shell. Pass the body, so it refuses room that would break through the outside wall.
 - stop(part, x, z, cover_y, clear_of=[...]): a column from the cover to just behind a part. It thickens when long. Put stops behind boards that have no other support, and one behind a knob so pressing it pushes against plastic.
-- Screw(x, z, back_y, seam_y, parts=[...], towers=[...]): has post(), shell_cut(), cover_cut() and entry(). It refuses a post in a part's path.
-- free_spots(parts, x0, x1, z0, z1, towers=[...]) and stop_spots(part, clear_of=[...]): the positions a post or stop can actually use. Call these and choose from the result, rather than guessing a position.
+- Screw(x, z, back_y, seam_y, parts=[...], towers=[...], body=body): has post(), shell_cut(), cover_cut() and entry(). It refuses a post in a part's path or outside the body.
+- free_spots(parts, x0, x1, z0, z1, towers=[...], body=body, y=seam_y) and stop_spots(part, clear_of=[...]): the positions a post or stop can actually use. Call these and choose from the result, rather than guessing a position.
 - wire_paths(data, parts, lane_y): guide paths for the wires.
 - finish(shell, cover, screen_and_inputs, controller, screws, wires, glued=[...], holder=..., insert_from=...): checks each part is one solid, exports it and writes design.json. For a controller with its own screen, pass holder="PRINT_Shell", insert_from="+y", and do not build a tower.
 - one_solid, block, along_y, joined, load_data, and the constants GAP, MIN_WALL, COVER_THICKNESS and SEAM_GAP.
@@ -30,6 +30,7 @@ The library, all in millimetres, with the screen facing -y and the rear cover cl
 How the case works:
 - BODY.step is the decided outer form, and its back is flat. Load it, and do not rebuild it or add anything outside it.
 - Parts go in the Shell, with their faces just behind the front wall. The cover holds a small controller on its tower and closes from the back.
+- Only the Shell forms the outside, apart from the flat back of the cover. Holders and stops stay inside, with the Shell's wall around them.
 - The first thing to decide is where each part goes. Parts must fit inside the body with at least MIN_WALL of plastic around them.
 - Everything behind a part in the Shell must stay out of its outline, or the Shell cannot close over it. pocket() and Screw() take care of this if you use them.
 - Glue is allowed only for a board sitting in its holder or pocket. A part you press or touch needs a real stop behind it, and marking it as glued has no effect.

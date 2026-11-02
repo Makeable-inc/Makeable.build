@@ -289,8 +289,8 @@ def _grouped(part, front, gap, cell=2.0):
     return [block([low[0] - gap, front - 1, low[2] - gap], [high[0] + gap, high[1] + gap, high[2] + gap]) for low, high in patches.values()]
 
 
-def free_spots(parts, x0, x1, z0, z1, reach=POST_RADIUS, towers=(), step=2.0):
-    """Places a post or stop can go without blocking any part: every (x, z) in the area that is clear of each part's outline by reach. Ask this first, rather than guessing."""
+def free_spots(parts, x0, x1, z0, z1, reach=POST_RADIUS, towers=(), step=2.0, body=None, y=None):
+    """Places a post or stop can go without blocking any part: every (x, z) in the area that is clear of each part's outline by reach. With the body and a y given, only places where it fits inside the body. Ask this first, rather than guessing."""
     outlines = [outline(p) for p in parts] + [outline(p, GAP + HOLDER_WALL) for p in towers]
     spots = []
     count_x, count_z = int((x1 - x0) / step), int((z1 - z0) / step)
@@ -298,7 +298,8 @@ def free_spots(parts, x0, x1, z0, z1, reach=POST_RADIUS, towers=(), step=2.0):
         for j in range(count_z + 1):
             x, z = x0 + i * step, z0 + j * step
             if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines):
-                spots.append((round(x, 2), round(z, 2)))
+                if body is None or all(inside(body, px, y - depth, pz) for px, pz in ((x - reach - 0.4, z), (x + reach + 0.4, z), (x, z - reach - 0.4), (x, z + reach + 0.4)) for depth in (0.3, 9.0)):
+                    spots.append((round(x, 2), round(z, 2)))
     return spots
 
 
@@ -320,16 +321,41 @@ def stop_spots(part, clear_of=(), width=MIN_STOP_WIDTH, step=2.0):
     return spots
 
 
-def tower_room(part, to_y, wall=HOLDER_WALL, gap=GAP):
-    """The room the holder needs in the Shell, so the Shell closes over it. Refuses a board too close to the wall, which would leave the Shell's wall too thin, through the check on the body."""
+def inside(body, x, y, z):
+    """True if this point is inside the body."""
+    from build123d import Vector
+    return body.is_inside(Vector(x, y, z))
+
+
+def outside_points(body, low, high, wall=MIN_WALL, levels=3):
+    """Points around a box, grown by a wall, that are not inside the body. Empty means the box keeps at least that wall all round."""
+    xs, zs = (low[0] - wall, high[0] + wall), (low[2] - wall, high[2] + wall)
+    ys = [low[1] + (high[1] - low[1]) * i / (levels - 1) for i in range(levels)]
+    points = [(x, y, z) for x in xs for z in zs for y in ys]
+    points += [((low[0] + high[0]) / 2, y, z) for z in zs for y in ys] + [(x, y, (low[2] + high[2]) / 2) for x in xs for y in ys]
+    return [p for p in points if not inside(body, *p)]
+
+
+def tower_room(part, to_y, wall=HOLDER_WALL, gap=GAP, body=None):
+    """The room the holder needs in the Shell, so the Shell closes over it. With the body given, refuses room that would cut through the outside wall."""
     pcb_low, pcb_high = part.feature("pcb")
-    return block([pcb_low[0] - GAP - wall - gap, pcb_low[1] - 1.0 - gap, pcb_low[2] - GAP - wall - gap], [pcb_high[0] + GAP + wall + gap, to_y, pcb_high[2] + GAP + wall + gap])
+    low = [pcb_low[0] - GAP - wall - gap, pcb_low[1] - 1.0 - gap, pcb_low[2] - GAP - wall - gap]
+    high = [pcb_high[0] + GAP + wall + gap, to_y, pcb_high[2] + GAP + wall + gap]
+    if body is not None:
+        outside = outside_points(body, low, [high[0], to_y - 1.5, high[2]])
+        assert not outside, f"The holder for {part.name} does not fit inside the body with a {MIN_WALL} mm wall: it would cut through the outside near {[round(v, 1) for v in outside[0]]}. Move the board inward, turn it, or make the body bigger."
+    return block(low, high)
 
 
 class Screw:
     """One screw from the back of the cover into a post on the Shell. Refuses a post that would block a part's path in."""
 
-    def __init__(self, x, z, back_y, seam_y, parts=(), towers=()):
+    def __init__(self, x, z, back_y, seam_y, parts=(), towers=(), body=None):
+        if body is not None:
+            front = seam_y + SEAM_GAP + HEAD_SEAT - SCREW_CLEAR_LENGTH - SCREW_GRIP_LENGTH - 0.5
+            reach = POST_RADIUS + 0.4
+            missing = [p for p in ((x - reach, z), (x + reach, z), (x, z - reach), (x, z + reach), (x, z)) for y in (front, seam_y - 0.3) if not inside(body, p[0], y, p[1])]
+            assert not missing, f"A screw post at x={x}, z={z} would stick out of the body. Use free_spots(..., body=body, y=seam_y) for places inside it."
         for part in list(parts) + list(towers):
             x0, x1, z0, z1 = outline(part, GAP + (HOLDER_WALL if part in towers else 0))
             if x0 - POST_RADIUS < x < x1 + POST_RADIUS and z0 - POST_RADIUS < z < z1 + POST_RADIUS:

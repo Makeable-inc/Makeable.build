@@ -7,7 +7,7 @@ from scipy.spatial import ConvexHull, QhullError
 
 from card import DIRECTIONS, load_nodes
 from parts import ensure_part
-from checks import AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, sanding_depth, travel, travel_ends
+from checks import load_stl, AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, sanding_depth, travel, travel_ends
 
 VIEW_ANGLE = 50
 MAX_WINDOW_GAP = 1.0
@@ -329,6 +329,34 @@ def check_flat_on_bed(meshes):
     return results
 
 
+OUTER_SKIN_ALLOWANCE = 6.0
+MAX_WRONG_OUTSIDE = 20.0
+
+
+def check_outer_parts(meshes, front, body):
+    """Only the Shell and the flat back of the rear cover may form the outside. A holder or stop showing through the wall prints, but shows as a patch. The outside is the frozen body's surface."""
+    if "PRINT_Shell" not in meshes or body is None:
+        return []
+    back = -direction_vector(front)
+    results = []
+    for name, mesh in meshes.items():
+        if name == "PRINT_Shell":
+            continue
+        points, faces = trimesh.sample.sample_surface(mesh, 5000, seed=5)
+        _, distance, _ = trimesh.proximity.closest_point(body, points)
+        on_outside = distance < 0.3
+        allowed = np.zeros(len(points), dtype=bool)
+        if name == "PRINT_Base":
+            along = points @ back
+            allowed = along >= along.max() - OUTER_SKIN_ALLOWANCE
+        wrong = on_outside & ~allowed
+        area = float(wrong.mean() * mesh.area)
+        place = rounded(points[wrong][0]) if wrong.any() else None
+        results.append(result("outer_parts", name, area <= MAX_WRONG_OUTSIDE, measured=round(area, 1), limit=f"at most {MAX_WRONG_OUTSIDE} mm2 of {name} on the outside, apart from the back of the cover", where=place,
+                              fix=f"{name} shows on the outside of the case near {place}. The Shell must form the outside everywhere except the flat back. Keep holders, stops and other pieces inside, with the Shell's wall around them."))
+    return results
+
+
 def check_case(design, meshes, purchased, cards, transforms):
     case = design.get("case")
     if not isinstance(case, dict):
@@ -340,6 +368,8 @@ def check_case(design, meshes, purchased, cards, transforms):
         return []
     results = check_plastic_pairs(meshes)
     results.extend(check_flat_on_bed(meshes))
+    body_path = design.get("body_stl")
+    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), load_stl(body_path) if body_path else None))
     union = merged(meshes.values())
     part_points = {}
     for name, transform in transforms.items():
