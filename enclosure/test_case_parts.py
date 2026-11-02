@@ -232,11 +232,6 @@ class InsideTheBody(unittest.TestCase):
             self.assertLess(abs(x) + c.POST_RADIUS, 50)
             self.assertGreater(z - c.POST_RADIUS, 0)
 
-    def test_holder_room_through_the_wall_is_refused(self):
-        part = placed((44, 0, 25))
-        with self.assertRaisesRegex(AssertionError, "cut through the outside"):
-            c.tower_room(part, 27, body=self.BODY)
-
     def test_holder_room_well_inside_is_allowed(self):
         c.tower_room(placed((0, 0, 25)), 27, body=self.BODY)
 

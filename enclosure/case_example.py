@@ -17,7 +17,7 @@ controller = Part(data, "PURCHASE_Board", faces="+y", up="-z", local_up="+z", at
 shell, cover = split(body, seam_y)
 usb = usb_opening(controller, data)
 wire_room = block([knob.feature("pcb")[0][0], knob.feature("pcb")[1][1] + 1.0, 4.0], [50.5, seam_y + 1, 50.0])
-cuts = [pocket(screen, seam_y + 1, data), pocket(knob, seam_y + 1, data), pocket(controller, seam_y + 1, data), tower_room(controller, seam_y + 1, body=body), wire_room,
+cuts = [pocket(screen, seam_y + 1, data), pocket(knob, seam_y + 1, data), pocket(controller, seam_y + 1, data), tower_room(controller, seam_y + 1), wire_room,
         window(screen), shaft_hole(knob), knob_recess(knob, knob.feature("bushing")[0][1] + 1.0), usb]
 shell = one_solid(shell - joined(cuts), "hollow shell")
 

@@ -337,13 +337,10 @@ def outside_points(body, low, high, wall=MIN_WALL, levels=3):
 
 
 def tower_room(part, to_y, wall=HOLDER_WALL, gap=GAP, body=None):
-    """The room the holder needs in the Shell, so the Shell closes over it. With the body given, refuses room that would cut through the outside wall."""
+    """The room the holder needs in the Shell, so the Shell closes over it. Whether the holder then shows on the outside is measured on the real files by the outside check. body is accepted for older scripts and not used."""
     pcb_low, pcb_high = part.feature("pcb")
     low = [pcb_low[0] - GAP - wall - gap, pcb_low[1] - 1.0 - gap, pcb_low[2] - GAP - wall - gap]
     high = [pcb_high[0] + GAP + wall + gap, to_y, pcb_high[2] + GAP + wall + gap]
-    if body is not None:
-        outside = outside_points(body, low, [high[0], to_y - 1.5, high[2]])
-        assert not outside, f"The holder for {part.name} does not fit inside the body with a {MIN_WALL} mm wall: it would cut through the outside near {[round(v, 1) for v in outside[0]]}. Move the board inward, turn it, or make the body bigger."
     return block(low, high)
 
 

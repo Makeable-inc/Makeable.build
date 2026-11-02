@@ -39,7 +39,7 @@ All in `enclosure/case_parts.py`. Sizes come from the part cards through `parts_
 | `Part` | Places a real part, turning it without changing its size | A turn that is not square |
 | `pocket` | The room a part needs in the Shell, including its plugs | It only widens toward the back, so a part always has a straight path in |
 | `window`, `shaft_hole`, `knob_recess`, `touch_opening`, `usb_opening` | Fitted openings | A touch opening outside the sensor's outline |
-| `tower`, `tower_room` | A holder for the controller built into the rear cover, and its room in the Shell | Room that would break through the outside wall |
+| `tower`, `tower_room` | A holder for the controller built into the rear cover, and its room in the Shell | |
 | `stop` | A column from the cover to just behind a part | A stop through another part or past the part's outline. It thickens by itself when long |
 | `Screw` | A post, pilot hole, clearance hole and screwdriver path | A post in a part's path or outside the body |
 | `free_spots`, `stop_spots` | Every position a post or stop can use | |
@@ -96,7 +96,7 @@ What the held-back runs found, and the general fix for each:
 | The needed space ignored the controller's length | It now counts the controller's full size |
 | The AI guessed post and stop positions and was refused | `free_spots` and `stop_spots` list the positions that work |
 | Posts landed outside the curved body | `Screw` and `free_spots` check the body |
-| The holder broke through the side wall and showed as a patch | `tower_room` refuses it, and a check confirms only the Shell and the cover's back form the outside |
+| The holder broke through the side wall and showed as a patch | A check confirms only the Shell and the cover's back form the outside. A refusal inside `tower_room` was tried and removed: it was stricter than the real checks and blocked a tight design that passed before |
 
 Each fix is a rule for any case, not a number set for one board. Fixes found on held-back parts make those parts no longer an unbiased test, so each round uses new pairings.
 
