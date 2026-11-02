@@ -17,7 +17,7 @@ MIN_SCREEN_SHARE_OTHER = 0.4
 MAX_SCREEN_TILT_UP = 70
 MIN_BALANCE_MARGIN = 2.0
 MIN_SCREWS = 2
-REQUIRED_PARTS = ["PRINT_Carrier", "PRINT_Shell", "PRINT_Base"]
+REQUIRED_PARTS = ["PRINT_Shell", "PRINT_Base"]
 MIN_COVER_FLAT = 0.9
 MIN_PART_CONTACT = 0.25
 BED_TOLERANCE = 0.1
@@ -330,7 +330,7 @@ def check_case(design, meshes, purchased, cards, transforms):
         return [result("case", "design.json", False, fix="design.json needs a case section with assembly and screws.")]
     missing = [n for n in REQUIRED_PARTS if n not in meshes]
     if missing:
-        return [result("case", "design.json", False, measured=missing, limit=REQUIRED_PARTS, fix="A case is PRINT_Shell, PRINT_Base and PRINT_Carrier.")]
+        return [result("case", "design.json", False, measured=missing, limit=REQUIRED_PARTS, fix="A case is at least PRINT_Shell and PRINT_Base. The controller's holder may be built into one of them or be its own PRINT_Carrier.")]
     if not all(m.is_watertight for m in meshes.values()) or set(transforms) != set(purchased):
         return []
     results = check_plastic_pairs(meshes)
@@ -357,7 +357,8 @@ def check_case(design, meshes, purchased, cards, transforms):
                                   fix="The plug would hit the desk. Turn the board so the USB faces sideways or backward, or raise it, so the whole plug path stays above the lowest point of the case."))
         if "screen" in card["features"] and "glass" in card["features"]:
             results.extend(check_screen(name, card, transform, union))
-    results.extend(check_retained("PRINT_Carrier", plastic_points(meshes["PRINT_Carrier"]), merged(m for n, m in meshes.items() if n != "PRINT_Carrier")))
+    if "PRINT_Carrier" in meshes:
+        results.extend(check_retained("PRINT_Carrier", plastic_points(meshes["PRINT_Carrier"]), merged(m for n, m in meshes.items() if n != "PRINT_Carrier")))
     results.extend(check_standing(meshes))
     assembly_points = {}
     for name, points in part_points.items():
