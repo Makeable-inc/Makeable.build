@@ -73,7 +73,8 @@ def measure(spec, nodes):
         axis, side = DIRECTIONS[usb["opens_toward"]]
         bound = "max" if side else "min"
         usb["mouth"] = usb[bound][axis]
-        if abs(usb["mouth"] - envelope[bound][axis]) > 0.5:
+        # Another connector at the same end, such as Ethernet, can stand a little prouder.
+        if abs(usb["mouth"] - envelope[bound][axis]) > 1.0:
             raise CardError(f"usb: mouth at {usb['mouth']} is not at the part's {usb['opens_toward']} edge {envelope[bound][axis]}")
     if "screen" in features and "glass" in features:
         s, g = features["screen"], features["glass"]

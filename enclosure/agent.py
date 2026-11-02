@@ -362,6 +362,14 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
         from concepts import base_picture
         base = json.loads(Path(parts).read_text(encoding="utf-8"))
         parts, look = base["parts"], base["look"]
+        if base.get("use_library"):
+            # Before any paid call, including the picture.
+            from body_stage import screen_limits
+            from part_data import required_space, space_conflict
+            conflict = space_conflict(base, required_space(parts.split(",")), screen_limits(base))
+            if conflict:
+                print(f"stopped: parts do not fit: {conflict}", flush=True)
+                return {"outcome": f"stopped: parts do not fit: {conflict}", "tokens": 0}
         picture = base_picture(base)
         print(f"base design: {base['name']}, picture: {picture}", flush=True)
     part_ids = parts.split(",")
@@ -402,14 +410,9 @@ def design_with_library(base, part_ids, picture, folder):
     """The outer form first, then the inside from tested pieces. The holder is one of those pieces, so it needs no stage of its own."""
     from body_stage import design_body, frozen_body_brief
     from library_brief import LIBRARY_SYSTEM, library_brief
-    from body_stage import screen_limits
-    from part_data import required_space, space_conflict
+    from part_data import required_space
     base = {**base, "min_body": required_space(part_ids)}
     print("needs at least", json.dumps(base["min_body"]), flush=True)
-    conflict = space_conflict(base, base["min_body"], screen_limits(base))
-    if conflict:
-        print(f"stopped: parts do not fit: {conflict}", flush=True)
-        return {"outcome": f"stopped: parts do not fit: {conflict}", "tokens": 0}
     body_code, body_stl, body_summary = design_body(base, picture, folder / "body")
     print("body", json.dumps({k: body_summary[k] for k in ("best_score", "tokens", "seconds")}), flush=True)
     if body_code is None:

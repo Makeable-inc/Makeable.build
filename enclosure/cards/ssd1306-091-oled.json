@@ -1,0 +1,36 @@
+{
+ "part_id": "ssd1306-091-oled",
+ "sha256": "721fa2767a9cf8a13d0f5933c6ad52e985df89a03cb01cbbd4a877ac679856b2",
+ "role": "display",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb"
+   ]
+  },
+  "frame": {
+   "nodes": [
+    "pcb"
+   ]
+  },
+  "glass": {
+   "nodes": [
+    "ssd1306-091-oled:glass"
+   ]
+  },
+  "screen": {
+   "nodes": [
+    "ssd1306-091-oled:screen-art"
+   ]
+  },
+  "pin_rows": {
+   "nodes": [
+    "header:pin:1",
+    "header:pin:2",
+    "header:pin:3",
+    "header:pin:4"
+   ]
+  }
+ }
+}
