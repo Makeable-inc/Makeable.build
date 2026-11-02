@@ -1,6 +1,7 @@
 """The AI designer loop: the AI writes CAD code, our checks judge the files, and hard stop rules end the run."""
 import base64
 import json
+import os
 import re
 import shutil
 import sys
@@ -59,6 +60,11 @@ SYSTEM = SYSTEM + "\n\n" + (HERE / "DESIGN_RULES.md").read_text(encoding="utf-8"
 
 
 def api_key():
+    """From the environment in the cloud, where the job's secret is passed in; from .env on a laptop."""
+    if os.environ.get("OPENAI_API_KEY"):
+        return os.environ["OPENAI_API_KEY"].strip()
+    if not ENV_FILE.exists():
+        raise SystemExit("OPENAI_API_KEY is not set and there is no .env")
     for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
         if line.startswith("OPENAI_API_KEY="):
             return line.split("=", 1)[1].strip().strip("\"'")
