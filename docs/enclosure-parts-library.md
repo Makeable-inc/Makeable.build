@@ -1,6 +1,6 @@
 # Enclosure parts library
 
-How the enclosure generator builds the inside of a case from tested pieces, why it was built, the rules it follows, and how it was tested. The code is in `enclosure/`. This is an experiment on `feat/enclosure-parts-library`, stacked on `feat/enclosure-agent`, and nothing in the site uses it yet.
+How the enclosure generator builds the inside of a case from tested pieces, why it was built, the rules it follows, and how it was tested. The code is in `enclosure/`. It was tested as an experiment and merged once it measured better. Nothing in the site uses it yet. The whole generator is described in [enclosure.md](enclosure.md).
 
 ## Why
 
@@ -116,6 +116,8 @@ Runs start from nothing on `gpt-6.1-sol`, with nobody stepping in. To avoid tuni
 | After fixes | 3 new held-back pairings | 2 of 3 | 71k to 89k |
 | After keeping pieces inside the body | 4 tuning designs | 2 of 4 | 40k to 113k |
 | After keeping pieces inside the body | 3 new held-back pairings | 3 of 3 | 64k to 101k |
+| Final check, with automatic retry | XIAO + OLED + knob, DevKitC + TFT + touch | 2 of 2 | 40k, 107k |
+| After adding the snap latch | DevKitC + bar + touch, which had failed 3 of 4 times | Passed first time | 57k |
 
 Across the 11 most recent library runs, 8 passed, about 73%, at about 76k tokens per run on average. The old system averaged about 197k on the tuning designs.
 
