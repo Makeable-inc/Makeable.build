@@ -123,7 +123,9 @@ New rules come only from real problems, such as a test print or a customer repor
 | PASS WITH WARNINGS | The model and a print checklist |
 | FAIL | No model, and a plain reason, such as "The last design still failed these checks: parts collide on the way in." |
 
-If each run passes about 73% of the time and the two tries were independent, two tries would pass about 93% of the time. They are not fully independent, so that is an upper estimate. A real retry has not been run yet; the retry logic is covered by unit tests.
+If each run passes about 73% of the time and the two tries were independent, two tries would pass about 93% of the time. They are not fully independent, so that is an upper estimate.
+
+A real retry was run on the DevKitC + bar + touch design: both tries failed, 129k tokens in total, and the customer result read "No case was made ... It was tried 2 times." Both tries hit the same wall: the controller holder needs nearly the full 37 mm height, and the curved body has none to spare. The needed-space estimate does not allow for rounded corners, so this design passed the early fit check and the retry could not help.
 
 ## Known limits
 
