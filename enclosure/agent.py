@@ -268,7 +268,7 @@ def crash_key(message):
     return lines[-1] if lines else ""
 
 
-def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None, base=None, body_stl=None):
+def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", continue_from=None, picture=None, base=None, body_stl=None, system=None, library_parts=None):
     """Runs tries until the design passes or a stop rule fires. Every try is saved. continue_from is an earlier try's folder, to pick up where it left off.
     Only code that ran counts against max_tries; crashes and timeouts have their own small budget. Each new try starts from the best script so far, so one bad rewrite cannot lose what worked."""
     folder = Path(folder)
@@ -288,7 +288,11 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
         if body_stl:
             # Ready before the code runs, so the script can load the frozen body rather than rebuild it.
             shutil.copy(Path(body_stl).with_suffix(".step"), attempt / "BODY.step")
-        reply, usage = ask_model(SYSTEM, text, picture) if picture else ask_model(SYSTEM, text)
+        if library_parts:
+            from part_data import write_data
+            shutil.copy(HERE / "case_parts.py", attempt / "case_parts.py")
+            write_data(library_parts, attempt)
+        reply, usage = ask_model(system or SYSTEM, text, picture) if picture else ask_model(system or SYSTEM, text)
         tokens += usage.get("total_tokens", 0)
         code = extract_code(reply)
         ran, message = run_design(code, attempt)
@@ -358,10 +362,20 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
         from concepts import base_picture
         base = json.loads(Path(parts).read_text(encoding="utf-8"))
         parts, look = base["parts"], base["look"]
+        if base.get("use_library"):
+            # Before any paid call, including the picture.
+            from body_stage import screen_limits
+            from part_data import required_space, space_conflict
+            conflict = space_conflict(base, required_space(parts.split(",")), screen_limits(base))
+            if conflict:
+                print(f"stopped: parts do not fit: {conflict}", flush=True)
+                return {"outcome": f"stopped: parts do not fit: {conflict}", "tokens": 0}
         picture = base_picture(base)
         print(f"base design: {base['name']}, picture: {picture}", flush=True)
     part_ids = parts.split(",")
     part_id = part_ids[0]
+    if base and base.get("use_library"):
+        return design_with_library(base, part_ids, picture, folder)
     if picture == "auto":
         from concepts import concept
         picture = concept(part_id, look)
@@ -390,6 +404,21 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
             return {"outcome": "stopped: no valid body", **body_summary}
         brief = "\n\n".join([brief, frozen_body_brief(body_code)])
     return design_part(brief, folder / "case", min(MAX_CASE_TRIES, MAX_TOTAL_TRIES - carrier["tries"]), stage="case", continue_from=continue_from, picture=picture, base=base, body_stl=body_stl)
+
+
+def design_with_library(base, part_ids, picture, folder):
+    """The outer form first, then the inside from tested pieces. The holder is one of those pieces, so it needs no stage of its own."""
+    from body_stage import design_body, frozen_body_brief
+    from library_brief import LIBRARY_SYSTEM, library_brief
+    from part_data import required_space
+    base = {**base, "min_body": required_space(part_ids)}
+    print("needs at least", json.dumps(base["min_body"]), flush=True)
+    body_code, body_stl, body_summary = design_body(base, picture, folder / "body")
+    print("body", json.dumps({k: body_summary[k] for k in ("best_score", "tokens", "seconds")}), flush=True)
+    if body_code is None:
+        return {"outcome": "stopped: no valid body", **body_summary}
+    brief = "\n\n".join([library_brief(part_ids, frozen_body_brief(body_code)), base_brief(base)])
+    return design_part(brief, folder / "case", MAX_CASE_TRIES, stage="case", picture=picture, base=base, body_stl=body_stl, system=LIBRARY_SYSTEM, library_parts=part_ids)
 
 
 if __name__ == "__main__":

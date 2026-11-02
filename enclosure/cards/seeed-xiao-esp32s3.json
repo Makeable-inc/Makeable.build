@@ -3,6 +3,7 @@
  "sha256": "89761a5afbebee2d27c6a3bf953558e6ade8bd8fe95f102134101bfd18f91f0f",
  "role": "controller",
  "front": "+y",
+ "pins_point": "-y",
  "features": {
   "pcb": {
    "nodes": ["0030"]

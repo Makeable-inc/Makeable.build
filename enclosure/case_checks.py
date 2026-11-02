@@ -7,7 +7,7 @@ from scipy.spatial import ConvexHull, QhullError
 
 from card import DIRECTIONS, load_nodes
 from parts import ensure_part
-from checks import AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, sanding_depth, travel, travel_ends
+from checks import load_stl, AXES, GAP_TOLERANCE, MAX_TRAVEL, MIN_GAP, apply, clearance, direction_vector, part_surface, port_room_box, result, rounded, sanding_depth, travel, travel_ends
 
 VIEW_ANGLE = 50
 MAX_WINDOW_GAP = 1.0
@@ -17,7 +17,7 @@ MIN_SCREEN_SHARE_OTHER = 0.4
 MAX_SCREEN_TILT_UP = 70
 MIN_BALANCE_MARGIN = 2.0
 MIN_SCREWS = 2
-REQUIRED_PARTS = ["PRINT_Carrier", "PRINT_Shell", "PRINT_Base"]
+REQUIRED_PARTS = ["PRINT_Shell", "PRINT_Base"]
 MIN_COVER_FLAT = 0.9
 MIN_PART_CONTACT = 0.25
 BED_TOLERANCE = 0.1
@@ -76,6 +76,11 @@ def check_retained(name, origins, others):
     return results
 
 
+def glueable(glued, cards):
+    """Glue is for a board that just sits in place. A part you press or turn needs a real support."""
+    return {name for name in glued if not {"shaft", "touch"} & set(cards.get(name, {}).get("features", {}))}
+
+
 def allow_glue(results, glued):
     """A purchased part marked as glued may be loose in the closed case, if it has a surface to glue to: plastic within the limit on at least one side."""
     results = [dict(r) for r in results]
@@ -126,14 +131,61 @@ def check_assembly(steps, meshes, purchased, part_points):
     return results
 
 
-def check_screw_spread(screws, meshes):
+MAX_SNAP_STRAIN = 0.02
+MIN_HOOK_DEPTH = 0.4
+MAX_HOOK_DEPTH = 1.5
+MAX_HOOK_PLAY = 0.5
+
+
+def box_mesh(low, high):
+    low, high = np.array(low, dtype=float), np.array(high, dtype=float)
+    return trimesh.creation.box(extents=high - low, transform=trimesh.transformations.translation_matrix((low + high) / 2))
+
+
+def check_snaps(snaps, meshes):
+    """A snap latch holds only if its arm can bend, the hook catches plastic behind it, and printed plastic takes the bend."""
+    results = []
+    for index, snap in enumerate(snaps, 1):
+        label = f"snap {index}"
+        strain = 1.5 * snap["arm_thickness"] * snap["hook_depth"] / snap["arm_length"] ** 2
+        results.append(result("snap_strain", label, strain <= MAX_SNAP_STRAIN and MIN_HOOK_DEPTH <= snap["hook_depth"] <= MAX_HOOK_DEPTH, measured=f"{strain:.2%} bend, hook {snap['hook_depth']} mm", limit=f"at most {MAX_SNAP_STRAIN:.0%} bend, hook {MIN_HOOK_DEPTH} to {MAX_HOOK_DEPTH} mm", where=snap["at"],
+                              fix="Make the arm longer or thinner, or the hook shallower, so printed plastic can take the bend."))
+        into = meshes.get(snap["into"])
+        if into is None:
+            continue
+        low, high = np.array(snap["hook"][0], dtype=float), np.array(snap["hook"][1], dtype=float)
+        grid = np.array([[x, high[1], z] for x in np.linspace(low[0] + 0.1, high[0] - 0.1, 3) for z in np.linspace(low[2] + 0.5, high[2] - 0.5, 4)])
+        distance, _ = travel(into, grid, np.array([0, 1.0, 0]))
+        results.append(result("snap_catch", label, distance <= MAX_HOOK_PLAY, measured=None if np.isinf(distance) else round(distance, 2), limit=f"plastic within {MAX_HOOK_PLAY} mm behind the hook", where=snap["at"],
+                              fix="The hook has nothing to catch. Cut its pocket into solid Shell wall, so plastic sits just behind the hook."))
+        flex = box_mesh(*snap["flex"])
+        blocked = sum(overlap(m, flex) for name, m in meshes.items() if name != snap["on"])
+        results.append(result("snap_flex", label, blocked < 1e-3, measured=round(blocked, 3), limit="0 mm3 of other plastic where the arm bends", where=snap["at"],
+                              fix="The arm has no room to bend as it goes in. Keep the slot beside the arm clear."))
+    return results
+
+
+def trimmed_for_assembly(meshes, snaps):
+    """The hooks are meant to ride over the Shell and click in, so the straight-path check leaves them out. check_snaps tests them instead."""
+    if not snaps:
+        return meshes
+    trimmed = dict(meshes)
+    for name in {s["on"] for s in snaps}:
+        if name in trimmed:
+            hooks = [box_mesh(np.array(s["hook"][0]) - 0.05, np.array(s["hook"][1]) + 0.05) for s in snaps if s["on"] == name]
+            trimmed[name] = trimesh.boolean.difference([trimmed[name], *hooks], engine="manifold")
+    return trimmed
+
+
+def check_screw_spread(screws, meshes, snaps=()):
     """The cover must be fastened across the whole seam: a screw in each half of its width and of its height, so no side is left to lift."""
     if not screws or any(not {"head_at", "drive_from", "through"} <= set(s) or s["through"] not in meshes for s in screws):
         return []
     cover = meshes[screws[0]["through"]]
     axis = DIRECTIONS[screws[0]["drive_from"]][0]
     across = [i for i in range(3) if i != axis]
-    heads = np.array([s["head_at"] for s in screws], dtype=float)
+    # A snap latch holds its side of the cover too.
+    heads = np.array([s["head_at"] for s in screws] + [s["at"] for s in snaps], dtype=float)
     results = []
     for i in across:
         low, high = cover.bounds[0][i], cover.bounds[1][i]
@@ -141,13 +193,13 @@ def check_screw_spread(screws, meshes):
         lower, upper = int((heads[:, i] < middle).sum()), int((heads[:, i] > middle).sum())
         name = "xyz"[i]
         results.append(result("screw_spread", f"along {name}", lower > 0 and upper > 0, measured=f"{lower} below and {upper} above the middle", limit="at least one screw in each half of the cover", where=f"cover {low:.1f} to {high:.1f} on {name}, middle {middle:.1f}",
-                              fix=f"All the screws are on one side along {name}, so the other side of the cover can lift. Put at least one screw on each side of {name} = {middle:.1f}, near the corners."))
+                              fix=f"All the screws and snaps are on one side along {name}, so the other side of the cover can lift. Where a side has no room for a screw post, a snap latch can hold it. Put at least one screw on each side of {name} = {middle:.1f}, near the corners."))
     return results
 
 
-def check_screws(screws, meshes, part_points):
+def check_screws(screws, meshes, part_points, snaps=()):
     results = [result("screw_count", "case", len(screws) >= MIN_SCREWS, measured=len(screws), limit=f"at least {MIN_SCREWS}", fix=f"Hold the case shut with at least {MIN_SCREWS} screws.")]
-    results.extend(check_screw_spread(screws, meshes))
+    results.extend(check_screw_spread(screws, meshes, snaps))
     for i, screw in enumerate(screws):
         label = f"screw {i + 1}"
         try:
@@ -324,17 +376,47 @@ def check_flat_on_bed(meshes):
     return results
 
 
+OUTER_SKIN_ALLOWANCE = 6.0
+MAX_WRONG_OUTSIDE = 20.0
+
+
+def check_outer_parts(meshes, front, body):
+    """Only the Shell and the flat back of the rear cover may form the outside. A holder or stop showing through the wall prints, but shows as a patch. The outside is the frozen body's surface."""
+    if "PRINT_Shell" not in meshes or body is None:
+        return []
+    back = -direction_vector(front)
+    results = []
+    for name, mesh in meshes.items():
+        if name == "PRINT_Shell":
+            continue
+        points, faces = trimesh.sample.sample_surface(mesh, 5000, seed=5)
+        _, distance, _ = trimesh.proximity.closest_point(body, points)
+        on_outside = distance < 0.3
+        allowed = np.zeros(len(points), dtype=bool)
+        if name == "PRINT_Base":
+            along = points @ back
+            allowed = along >= along.max() - OUTER_SKIN_ALLOWANCE
+        wrong = on_outside & ~allowed
+        area = float(wrong.mean() * mesh.area)
+        place = rounded(points[wrong][0]) if wrong.any() else None
+        results.append(result("outer_parts", name, area <= MAX_WRONG_OUTSIDE, measured=round(area, 1), limit=f"at most {MAX_WRONG_OUTSIDE} mm2 of {name} on the outside, apart from the back of the cover", where=place,
+                              fix=f"{name} shows on the outside of the case near {place}. The Shell must form the outside everywhere except the flat back. Keep holders, stops and other pieces inside, with the Shell's wall around them."))
+    return results
+
+
 def check_case(design, meshes, purchased, cards, transforms):
     case = design.get("case")
     if not isinstance(case, dict):
         return [result("case", "design.json", False, fix="design.json needs a case section with assembly and screws.")]
     missing = [n for n in REQUIRED_PARTS if n not in meshes]
     if missing:
-        return [result("case", "design.json", False, measured=missing, limit=REQUIRED_PARTS, fix="A case is PRINT_Shell, PRINT_Base and PRINT_Carrier.")]
+        return [result("case", "design.json", False, measured=missing, limit=REQUIRED_PARTS, fix="A case is at least PRINT_Shell and PRINT_Base. The controller's holder may be built into one of them or be its own PRINT_Carrier.")]
     if not all(m.is_watertight for m in meshes.values()) or set(transforms) != set(purchased):
         return []
     results = check_plastic_pairs(meshes)
     results.extend(check_flat_on_bed(meshes))
+    body_path = design.get("body_stl")
+    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), load_stl(body_path) if body_path else None))
     union = merged(meshes.values())
     part_points = {}
     for name, transform in transforms.items():
@@ -345,7 +427,7 @@ def check_case(design, meshes, purchased, cards, transforms):
             place = rounded(where) if where is not None else None
             results.append(result("clearance", f"{mesh_name} / {name}", gap >= MIN_GAP - GAP_TOLERANCE and inside == 0, measured=None if np.isinf(gap) else round(gap, 3), limit=f"at least {MIN_GAP} mm", where=f"at {place}, {inside} points inside the plastic",
                                   fix=f"{mesh_name} is too close to {name} at {place}. Move that surface away until the gap is at least {MIN_GAP} mm."))
-        results.extend(allow_glue(check_retained(name, part_points[name], union), set((design.get("case") or {}).get("glued") or [])))
+        results.extend(allow_glue(check_retained(name, part_points[name], union), glueable(set((design.get("case") or {}).get("glued") or []), cards)))
         card = cards[name]
         if "usb" in card["features"]:
             room = port_room_box(card["features"]["usb"], transform)
@@ -357,7 +439,8 @@ def check_case(design, meshes, purchased, cards, transforms):
                                   fix="The plug would hit the desk. Turn the board so the USB faces sideways or backward, or raise it, so the whole plug path stays above the lowest point of the case."))
         if "screen" in card["features"] and "glass" in card["features"]:
             results.extend(check_screen(name, card, transform, union))
-    results.extend(check_retained("PRINT_Carrier", plastic_points(meshes["PRINT_Carrier"]), merged(m for n, m in meshes.items() if n != "PRINT_Carrier")))
+    if "PRINT_Carrier" in meshes:
+        results.extend(check_retained("PRINT_Carrier", plastic_points(meshes["PRINT_Carrier"]), merged(m for n, m in meshes.items() if n != "PRINT_Carrier")))
     results.extend(check_standing(meshes))
     assembly_points = {}
     for name, points in part_points.items():
@@ -367,10 +450,15 @@ def check_case(design, meshes, purchased, cards, transforms):
                 local = (points - transforms[name][:3, 3]) @ transforms[name][:3, :3]
                 keep &= ~np.all((local >= np.array(feature["min"]) - 0.01) & (local <= np.array(feature["max"]) + 0.01), axis=1)
         assembly_points[name] = points[keep]
-    results.extend(check_assembly(case.get("assembly") or [{}], meshes, purchased, assembly_points))
-    results.extend(check_screws(case.get("screws") or [], meshes, part_points))
+    snaps = case.get("snaps") or []
+    results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points))
+    results.extend(check_snaps(snaps, meshes))
+    results.extend(check_screws(case.get("screws") or [], meshes, part_points, case.get("snaps") or []))
     from wiring_checks import check_wiring
     results.extend(check_wiring(design, meshes, purchased, cards, transforms))
     from layout_checks import check_layout
     results.extend(check_layout(design, cards, transforms, union))
+    if design.get("base_design", {}) and design["base_design"].get("use_library"):
+        from access import check_access
+        results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms))
     return results

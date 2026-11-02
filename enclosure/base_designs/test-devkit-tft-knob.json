@@ -1,0 +1,42 @@
+{
+  "name": "Square screen and knob",
+  "parts": "esp32-s3-devkit-n16r8,tft-154-lcd-display-module,ky-040-rotary-encoder",
+  "look": "a desk device with a square screen on the left and a chunky knob that clicks on a raised panel on the right",
+  "picture_prompt": "Product concept render of a small 3D-printable desk device, seen from the front and slightly to one side. It is a little wider than it is tall. One smooth continuous body with soft rounded corners. On the left of the front is a flat square screen, about 28 mm across. On the right is a raised panel with one chunky round knob. One matte plastic colour with a dark screen. Soft studio light, plain light background. Flat bottom, flat back, no text, no logos, no speaker holes, no feet, no visible seams, no cables.",
+  "sheet": [
+    "Front faces -y and stands upright. World +z is up.",
+    "Left about 60% of the front: the screen, a separate board with its long side along z, just behind the front wall.",
+    "Right part of the front: a raised control panel, stepping forward as far as the knob's plugs need, across the full height of the case, with a rounded transition.",
+    "The knob comes straight out of that panel toward -y. It is also the button: pressing it clicks. Its pins point -y too.",
+    "The controller is a separate board behind the screen, so its USB reaches the left wall. Its top faces the back (+y) and its pins point forward (-y), with their plugs between it and the screen.",
+    "USB opens on the left side (-x).",
+    "The wires run behind the screen board as one neat bundle, side by side, and do not show from outside.",
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover.",
+    "The controller sits on a holder built into the rear cover. The rear cover is a flat plate with holder and stops on it, and it closes from +y."
+  ],
+  "width_to_height": [
+    1.0,
+    1.8
+  ],
+  "max_depth": 75,
+  "place": {
+    "PURCHASE_Part2": {
+      "feature": "screen",
+      "across": [
+        0.15,
+        0.55
+      ]
+    },
+    "PURCHASE_Part3": {
+      "feature": "shaft",
+      "across": [
+        0.6,
+        0.95
+      ]
+    }
+  },
+  "body_first": true,
+  "front": "-y",
+  "usb_side": "-x",
+  "use_library": true
+}
