@@ -344,6 +344,77 @@ def tower_room(part, to_y, wall=HOLDER_WALL, gap=GAP, body=None):
     return block(low, high)
 
 
+SNAP_ARM_LENGTH = 10.0
+SNAP_ARM_THICKNESS = 1.6
+SNAP_WIDTH = 8.0
+SNAP_HOOK_DEPTH = 0.8
+SNAP_HOOK_LENGTH = 2.0
+MAX_SNAP_STRAIN = 0.02
+
+
+def side_surface(body, side, y, z, half=0.5):
+    """Where the outside of the body is on one side (-x or +x) at this height and depth."""
+    column = body & block([-FAR, y - half, z - half], [FAR, y + half, z + half])
+    assert column.solids(), f"The body does not reach y={y}, z={z}."
+    box = column.bounding_box()
+    return box.min.X if side == "-x" else box.max.X
+
+
+class Snap:
+    """A one-arm snap latch: an arm on the rear cover, with a hook at its tip that clicks into a pocket inside the Shell's side wall. Use it where a side has no room for a screw post. It needs no flexing room outside the case, and it refuses a place where the wall around it would be too thin.
+
+    The arm stands up from the cover plate, so its layers run across it when the cover prints flat. That is the weak direction, so the arm is kept short and thick, and PETG holds it better than PLA."""
+
+    def __init__(self, body, side, z, seam_y, length=SNAP_ARM_LENGTH, thickness=SNAP_ARM_THICKNESS, width=SNAP_WIDTH, depth=SNAP_HOOK_DEPTH):
+        assert side in ("-x", "+x"), "A snap goes on the -x or +x side."
+        strain = 1.5 * thickness * depth / length ** 2
+        assert strain <= MAX_SNAP_STRAIN, f"This arm would bend {strain:.1%}, more than the {MAX_SNAP_STRAIN:.0%} printed plastic takes. Make it longer or the hook shallower."
+        self.side, self.z, self.seam_y = side, z, seam_y
+        self.length, self.thickness, self.width, self.depth = length, thickness, width, depth
+        outward = -1 if side == "-x" else 1
+        tip_y = seam_y - length
+        surfaces = [side_surface(body, side, y, zz) for y in (tip_y, tip_y + SNAP_HOOK_LENGTH, seam_y - 0.5) for zz in (z - width / 2, z + width / 2)]
+        outside = max(surfaces) if side == "-x" else min(surfaces)
+        # The pocket's outer face keeps a full wall to the outside of the body.
+        pocket_outer = outside - outward * MIN_WALL
+        hook_outer = pocket_outer - outward * GAP
+        self.arm_outer = hook_outer - outward * depth
+        arm_inner = self.arm_outer - outward * thickness
+        self.outward = outward
+        self.tip_y = tip_y
+
+        def span(a, b):
+            return min(a, b), max(a, b)
+
+        self.arm_x = span(self.arm_outer, arm_inner)
+        self.hook_x = span(hook_outer, self.arm_outer)
+        self.slot_x = span(self.arm_outer + outward * GAP, arm_inner - outward * (depth + GAP))
+        assert abs(self.arm_x[0]) < FAR and inside(body, (self.slot_x[0] + self.slot_x[1]) / 2, tip_y, z), f"A snap on the {side} side at z={z} is not inside the body."
+
+    def arm(self):
+        """Add to the cover: the arm and its hook. The hook's front is sloped so it rides up the slot, and its back is square so it holds."""
+        from build123d import Rot
+        z0, z1 = self.z - self.width / 2, self.z + self.width / 2
+        arm = block([self.arm_x[0], self.tip_y, z0], [self.arm_x[1], self.seam_y + SEAM_GAP + 0.5, z1])
+        hook = block([self.hook_x[0], self.tip_y, z0], [self.hook_x[1], self.tip_y + SNAP_HOOK_LENGTH, z1])
+        edge_x = self.hook_x[0] if self.outward < 0 else self.hook_x[1]
+        ramp = Pos(edge_x, self.tip_y, self.z) * (Rot(Z=45) * Box(self.depth * 1.42, self.depth * 1.42, self.width + 2))
+        return arm + (hook - ramp)
+
+    def shell_cut(self):
+        """Cut from the Shell: a slot the arm slides into, with room for it to bend inward, and the pocket the hook clicks into."""
+        z0, z1 = self.z - self.width / 2 - GAP, self.z + self.width / 2 + GAP
+        slot = block([self.slot_x[0], self.tip_y - GAP, z0], [self.slot_x[1], self.seam_y + 1, z1])
+        pocket = block([min(self.hook_x) - GAP if self.outward < 0 else self.arm_outer, self.tip_y - GAP, z0], [self.arm_outer if self.outward < 0 else max(self.hook_x) + GAP, self.tip_y + SNAP_HOOK_LENGTH + GAP, z1])
+        return slot + pocket
+
+    def entry(self):
+        z0, z1 = self.z - self.width / 2, self.z + self.width / 2
+        return {"kind": "snap", "side": self.side, "on": "PRINT_Base", "into": "PRINT_Shell", "at": [(self.hook_x[0] + self.hook_x[1]) / 2, self.tip_y + SNAP_HOOK_LENGTH / 2, self.z],
+                "hook": [[self.hook_x[0], self.tip_y, z0], [self.hook_x[1], self.tip_y + SNAP_HOOK_LENGTH, z1]], "flex": [[min(self.slot_x[0], self.slot_x[1]), self.tip_y, z0], [max(self.slot_x[0], self.slot_x[1]), self.seam_y, z1]],
+                "arm_length": self.length, "arm_thickness": self.thickness, "hook_depth": self.depth}
+
+
 class Screw:
     """One screw from the back of the cover into a post on the Shell. Refuses a post that would block a part's path in."""
 
@@ -390,7 +461,7 @@ def wire_paths(data, parts, lane_y, lane_step=0.6):
     return paths
 
 
-def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base", insert_from="-y"):
+def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base", insert_from="-y", snaps=()):
     """Checks each printed part is one solid, exports it, and writes design.json with the build order. The cover and controller go first, and the Shell closes over everything last."""
     prints = {"PRINT_Shell": one_solid(shell, "PRINT_Shell"), "PRINT_Base": one_solid(base, "PRINT_Base")}
     for name, shape in prints.items():
@@ -405,6 +476,7 @@ def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), 
             "assembly": [{"add": "PRINT_Base"}, {"add": controller.name, "from": "-y"}] + [{"add": p.name, "from": "-y"} for p in screen_and_inputs] + [{"add": "PRINT_Shell", "from": "-y"}],
             "screws": [s.entry() for s in screws],
             "glued": list(glued),
+            "snaps": [snap.entry() for snap in snaps],
         },
         "wires": wires,
     }

@@ -131,14 +131,61 @@ def check_assembly(steps, meshes, purchased, part_points):
     return results
 
 
-def check_screw_spread(screws, meshes):
+MAX_SNAP_STRAIN = 0.02
+MIN_HOOK_DEPTH = 0.4
+MAX_HOOK_DEPTH = 1.5
+MAX_HOOK_PLAY = 0.5
+
+
+def box_mesh(low, high):
+    low, high = np.array(low, dtype=float), np.array(high, dtype=float)
+    return trimesh.creation.box(extents=high - low, transform=trimesh.transformations.translation_matrix((low + high) / 2))
+
+
+def check_snaps(snaps, meshes):
+    """A snap latch holds only if its arm can bend, the hook catches plastic behind it, and printed plastic takes the bend."""
+    results = []
+    for index, snap in enumerate(snaps, 1):
+        label = f"snap {index}"
+        strain = 1.5 * snap["arm_thickness"] * snap["hook_depth"] / snap["arm_length"] ** 2
+        results.append(result("snap_strain", label, strain <= MAX_SNAP_STRAIN and MIN_HOOK_DEPTH <= snap["hook_depth"] <= MAX_HOOK_DEPTH, measured=f"{strain:.2%} bend, hook {snap['hook_depth']} mm", limit=f"at most {MAX_SNAP_STRAIN:.0%} bend, hook {MIN_HOOK_DEPTH} to {MAX_HOOK_DEPTH} mm", where=snap["at"],
+                              fix="Make the arm longer or thinner, or the hook shallower, so printed plastic can take the bend."))
+        into = meshes.get(snap["into"])
+        if into is None:
+            continue
+        low, high = np.array(snap["hook"][0], dtype=float), np.array(snap["hook"][1], dtype=float)
+        grid = np.array([[x, high[1], z] for x in np.linspace(low[0] + 0.1, high[0] - 0.1, 3) for z in np.linspace(low[2] + 0.5, high[2] - 0.5, 4)])
+        distance, _ = travel(into, grid, np.array([0, 1.0, 0]))
+        results.append(result("snap_catch", label, distance <= MAX_HOOK_PLAY, measured=None if np.isinf(distance) else round(distance, 2), limit=f"plastic within {MAX_HOOK_PLAY} mm behind the hook", where=snap["at"],
+                              fix="The hook has nothing to catch. Cut its pocket into solid Shell wall, so plastic sits just behind the hook."))
+        flex = box_mesh(*snap["flex"])
+        blocked = sum(overlap(m, flex) for name, m in meshes.items() if name != snap["on"])
+        results.append(result("snap_flex", label, blocked < 1e-3, measured=round(blocked, 3), limit="0 mm3 of other plastic where the arm bends", where=snap["at"],
+                              fix="The arm has no room to bend as it goes in. Keep the slot beside the arm clear."))
+    return results
+
+
+def trimmed_for_assembly(meshes, snaps):
+    """The hooks are meant to ride over the Shell and click in, so the straight-path check leaves them out. check_snaps tests them instead."""
+    if not snaps:
+        return meshes
+    trimmed = dict(meshes)
+    for name in {s["on"] for s in snaps}:
+        if name in trimmed:
+            hooks = [box_mesh(np.array(s["hook"][0]) - 0.05, np.array(s["hook"][1]) + 0.05) for s in snaps if s["on"] == name]
+            trimmed[name] = trimesh.boolean.difference([trimmed[name], *hooks], engine="manifold")
+    return trimmed
+
+
+def check_screw_spread(screws, meshes, snaps=()):
     """The cover must be fastened across the whole seam: a screw in each half of its width and of its height, so no side is left to lift."""
     if not screws or any(not {"head_at", "drive_from", "through"} <= set(s) or s["through"] not in meshes for s in screws):
         return []
     cover = meshes[screws[0]["through"]]
     axis = DIRECTIONS[screws[0]["drive_from"]][0]
     across = [i for i in range(3) if i != axis]
-    heads = np.array([s["head_at"] for s in screws], dtype=float)
+    # A snap latch holds its side of the cover too.
+    heads = np.array([s["head_at"] for s in screws] + [s["at"] for s in snaps], dtype=float)
     results = []
     for i in across:
         low, high = cover.bounds[0][i], cover.bounds[1][i]
@@ -146,13 +193,13 @@ def check_screw_spread(screws, meshes):
         lower, upper = int((heads[:, i] < middle).sum()), int((heads[:, i] > middle).sum())
         name = "xyz"[i]
         results.append(result("screw_spread", f"along {name}", lower > 0 and upper > 0, measured=f"{lower} below and {upper} above the middle", limit="at least one screw in each half of the cover", where=f"cover {low:.1f} to {high:.1f} on {name}, middle {middle:.1f}",
-                              fix=f"All the screws are on one side along {name}, so the other side of the cover can lift. Put at least one screw on each side of {name} = {middle:.1f}, near the corners."))
+                              fix=f"All the screws and snaps are on one side along {name}, so the other side of the cover can lift. Where a side has no room for a screw post, a snap latch can hold it. Put at least one screw on each side of {name} = {middle:.1f}, near the corners."))
     return results
 
 
-def check_screws(screws, meshes, part_points):
+def check_screws(screws, meshes, part_points, snaps=()):
     results = [result("screw_count", "case", len(screws) >= MIN_SCREWS, measured=len(screws), limit=f"at least {MIN_SCREWS}", fix=f"Hold the case shut with at least {MIN_SCREWS} screws.")]
-    results.extend(check_screw_spread(screws, meshes))
+    results.extend(check_screw_spread(screws, meshes, snaps))
     for i, screw in enumerate(screws):
         label = f"screw {i + 1}"
         try:
@@ -403,8 +450,10 @@ def check_case(design, meshes, purchased, cards, transforms):
                 local = (points - transforms[name][:3, 3]) @ transforms[name][:3, :3]
                 keep &= ~np.all((local >= np.array(feature["min"]) - 0.01) & (local <= np.array(feature["max"]) + 0.01), axis=1)
         assembly_points[name] = points[keep]
-    results.extend(check_assembly(case.get("assembly") or [{}], meshes, purchased, assembly_points))
-    results.extend(check_screws(case.get("screws") or [], meshes, part_points))
+    snaps = case.get("snaps") or []
+    results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points))
+    results.extend(check_snaps(snaps, meshes))
+    results.extend(check_screws(case.get("screws") or [], meshes, part_points, case.get("snaps") or []))
     from wiring_checks import check_wiring
     results.extend(check_wiring(design, meshes, purchased, cards, transforms))
     from layout_checks import check_layout

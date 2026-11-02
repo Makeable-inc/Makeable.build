@@ -23,6 +23,7 @@ The library, all in millimetres, with the screen facing -y and the rear cover cl
 - stop(part, x, z, cover_y, clear_of=[...]): a column from the cover to just behind a part. It thickens when long. Put stops behind boards that have no other support, and one behind a knob so pressing it pushes against plastic.
 - Screw(x, z, back_y, seam_y, parts=[...], towers=[...], body=body): has post(), shell_cut(), cover_cut() and entry(). It refuses a post in a part's path or outside the body.
 - free_spots(parts, x0, x1, z0, z1, towers=[...], body=body, y=seam_y) and stop_spots(part, clear_of=[...]): the positions a post or stop can actually use. Call these and choose from the result, rather than guessing a position.
+- Snap(body, side, z, seam_y): a one-arm snap latch on the -x or +x side. snap.arm() is added to the cover and snap.shell_cut() is cut from the Shell. Pass the snaps to finish(..., snaps=[...]).
 - wire_paths(data, parts, lane_y): guide paths for the wires.
 - finish(shell, cover, screen_and_inputs, controller, screws, wires, glued=[...], holder=..., insert_from=...): checks each part is one solid, exports it and writes design.json. For a controller with its own screen, pass holder="PRINT_Shell", insert_from="+y", and do not build a tower.
 - one_solid, block, along_y, joined, load_data, and the constants GAP, MIN_WALL, COVER_THICKNESS and SEAM_GAP.
@@ -35,6 +36,7 @@ How the case works:
 - Everything behind a part in the Shell must stay out of its outline, or the Shell cannot close over it. pocket() and Screw() take care of this if you use them.
 - Glue is allowed only for a board sitting in its holder or pocket. A part you press or touch needs a real stop behind it, and marking it as glued has no effect.
 - What must reach the outside is listed in the brief. Give each of those a fitted opening. Everything else, including boot and reset buttons and unused ports, stays closed inside the case with room around it. Do not add openings for them.
+- Snap fits: the cover must be held across its whole width and height. Use screws where a post fits. Where a side has no room for a post, for example because a holder fills that end, hold that side with a Snap instead. A snap is an arm on the cover with a hook at its tip. As the cover goes on, the arm bends inward, then the hook clicks into a pocket inside the Shell's side wall. It needs about 3 mm of the wall's thickness and 12 mm of depth in front of the seam, at a height clear of parts. Keep it away from holders and stops, and keep the slot beside the arm clear so it can bend. One snap on the crowded side and screws on the other side is a good pattern. Snaps count toward the spread of fasteners.
 - Keep the script short. It should read like the example."""
 
 

@@ -43,6 +43,7 @@ All in `enclosure/case_parts.py`. Sizes come from the part cards through `parts_
 | `stop` | A column from the cover to just behind a part | A stop through another part or past the part's outline. It thickens by itself when long |
 | `Screw` | A post, pilot hole, clearance hole and screwdriver path | A post in a part's path or outside the body |
 | `free_spots`, `stop_spots` | Every position a post or stop can use | |
+| `Snap` | A one-arm snap latch: an arm on the cover whose hook clicks into a pocket in the Shell's side wall | An arm that would bend more than printed plastic takes, or a place outside the body |
 | `wire_paths` | Guide paths for the wires | |
 | `finish` | Exports the parts and writes `design.json` with the build order | A part that is not one solid |
 
@@ -68,6 +69,40 @@ A must-pass check confirms each item has a clear straight path out. The catalog 
 **Printing.** Every printed part needs a flat side on the print bed, and the rear cover must be at least 90% flat. Gaps between mating parts are at least 0.1 mm. Only the Shell and the flat back of the cover may form the outside.
 
 **Glue.** A board that sits in its holder may be glued, if plastic is within 0.5 mm on one side. A part you press or touch needs a real stop.
+
+## Snap fits
+
+A snap fit is a springy hook. As a part goes on, the hook bends out of the way, then springs back behind a ledge and holds. The library has a one-arm snap latch for the rear cover.
+
+```text
+SIDE VIEW, left end of the case
+
+  Shell wall
+     |  _
+     | |_|  <- hook clicks into a pocket in the wall
+     | | |
+     | | |  <- arm bends inward as the cover goes on
+  ___|_| |______
+  cover plate
+```
+
+**When to use it.** The cover must be held across its whole width and height. Use screws where a post fits. Where a side has no room for a post, for example when the controller's holder fills that end, hold that side with a snap. One snap on the crowded side and screws on the other is a good pattern, and snaps count toward the spread of fasteners.
+
+**Sizes**, starting values to confirm with a test print:
+
+| | Value | Why |
+|---|---|---|
+| Arm length | 10 mm | Longer bends more easily |
+| Arm thickness | 1.6 mm | Thin enough to bend, thick enough to print |
+| Hook depth | 0.8 mm | How far it catches |
+| Bend limit | 2% strain | Printed plastic cracks beyond a few percent. The strain is 1.5 x thickness x hook depth / length squared |
+| Hook front | Sloped 45 degrees | Rides up the slot as the cover goes on |
+| Hook back | Square | Holds; an angled back would let it pull apart |
+| Gaps | 0.15 mm | The same as the other gaps |
+
+**Printing.** The arm stands up from the cover, which prints flat, so its layer lines run across the arm. That is the weakest direction. The arm is kept short and thick, and PETG holds better than PLA. A test print should check that it clicks in and stays in.
+
+**How it is checked.** The straight-path assembly check leaves the hooks out, because they are meant to ride over the Shell. A separate check confirms the bend is within the limit, that plastic sits just behind each hook so it catches, and that nothing blocks the slot the arm bends into.
 
 ## How it was tested
 

@@ -17,7 +17,7 @@ import case_parts as c
 import checks
 from access import access_list, check_access
 from card import build_card
-from case_checks import check_outer_parts, glueable
+from case_checks import check_assembly, check_outer_parts, check_plastic_pairs, check_screw_spread, check_snaps, glueable, trimmed_for_assembly
 from severity import is_warning
 from part_data import build_data, required_space, space_conflict, write_data
 
@@ -256,6 +256,57 @@ class OuterParts(unittest.TestCase):
         found = [r for r in check_outer_parts(self.meshes(True), "-y", self.body()) if r["part"] == "PRINT_Base"][0]
         self.assertFalse(found["ok"])
         self.assertFalse(is_warning(found))
+
+
+class SnapLatch(unittest.TestCase):
+    """A one-arm snap on the -x side of a simple case, checked with the same checks a real case gets."""
+    BODY = Pos(0, -5, 25) * Box(100, 50, 50)
+    SEAM = 16.85
+
+    def build(self, **kwargs):
+        snap = c.Snap(self.BODY, "-x", 25, self.SEAM, **kwargs)
+        shell, cover = c.split(self.BODY, self.SEAM)
+        shell = c.one_solid(shell - c.block([-44, -20, 5], [44, self.SEAM + 1, 45]) - snap.shell_cut(), "shell")
+        cover = c.one_solid(cover + snap.arm(), "cover")
+        meshes = {}
+        with tempfile.TemporaryDirectory() as temp:
+            for name, shape in (("PRINT_Shell", shell), ("PRINT_Base", cover)):
+                path = Path(temp) / f"{name}.stl"
+                export_stl(shape, str(path), tolerance=0.01)
+                meshes[name] = trimesh.load_mesh(path)
+        return snap, meshes
+
+    def test_a_good_snap_passes_every_snap_check(self):
+        snap, meshes = self.build()
+        for found in check_snaps([snap.entry()], meshes):
+            self.assertTrue(found["ok"], found)
+
+    def test_the_hook_catches_plastic_behind_it(self):
+        snap, meshes = self.build()
+        catch = [r for r in check_snaps([snap.entry()], meshes) if r["check"] == "snap_catch"][0]
+        self.assertLessEqual(catch["measured"], 0.5)
+
+    def test_the_cover_can_go_on_once_the_hook_is_left_out(self):
+        snap, meshes = self.build()
+        steps = [{"add": "PRINT_Shell"}, {"add": "PRINT_Base", "from": "+y"}]
+        self.assertFalse(check_assembly(steps, meshes, {}, {})[0]["ok"])
+        self.assertTrue(check_assembly(steps, trimmed_for_assembly(meshes, [snap.entry()]), {}, {})[0]["ok"])
+
+    def test_the_parts_keep_their_gap(self):
+        _, meshes = self.build()
+        self.assertTrue(all(r["ok"] for r in check_plastic_pairs(meshes)))
+
+    def test_a_stiff_arm_is_refused(self):
+        with self.assertRaisesRegex(AssertionError, "bend"):
+            c.Snap(self.BODY, "-x", 25, self.SEAM, length=5, thickness=2.5)
+
+    def test_a_snap_counts_toward_the_spread_of_fasteners(self):
+        snap, meshes = self.build()
+        screws = [{"head_at": [40, 18, 10], "drive_from": "+y", "through": "PRINT_Base", "into": "PRINT_Shell"}, {"head_at": [40, 18, 40], "drive_from": "+y", "through": "PRINT_Base", "into": "PRINT_Shell"}]
+        without = {r["part"]: r["ok"] for r in check_screw_spread(screws, meshes)}
+        self.assertFalse(without["along x"])
+        with_snap = {r["part"]: r["ok"] for r in check_screw_spread(screws, meshes, [snap.entry()])}
+        self.assertTrue(with_snap["along x"])
 
 
 class Conflict(unittest.TestCase):
