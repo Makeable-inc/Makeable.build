@@ -42,6 +42,8 @@ try {
 // at real data.
 process.env.MAKEABLE_STORAGE_BACKEND = "memory";
 delete process.env.MAKEABLE_BUILD_DISPATCH;
+// Enclosure jobs run the generator's container with Docker on this machine.
+process.env.MAKEABLE_ENCLOSURE_DISPATCH ||= "docker";
 
 if (!args.includes("--skip-build")) {
   console.log("[dev-local] npm run build");

@@ -58,6 +58,38 @@ class Retry(unittest.TestCase):
         self.assertIn("parts collide on the way in", record["message"])
         self.assertIn("tried 2 times", record["message"])
 
+    def test_progress_is_written_while_it_runs(self):
+        target = Path(self.folder.name) / "runs" / "jobs" / "job.progress.json"
+        design_case, _ = fake(["pass"])
+        with mock.patch.dict(generate.agent.os.environ, {"ENCLOSURE_PROGRESS_PATH": str(target)}):
+            generate.generate("x.json", "job", design_case=design_case)
+        import json
+        self.assertEqual(json.loads(target.read_text(encoding="utf-8"))["stage"], "done")
+
+    def test_without_a_picture_the_call_is_unchanged(self):
+        seen = []
+        generate.generate("x.json", "job", design_case=lambda *a, **k: seen.append((a, k)) or {"outcome": "pass", "tries": 1})
+        self.assertEqual(seen, [(("x.json", None, "job"), {})])
+
+    def test_a_chosen_picture_is_passed_to_every_attempt(self):
+        picture = Path(self.folder.name) / "chosen.png"
+        picture.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 100)
+        seen = []
+        outcomes = iter(["stopped: max tries", "pass"])
+        generate.generate("x.json", "job", picture=str(picture), design_case=lambda *a, **k: seen.append(k.get("picture")) or {"outcome": next(outcomes), "tries": 1})
+        self.assertEqual(seen, [str(picture), str(picture)])
+
+    def test_a_picture_that_is_not_an_image_fails_before_any_ai_call(self):
+        bad = Path(self.folder.name) / "bad.png"
+        bad.write_bytes(b"not an image")
+        calls = []
+        record = generate.generate("x.json", "job", picture=str(bad), design_case=lambda *a, **k: calls.append(1))
+        self.assertEqual(calls, [])
+        self.assertEqual(record["status"], "FAIL")
+        self.assertIn("picture", record["message"])
+        missing = generate.generate("x.json", "job2", picture=str(Path(self.folder.name) / "gone.png"), design_case=lambda *a, **k: calls.append(1))
+        self.assertEqual((calls, missing["status"]), ([], "FAIL"))
+
     def test_the_result_is_saved(self):
         design_case, _ = fake(["pass"])
         generate.generate("x.json", "job", design_case=design_case)

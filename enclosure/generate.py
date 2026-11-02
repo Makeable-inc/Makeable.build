@@ -40,12 +40,35 @@ def should_retry(outcome):
     return not outcome.startswith("stopped: parts do not fit")
 
 
-def generate(base_path, job, attempts=MAX_ATTEMPTS, design_case=None):
+PICTURE_MAX_BYTES = 10 * 1024 * 1024
+
+
+def picture_problem(picture):
+    """Why a chosen picture cannot be used, or None. Checked before any paid call."""
+    path = Path(picture)
+    if not path.is_file():
+        return "The chosen picture was not found."
+    head = path.read_bytes()[:8]
+    if not (head.startswith(b"\x89PNG\r\n\x1a\n") or head.startswith(b"\xff\xd8\xff")):
+        return "The chosen picture is not a PNG or JPEG image."
+    if path.stat().st_size > PICTURE_MAX_BYTES:
+        return "The chosen picture is larger than 10 MB."
+    return None
+
+
+def generate(base_path, job, attempts=MAX_ATTEMPTS, design_case=None, picture=None):
+    """picture is an optional image the user chose. Without it, nothing changes: the design's own picture is generated."""
     design_case = design_case or agent.design_case
     record = {"job": job, "attempts": []}
+    problem = picture and picture_problem(picture)
+    if problem:
+        record.update(status="FAIL", model=None, message=f"No case was made. {problem}", tokens=0, seconds=0)
+        return save(record)
+    extra = {"picture": str(picture)} if picture else {}
     for number in range(1, attempts + 1):
         run = job if number == 1 else f"{job}-retry{number - 1}"
-        summary = design_case(base_path, None, run) or {}
+        agent.report_progress(stage="starting", attempt=number, attempt_try=0, failed=[])
+        summary = design_case(base_path, None, run, **extra) or {}
         outcome = summary.get("outcome", "stopped: unknown")
         attempt = {"run": run, "outcome": outcome, "tokens": summary.get("tokens", 0), "seconds": summary.get("seconds", 0)}
         record["attempts"].append(attempt)
@@ -62,12 +85,19 @@ def generate(base_path, job, attempts=MAX_ATTEMPTS, design_case=None):
         record.update(status="FAIL", model=None, message=f"No case was made. {last['reason']} Nothing is shown, because it did not pass every must-pass check." + (f" It was tried {len(record['attempts'])} times." if len(record["attempts"]) > 1 else ""))
     record["tokens"] = sum(a["tokens"] for a in record["attempts"])
     record["seconds"] = round(sum(a["seconds"] for a in record["attempts"]), 1)
+    return save(record)
+
+
+def save(record):
+    job = record["job"]
     folder = agent.HERE / "runs" / "jobs"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f"{job}.json").write_text(json.dumps(record, indent=1), encoding="utf-8")
+    agent.report_progress(stage="done", status=record["status"])
     print(json.dumps({k: record[k] for k in ("status", "message", "model", "tokens")}), flush=True)
     return record
 
 
 if __name__ == "__main__":
-    generate(sys.argv[1], sys.argv[2])
+    # python generate.py <base design .json> <job> [chosen picture]
+    generate(sys.argv[1], sys.argv[2], picture=sys.argv[3] if len(sys.argv) > 3 else None)

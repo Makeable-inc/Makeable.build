@@ -1,6 +1,7 @@
 import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
 import { backgroundDispatchFetch } from "../../lib/aws/background-invoke.mjs";
 import { openStore } from "../../lib/storage/index.mjs";
+import { createEnclosureJobs, dockerDispatch, enclosureJobsRoute, ENCLOSURE_JOB_STORE } from "../../lib/enclosure-jobs.mjs";
 import { getGalleryThumbnail } from "../../lib/build-thumbnails.mjs";
 import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -277,6 +278,10 @@ export default async function handler(req, context = {}) {
         });
       }
       return await publicPartPrices(url, context);
+    }
+
+    if (localApiPath === "/api/enclosure-jobs" || localApiPath.startsWith("/api/enclosure-jobs/")) {
+      return await enclosureJobs(req, context, localApiPath);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -2090,6 +2095,29 @@ function requestError(message, status) {
   const error = new Error(message);
   error.status = status;
   return error;
+}
+
+// Enclosure jobs (lib/enclosure-jobs.mjs, docs/enclosure-jobs.md). MAKEABLE_ENCLOSURE_DISPATCH
+// picks where the generator runs: "docker" on a laptop. Anything else means not set up here.
+let enclosureJobsRouteFn;
+function enclosureJobsRouteFor(context) {
+  if ((process.env.MAKEABLE_ENCLOSURE_DISPATCH || "") !== "docker") return null;
+  if (!enclosureJobsRouteFn) {
+    const runsDir = process.env.MAKEABLE_ENCLOSURE_RUNS_DIR || new URL("../../enclosure/runs", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+    const jobs = createEnclosureJobs({
+      store: openStore({ name: ENCLOSURE_JOB_STORE, consistency: "strong" }),
+      dispatch: dockerDispatch({ runsDir }),
+      runsDir,
+    });
+    enclosureJobsRouteFn = enclosureJobsRoute({ jobs, authenticate: (req) => requireBuilderSession(req, context) });
+  }
+  return enclosureJobsRouteFn;
+}
+
+async function enclosureJobs(req, context, localApiPath) {
+  const route = enclosureJobsRouteFor(context);
+  if (!route) return jsonResponse({ error: "Enclosure generation is not set up on this server." }, 503, { "Cache-Control": "no-store" });
+  return route(req, localApiPath);
 }
 
 async function proxyMakeableApi(req, env) {
