@@ -79,6 +79,14 @@ Runs start from nothing on `gpt-6.1-sol`, with nobody stepping in. To avoid tuni
 | Library, first version | Same 4 | 4 of 4 | 47k to 66k |
 | Library, first version | 3 held-back designs | 0 of 3 | 0k (stopped early), 103k, 127k |
 | After fixes | 3 new held-back pairings | 2 of 3 | 71k to 89k |
+| After keeping pieces inside the body | 4 tuning designs | 2 of 4 | 40k to 113k |
+| After keeping pieces inside the body | 3 new held-back pairings | 3 of 3 | 64k to 101k |
+
+Across the 11 most recent library runs, 8 passed, about 73%, at about 76k tokens per run on average. The old system averaged about 197k on the tuning designs.
+
+![Latest results](../enclosure/examples/library-results.png)
+
+The two tuning designs that failed in the last round are both tight fits: a 37 mm tall front and a 68 mm wide body. The stricter checks refused the layouts the AI tried, and it used up its crash budget. No bad case reached the output.
 
 What the held-back runs found, and the general fix for each:
 
@@ -91,6 +99,31 @@ What the held-back runs found, and the general fix for each:
 | The holder broke through the side wall and showed as a patch | `tower_room` refuses it, and a check confirms only the Shell and the cover's back form the outside |
 
 Each fix is a rule for any case, not a number set for one board. Fixes found on held-back parts make those parts no longer an unbiased test, so each round uses new pairings.
+
+## Release bar
+
+It will never pass every time, and adding a rule after every failure does not converge: each fix exposed the next problem. So the bar is about safety and cost, not a perfect pass rate.
+
+| Measure | Bar | Now |
+|---|---|---|
+| Bad cases shipped | Never: a must-pass failure gives no model | Met |
+| Pass rate per run | About 70% | About 73% over the last 11 runs |
+| Cost per run | Well below the old system | About 76k tokens, against 197k |
+| Failures | A plain reason, and an automatic retry | Met, in `generate.py` |
+
+New rules come only from real problems, such as a test print or a customer report, not from failures in test runs.
+
+## Failures and retry
+
+`enclosure/generate.py` handles one customer request. It runs the generator, and if the run fails it retries once with a fresh outer body. A design whose parts cannot fit is not retried, because a second try cannot change that. The result is written to `runs/jobs/<job>.json`:
+
+| Status | What the customer gets |
+|---|---|
+| PASS | The model |
+| PASS WITH WARNINGS | The model and a print checklist |
+| FAIL | No model, and a plain reason, such as "The last design still failed these checks: parts collide on the way in." |
+
+If each run passes about 73% of the time and the two tries were independent, two tries would pass about 93% of the time. They are not fully independent, so that is an upper estimate. A real retry has not been run yet; the retry logic is covered by unit tests.
 
 ## Known limits
 
@@ -108,8 +141,11 @@ Each fix is a rule for any case, not a number set for one board. Fixes found on 
 From `enclosure/`, with `OPENAI_API_KEY` in `.env`:
 
 ```text
+.venv/Scripts/python -W ignore generate.py base_designs/<design>.json <job name>
 .venv/Scripts/python -W ignore agent.py base_designs/<design>.json - <run name>
-.venv/Scripts/python -W ignore -m unittest test_case_parts test_rules test_layout test_agent test_card test_checks test_wiring test_knob
+.venv/Scripts/python -W ignore -m unittest test_case_parts test_rules test_layout test_agent test_card test_checks test_wiring test_knob test_generate
 ```
+
+`generate.py` is one customer request with retry. `agent.py` is a single run.
 
 A base design asks for the library with `"use_library": true`. Results are saved under `enclosure/runs/agent/<run name>/`, which is not committed.
