@@ -1,0 +1,47 @@
+{
+  "name": "DevKit screen and knob",
+  "parts": "esp32-s3-devkitc-1-n8r2,ssd1309-242-oled,ky-040-rotary-encoder",
+  "look": "a small retro tabletop device with soft rounded corners, a wide screen on the left and a chunky knob that turns and clicks on a raised control panel on the right",
+  "picture_prompt": "Product concept render of a small 3D-printable desk device, seen from the front and slightly to one side. It is wider than it is tall. One smooth continuous body with soft rounded corners. On the left of the front is a flat wide rectangular screen, about 55 mm wide and 27 mm tall, in a slim even bezel. On the right, the front steps forward into a raised control panel running the full height of the case, with one chunky round knob. One matte plastic colour with a dark screen. Soft studio light, plain light background. Flat bottom, flat back, no text, no logos, no speaker holes, no feet, no visible seams, no cables.",
+  "sheet": [
+    "Front faces -y and stands upright. World +z is up.",
+    "Left about 70% of the front: the screen, landscape, with its long side along x, a separate board just behind the front wall.",
+    "Right about 30% of the front: a raised control panel. The front steps forward here by as much as the knob's plugs need, across the full height of the case, with a rounded transition.",
+    "The knob comes straight out of that panel toward -y. It is also the button: pressing it clicks. Its pins point -y too, and the plugs and their first turn sit inside the raised panel.",
+    "The controller is a long separate board behind the screen, with its long side along x, so its USB reaches the left wall. Its top faces the back (+y) and its pins point forward (-y), with their plugs between it and the screen.",
+    "Build it from the back, in this order, each part coming in from +y: PRINT_Shell first, lying face down; then the screen; then the knob; then PRINT_Carrier holding the controller; then PRINT_Base last. Nothing on the Shell may have to pass the screen to reach the controller.",
+    "The Carrier stops the controller toward the front. A rib on PRINT_Base stops it toward the back.",
+    "USB opens on the left side (-x).",
+    "The wires run behind the screen board as one neat bundle, side by side, and do not show from outside.",
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover."
+  ],
+  "body_first": true,
+  "min_body": {
+    "width": 104,
+    "height": 50,
+    "depth": 56
+  },
+  "front": "-y",
+  "width_to_height": [
+    1.6,
+    2.6
+  ],
+  "max_depth": 75,
+  "usb_side": "-x",
+  "place": {
+    "PURCHASE_Part2": {
+      "feature": "screen",
+      "across": [
+        0.2,
+        0.5
+      ]
+    },
+    "PURCHASE_Part3": {
+      "feature": "shaft",
+      "across": [
+        0.65,
+        0.95
+      ]
+    }
+  }
+}

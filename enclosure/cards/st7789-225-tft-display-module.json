@@ -1,0 +1,40 @@
+{
+ "part_id": "st7789-225-tft-display-module",
+ "sha256": "25fbda55e6e37d616d79e5d2e299daddedaa34d82fec0aef79002c9cb5e34cf0",
+ "role": "display",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb"
+   ]
+  },
+  "frame": {
+   "nodes": [
+    "pcb"
+   ]
+  },
+  "glass": {
+   "nodes": [
+    "st7789-225-tft-display-module:glass"
+   ]
+  },
+  "screen": {
+   "nodes": [
+    "st7789-225-tft-display-module:screen-art"
+   ]
+  },
+  "pin_rows": {
+   "nodes": [
+    "header:pin:1",
+    "header:pin:2",
+    "header:pin:3",
+    "header:pin:4",
+    "header:pin:5",
+    "header:pin:6",
+    "header:pin:7",
+    "header:pin:8"
+   ]
+  }
+ }
+}

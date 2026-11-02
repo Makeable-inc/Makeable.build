@@ -10,6 +10,8 @@ from part_variants import base_hash_path
 from parts import ensure_part
 
 CARDS = Path(__file__).resolve().parent / "cards"
+# A display's flex tab can stand slightly proud of its screen.
+MAX_FRONT_OFFSET = 0.15
 DIRECTIONS = {"+x": (0, 1), "-x": (0, 0), "+y": (1, 1), "-y": (1, 0), "+z": (2, 1), "-z": (2, 0)}
 
 
@@ -62,7 +64,7 @@ def measure(spec, nodes):
             continue
         axis, side = DIRECTIONS[spec["front"]]
         face = features[required]["max" if side else "min"][axis]
-        if abs(face - envelope["max" if side else "min"][axis]) > 0.05:
+        if abs(face - envelope["max" if side else "min"][axis]) > MAX_FRONT_OFFSET:
             raise CardError(f"{required}: front face at {face} is not the front of the part")
     if "usb" in features:
         usb = features["usb"]

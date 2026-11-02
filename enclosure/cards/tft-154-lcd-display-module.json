@@ -1,0 +1,40 @@
+{
+ "part_id": "tft-154-lcd-display-module",
+ "sha256": "ed62853b118f528d25227abde7b0800476f42cf597dd7dfbe511093fba8a91f5",
+ "role": "display",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb"
+   ]
+  },
+  "frame": {
+   "nodes": [
+    "pcb"
+   ]
+  },
+  "glass": {
+   "nodes": [
+    "tft-154-lcd-display-module:glass"
+   ]
+  },
+  "screen": {
+   "nodes": [
+    "tft-154-lcd-display-module:screen-art"
+   ]
+  },
+  "pin_rows": {
+   "nodes": [
+    "header:pin:1",
+    "header:pin:2",
+    "header:pin:3",
+    "header:pin:4",
+    "header:pin:5",
+    "header:pin:6",
+    "header:pin:7",
+    "header:pin:8"
+   ]
+  }
+ }
+}
