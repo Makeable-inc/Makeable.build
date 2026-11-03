@@ -108,7 +108,7 @@ Use the links in `files`. Locally the file comes back directly. On AWS the reply
 DELETE /api/enclosure-jobs/enc-f08ls3w083gh
 ```
 
-Stops the container and answers with the job, now `CANCELLED`. A finished job is returned unchanged.
+Asks for the container to stop and answers with the job: `CANCELLED` once it has stopped, or `STOPPING` while the server waits for it (for example when the container is still starting). Keep checking until the state is final. Cancel can be sent any number of times: a repeat changes nothing, and a finished job is returned unchanged.
 
 ### Example from a page
 
@@ -140,7 +140,7 @@ start ─┬─ bad input ──────────────────
        ├─ a limit is reached ───────── REFUSED + reason, saved, nothing started
        └─ STARTING ─┬─ container does not start ─────────── FAIL (dispatch_failed)
                     └─ RUNNING ─┬─ container writes its result ─── PASS / PASS WITH WARNINGS / FAIL
-                                ├─ user cancels ──────────────── CANCELLED
+                                ├─ user cancels ─── STOPPING ─── CANCELLED (once the container has stopped)
                                 └─ no progress, or too long ──── FAIL (stuck / too_long)
 ```
 
@@ -278,7 +278,7 @@ The CLI signs in as the local test user. For another server, pass `--base <url>`
 
 ## Tests
 
-`node --test tests/enclosure-jobs.test.mjs` runs 29 tests with a fake dispatch and the in-memory store. They use no Docker or AI. They cover:
+`node --test tests/enclosure-jobs.test.mjs` runs 41 tests with a fake dispatch and the in-memory store. They use no Docker or AI. They cover:
 
 - Sign-in: signed-out requests get 401 on every route.
 - Requests: another site's origin gets 403, wrong methods get 405, bad or oversized bodies get 400, and the site API answers 503 when jobs are not set up.

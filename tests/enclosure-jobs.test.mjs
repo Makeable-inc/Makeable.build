@@ -193,8 +193,82 @@ test("a place left by a job that crashed is freed by the cleanup, and a live job
   await store.setJSON(`job/${crashed.id}`, crashed);
   await store.setJSON("place/0", { id: crashed.id, at: crashed.createdAt });
   later(2 * MINUTE);
-  assert.equal((await jobs.start("user-1", { design: DESIGN })).status, 202, "start runs the cleanup first, which frees the stale place");
+  // Freeing is a read then a delete, so two starts doing it at once could free a live place. Only the schedule does it.
+  assert.equal((await jobs.start("user-1", { design: DESIGN })).status, 503, "a start never frees places itself");
+  await jobs.reap();
+  assert.equal((await jobs.start("user-1", { design: DESIGN })).status, 202, "the scheduled cleanup freed the stale place");
   assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 503, "the live job keeps its place");
+});
+
+test("cancel is idempotent: a second cancel while the task is starting changes nothing", async () => {
+  const dispatch = slowDispatch();
+  const { jobs, store } = setup({ dispatch, limits: { runningAtOnce: 1 } });
+  const starting = jobs.start("user-1", { design: DESIGN });
+  await new Promise((resolve) => setImmediate(resolve));
+  const id = await onlyJobId(store);
+  await jobs.cancel("user-1", id);
+  const again = await jobs.cancel("user-1", id);
+  assert.equal(again.body.job.state, "STOPPING");
+  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 503, "a double click does not free the place while the task may still start");
+  dispatch.release();
+  await starting;
+  assert.equal((await jobs.status("user-1", id)).body.job.state, "CANCELLED");
+});
+
+test("cancel stops a job that was already running before start and cancel shared a key", async () => {
+  // Jobs started by the version before this one have no phase key.
+  const { jobs, store, stopped } = setup();
+  const { body } = await jobs.start("user-1", { design: DESIGN });
+  await store.delete(`phase/${body.job.id}`);
+  const reply = await jobs.cancel("user-1", body.job.id);
+  assert.equal(reply.body.job.state, "CANCELLED");
+  assert.deepEqual(stopped, [body.job.id]);
+});
+
+test("cancelling a job whose start failed leaves it failed", async () => {
+  let fail;
+  const gate = new Promise((resolve) => { fail = resolve; });
+  const dispatch = { start: async () => { await gate; throw new Error("RunTask failed"); }, stop: async () => {} };
+  // Cancel reads the job while it is starting, then pauses; the start fails; then cancel carries on with what it read.
+  let pause = false;
+  let resume;
+  const outputs = {
+    async read() {
+      if (pause) {
+        pause = false;
+        await new Promise((resolve) => { resume = resolve; });
+      }
+      return { result: null, progress: null };
+    },
+    async file() { return null; },
+  };
+  const { jobs, store } = setup({ dispatch, outputs });
+  const starting = jobs.start("user-1", { design: DESIGN });
+  await new Promise((resolve) => setImmediate(resolve));
+  const id = await onlyJobId(store);
+  pause = true;
+  const cancelling = jobs.cancel("user-1", id);
+  await new Promise((resolve) => setImmediate(resolve));
+  fail();
+  await starting;
+  resume();
+  const reply = await cancelling;
+  assert.equal(reply.body.job.state, "FAIL");
+  assert.equal(reply.body.job.reason, "dispatch_failed");
+});
+
+test("status reads never retry a failed stop; only the cleanup does", async () => {
+  const dispatch = slowDispatch({ failStops: 1000 });
+  dispatch.release();
+  let stopCalls = 0;
+  const counted = { start: dispatch.start, stop: async (job) => { stopCalls += 1; return dispatch.stop(job); } };
+  const { jobs } = setup({ dispatch: counted });
+  const { body } = await jobs.start("user-1", { design: DESIGN });
+  await jobs.cancel("user-1", body.job.id);
+  for (let i = 0; i < 5; i += 1) await jobs.status("user-1", body.job.id);
+  assert.equal(stopCalls, 1, "five polls made no more StopTask calls");
+  await jobs.reap();
+  assert.equal(stopCalls, 2);
 });
 
 // A dispatch whose start waits until the test lets it finish, as RunTask does while AWS places the task.
@@ -482,6 +556,9 @@ test("fargate: a failed StopTask is reported, and a task that is already gone co
   await assert.rejects(failing.stop({ id: "enc-aaaaaaaaaaaa", taskArn: "arn:x" }), /throttled/);
   const gone = fargateDispatch({ ecs: { send: async () => { throw Object.assign(new Error("The referenced task was not found."), { name: "InvalidParameterException" }); } }, ...FARGATE });
   await gone.stop({ id: "enc-aaaaaaaaaaaa", taskArn: "arn:x" });
+  // A wrong cluster setting must not look like a stopped task, or places are freed while tasks keep running.
+  const noCluster = fargateDispatch({ ecs: { send: async () => { throw Object.assign(new Error("Cluster not found."), { name: "ClusterNotFoundException" }); } }, ...FARGATE });
+  await assert.rejects(noCluster.stop({ id: "enc-aaaaaaaaaaaa", taskArn: "arn:x" }), /Cluster not found/);
 });
 
 function fakeS3(objects = {}) {
