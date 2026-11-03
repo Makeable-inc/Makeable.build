@@ -295,23 +295,33 @@ The generator side is in `enclosure/test_generate.py` and `enclosure/test_agent.
 
 ## Explaining a run afterwards
 
+The trace only **records** what each try did. It never asks the AI for anything extra, so the AI calls are the same with or without it.
+
 Every try leaves one line in `trace.jsonl`, in its stage's folder (`runs/agent/<job>/body/` and `.../case/`):
 
 | Field | What it holds |
 |---|---|
 | `stage`, `try` | `body` or `case` (`carrier` in the older path), and the try number |
-| `ran`, `status`, `failed` | Whether the script ran, the check result, and the names of the failed must-pass checks |
-| `crash` | The error text when the script crashed or timed out (up to 4,000 characters) |
-| `tokens`, `seconds`, `look_tokens` | What the call cost; for the body, the look review's tokens too |
-| `reasoning` | The model's own short summary of its reasoning (the Responses API's `reasoning.summary: "auto"`) |
-| `problems`, `score` | Body only: the plain rule problems and the look score |
+| `ran` | Whether the script ran and, for the body, wrote its files |
+| `status`, `failed` | Case only: the check result, and the names of the failed must-pass checks |
+| `problems`, `score` | Body only: the plain rule problems, and the look score |
+| `crash` | The error text when the script crashed or timed out. Long text keeps its **last** 4,000 characters, where a traceback's actual error is |
+| `tokens`, `seconds` | What the try cost in AI tokens and time. Body lines also have `look_tokens`, for the look review |
+| `at` | When the line was written (UTC) |
 
-On AWS, `cloud_run.py` zips the whole run folder at the end of every job, whether it passed, failed or hit the deadline. That's every try of every attempt (`runs/agent/<job>*`) and the job record. It's uploaded as `makeable-enclosure-runs/<job>/run.zip`, before `result.json`. A zip that can't be sent never blocks the result. It holds prompts and code, so it isn't one of the user's files: read it with the AWS CLI.
+Each try's folder (`try-N/`) also keeps the full prompt (`prompt.txt`), the code the AI wrote (`design.py`), its output (`output.txt`) and the check report (`report.json`).
+
+On AWS, `cloud_run.py` zips the whole run folder at the end of every job, whether it passed, failed or hit the deadline: every try of every attempt (`runs/agent/<job>*`) and the job record. It's uploaded as `makeable-enclosure-runs/<job>/run.zip`. It holds prompts and code, so it isn't one of the user's files: read it with the AWS CLI.
 
 ```
 aws s3 cp s3://<data bucket>/makeable-enclosure-runs/<job>/run.zip . && unzip run.zip
 cat agent/<job>/case/trace.jsonl
 ```
+
+How the zip stays out of the user's way:
+- **The user's answer comes first when a job runs out of time.** At the 55-minute deadline, the "took too long" `result.json` is written before the zip, so the trail can never delay or block it. On a normal finish the zip is sent just before `result.json`; the API reads only `result.json` and `progress.json` and never the zip.
+- **A vanishing file doesn't lose the trail.** At the deadline the generator is still writing and deleting try folders. The zip skips any file or folder that disappears while it's packed, and keeps the rest.
+- **A zip that can't be sent is only logged**, and never fails the job.
 
 ## Known debt
 

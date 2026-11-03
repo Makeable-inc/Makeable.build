@@ -55,14 +55,23 @@ def zip_run(job):
     extra = [p for p in ((runs / "jobs" / f"{job}.json"), (runs / "jobs" / f"{job}.progress.json")) if p.exists()]
     if not folders and not extra:
         return None
+    # At the deadline the generator is still writing and deleting tries, so a file or folder can vanish mid-walk.
+    # os.walk skips folders that are gone, and a file that is gone is left out: the rest of the trail still counts.
+    def files():
+        for folder in folders:
+            for root, dirs, names in os.walk(folder):
+                dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+                for name in sorted(names):
+                    yield Path(root) / name
+        yield from extra
+
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as out:
-        for folder in folders:
-            for path in sorted(folder.rglob("*")):
-                if path.is_file() and "__pycache__" not in path.parts:
-                    out.write(path, path.relative_to(runs).as_posix())
-        for path in extra:
-            out.write(path, path.relative_to(runs).as_posix())
+        for path in files():
+            try:
+                out.write(path, path.relative_to(runs).as_posix())
+            except OSError:
+                pass
     return buffer.getvalue()
 
 
@@ -116,9 +125,10 @@ def run(base, job, s3, bucket, prefix, picture_key=None, generate=None, deadline
             state["timed_out"] = True
         print("deadline reached, ending the task", flush=True)
         try:
-            send_run_zip(s3, bucket, prefix, job)
+            # The user's answer first: the trail must never delay or block it.
             s3.put_object(Bucket=bucket, Key=prefix + "result.json", ContentType="application/json",
                           Body=json.dumps(failed("This job took too long, so it was stopped. You can start it again.")).encode())
+            send_run_zip(s3, bucket, prefix, job)
         finally:
             exit_task(1)
 

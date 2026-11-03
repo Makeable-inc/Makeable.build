@@ -39,14 +39,15 @@ class BodyTrace(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         run = Path(temporary.name)
         replies = iter(["```python\nraise ValueError('no body here')\n```"] * body_stage.MAX_BODY_CRASHES)
-        with mock.patch.object(body_stage.agent, "ask_model", lambda _i, _t, _p=None: (next(replies), {"total_tokens": 300, "reasoning_summary": "Tried a rounded box."})), \
+        with mock.patch.object(body_stage.agent, "ask_model", lambda _i, _t, _p=None: (next(replies), {"total_tokens": 300})), \
                 mock.patch.object(body_stage, "body_brief", lambda _b: "brief"):
             body_stage.design_body({}, "concept.png", run / "body")
         lines = [json.loads(l) for l in (run / "body" / "trace.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual(len(lines), body_stage.MAX_BODY_CRASHES)
         self.assertEqual((lines[0]["stage"], lines[0]["try"], lines[0]["ran"]), ("body", 1, False))
         self.assertIn("no body here", lines[0]["crash"])
-        self.assertEqual(lines[0]["reasoning"], "Tried a rounded box.")
+        self.assertIn("seconds", lines[0])
+        self.assertNotIn("reasoning", lines[0])
 
 
 if __name__ == "__main__":

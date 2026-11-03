@@ -110,6 +110,49 @@ class CloudRun(unittest.TestCase):
         cloud_run.run("base_designs/x.json", "enc-aaaaaaaaaaaa", s3=s3, bucket="b", prefix=PREFIX, generate=self.passing_generate([]))
         self.assertEqual(json.loads(s3.objects[PREFIX + "result.json"])["status"], "PASS")
 
+    def test_a_file_that_vanishes_while_zipping_is_skipped_and_the_rest_is_kept(self):
+        folder = self.here / "runs" / "agent" / "enc-aaaaaaaaaaaa" / "case" / "try-1"
+        folder.mkdir(parents=True)
+        for name in ("design.py", "report.json", "PRINT_Shell.stl"):
+            (folder / name).write_text(name)
+        real_write = zipfile.ZipFile.write
+
+        def vanishing_write(zf, path, *a, **k):
+            # The generator deletes this one just as it is being packed.
+            if str(path).endswith("PRINT_Shell.stl"):
+                Path(path).unlink()
+            return real_write(zf, path, *a, **k)
+        with mock.patch.object(zipfile.ZipFile, "write", vanishing_write):
+            names = zipfile.ZipFile(io.BytesIO(cloud_run.zip_run("enc-aaaaaaaaaaaa"))).namelist()
+        self.assertIn("agent/enc-aaaaaaaaaaaa/case/try-1/design.py", names)
+        self.assertNotIn("agent/enc-aaaaaaaaaaaa/case/try-1/PRINT_Shell.stl", names)
+
+    def test_past_the_deadline_the_user_is_told_first_then_the_run_is_zipped(self):
+        s3, exits, done = FakeS3(), [], threading.Event()
+
+        def busy(base, job, picture=None):
+            # Still writing and deleting try folders when the deadline comes.
+            n = 0
+            while not done.is_set():
+                n += 1
+                folder = self.here / "runs" / "agent" / job / "case" / f"try-{n}"
+                folder.mkdir(parents=True)
+                (folder / "design.py").write_text("x")
+                if n > 1:
+                    import shutil
+                    shutil.rmtree(self.here / "runs" / "agent" / job / "case" / f"try-{n - 1}", ignore_errors=True)
+                done.wait(0.01)
+            return {"status": "PASS", "model": None, "tokens": 1, "seconds": 1, "attempts": []}
+
+        def exit_task(code):
+            exits.append(code)
+            done.set()
+        cloud_run.run("base_designs/x.json", "enc-aaaaaaaaaaaa", s3=s3, bucket="b", prefix=PREFIX, generate=busy, deadline_seconds=0.3, exit_task=exit_task)
+        self.assertEqual(exits, [1])
+        self.assertEqual(json.loads(s3.objects[PREFIX + "result.json"])["status"], "FAIL")
+        self.assertLess(s3.order.index(PREFIX + "result.json"), s3.order.index(PREFIX + "run.zip"), "the user's answer never waits on the trail")
+        self.assertTrue(any(n.endswith("design.py") for n in self.zip_names(s3)))
+
     def test_a_run_past_its_deadline_writes_a_plain_failure_and_ends_the_task(self):
         # Fargate has no time limit of its own, so the task enforces one; the API's cleanup relies on tasks ending.
         s3, exits, done = FakeS3(), [], threading.Event()

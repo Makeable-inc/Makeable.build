@@ -160,13 +160,11 @@ def ask_model(instructions, text, picture=None):
     if picture:
         image = base64.b64encode(Path(picture).read_bytes()).decode()
         content = [{"role": "user", "content": [{"type": "input_text", "text": text}, {"type": "input_image", "image_url": f"data:image/png;base64,{image}"}]}]
-    # summary: "auto" only asks for a short summary of the reasoning the model does anyway, for the trace.
-    body = json.dumps({"model": MODEL, "instructions": instructions, "input": content, "reasoning": {"effort": "medium", "summary": "auto"}}).encode()
+    body = json.dumps({"model": MODEL, "instructions": instructions, "input": content, "reasoning": {"effort": "medium"}}).encode()
     request = urllib.request.Request("https://api.openai.com/v1/responses", data=body, headers={"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"})
     data = send_with_retries(request)
     reply = "".join(c.get("text", "") for item in data["output"] if item["type"] == "message" for c in item["content"])
-    summary = "\n".join(s.get("text", "") for item in data["output"] if item.get("type") == "reasoning" for s in item.get("summary") or [])
-    return reply, {**data.get("usage", {}), **({"reasoning_summary": summary} if summary else {})}
+    return reply, data.get("usage", {})
 
 
 TRACE_TEXT_LIMIT = 4000
@@ -174,8 +172,9 @@ TRACE_TEXT_LIMIT = 4000
 
 def trace(folder, **entry):
     """One line per AI call in <stage folder>/trace.jsonl, so a run can be explained afterwards, also on AWS
-    (cloud_run.py uploads the whole run folder). Never stops a run."""
-    entry = {k: (v[:TRACE_TEXT_LIMIT] if isinstance(v, str) else v) for k, v in entry.items()}
+    (cloud_run.py uploads the whole run folder). It only records what happened. Never stops a run.
+    Long text keeps its end, where a traceback's actual error is."""
+    entry = {k: (v[-TRACE_TEXT_LIMIT:] if isinstance(v, str) else v) for k, v in entry.items()}
     entry["at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     try:
         Path(folder).mkdir(parents=True, exist_ok=True)
@@ -398,7 +397,7 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
             draw(attempt)
         history.append({"try": len(history) + 1, "ran": ran, "message": message, "report": report, "usage": usage, "seconds": round(time.time() - began, 1)})
         trace(folder, stage=stage, **{"try": len(history)}, ran=ran, status=report.get("status"), failed=[r["check"] for r in report["failed"]],
-              crash=None if ran else message, tokens=usage.get("total_tokens"), seconds=history[-1]["seconds"], reasoning=usage.get("reasoning_summary"))
+              crash=None if ran else message, tokens=usage.get("total_tokens"), seconds=history[-1]["seconds"])
         report_progress(stage=stage, attempt_try=len(history), ran=ran, failed=[r["check"] for r in report["failed"]], tokens_so_far=tokens)
         print(f"try {len(history)}: ran={ran} passed={report['passed']} status={report.get('status')} failed={[r['check'] for r in report['failed']]} tokens={usage.get('total_tokens')} {history[-1]['seconds']}s", flush=True)
         if report["passed"]:
