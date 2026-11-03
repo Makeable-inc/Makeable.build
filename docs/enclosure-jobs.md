@@ -263,7 +263,15 @@ aws logs tail /makeable/makeable-prod/enclosure-reap --since 15m          # the 
 
 To turn jobs off again, set `EnclosureSubnets=` (empty) and deploy. The routes then answer 503 and nothing else changes.
 
-The image is not built by CI. After a change under `enclosure/`, build and push it by hand (the commands above). Tasks always pull `:latest`, so the next job uses it.
+The deploy workflow keeps the image up to date (`scripts/ci-enclosure-image.sh`). The step runs before the app deploy. The image is named after a fingerprint of everything the Dockerfile copies in: `enclosure/`, `lib/` (the wiring compiler) and `artifacts/aws-assembly-release` (the part models). If ECR already has that fingerprint nothing is built; otherwise it's built, reusing unchanged layers from `:latest`. Then `:latest` is pointed at it, and tasks always pull `:latest`. Because the step runs before the deploy, a failure is like a failed test: nothing is deployed and nothing is rolled back. A rollback (`scripts/ci-rollback.sh`) runs the same script for the older commit, so its image comes back too, and is rebuilt if ECR has expired it (the repository keeps the last 5). For a few minutes during a deploy, the new image runs with the previous API. That's fine while the API and the task keep the same contract.
+
+The deploy role needs ECR rights for this (`aws/github-deploy-role.yaml`, statements `EnclosureImageLogin` and `EnclosureImagePush`). The role is applied by hand, not by the workflow. Review the change set before applying it:
+
+```
+aws cloudformation deploy --template-file aws/github-deploy-role.yaml --stack-name makeable-github-deploy --capabilities CAPABILITY_NAMED_IAM --profile makeable --no-execute-changeset
+aws cloudformation describe-change-set --stack-name makeable-github-deploy --change-set-name <name it prints> --profile makeable
+aws cloudformation execute-change-set --stack-name makeable-github-deploy --change-set-name <name> --profile makeable
+```
 
 ## Try it locally
 

@@ -68,6 +68,12 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
+      # The enclosure generator's container isn't part of the SAM stack. It runs before the app deploy, so a
+      # failure here is like a failed test: nothing deployed, nothing rolled back, the commit not marked good.
+      # It builds only when enclosure/, lib/ or the part models changed, then points :latest at the image.
+      - name: Enclosure image
+        run: bash scripts/ci-enclosure-image.sh
+
       - name: Deploy and smoke build
         id: deploy
         run: bash scripts/ci-deploy.sh

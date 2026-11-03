@@ -10,10 +10,13 @@ if ! git ls-remote --exit-code --tags origin aws-last-good > /dev/null; then
 fi
 
 git fetch --depth 1 origin tag aws-last-good
+here="$(pwd)"
 dir="$(mktemp -d)"
 git worktree add --detach "$dir" aws-last-good
 cd "$dir"
 echo "Rolling back to $(git rev-parse --short HEAD)"
+# Puts back that commit's enclosure image too (this checkout's script, which older commits may not have).
+bash "$here/scripts/ci-enclosure-image.sh"
 npm ci
 npm run build
 DEPLOY_ORDER=site-first bash scripts/ci-deploy.sh
