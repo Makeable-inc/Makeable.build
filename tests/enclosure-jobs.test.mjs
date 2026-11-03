@@ -354,16 +354,25 @@ test("a result written while a job is stopping does not make it a pass", async (
   assert.equal(job.files, undefined);
 });
 
-test("a job that never confirms its stop does not stay stopping for ever", async () => {
+test("a stopping job keeps its place until AWS confirms the task has stopped, however long that takes", async () => {
+  // Reproduces the recheck: the place used to be freed on a 60-minute timer while the task could still be running.
   const dispatch = slowDispatch({ failStops: 1000 });
   dispatch.release();
-  const { jobs, later } = setup({ dispatch, limits: { runningAtOnce: 1 } });
+  let taskStopped = false;
+  dispatch.isStopped = async () => taskStopped;
+  const { jobs, later } = setup({ dispatch, limits: { runningAtOnce: 2 } });
   const { body } = await jobs.start("user-1", { design: DESIGN });
+  await jobs.start("user-2", { design: DESIGN });
   await jobs.cancel("user-1", body.job.id);
   later(61 * MINUTE);
   await jobs.reap();
-  assert.equal((await jobs.status("user-1", body.job.id)).body.job.state, "CANCELLED", "past the longest run the task has ended by itself");
-  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 202);
+  assert.equal((await jobs.status("user-1", body.job.id)).body.job.state, "STOPPING", "no timer settles it");
+  assert.equal((await jobs.start("user-3", { design: DESIGN })).status, 503, "its place is still held");
+  assert.equal((await jobs.start("user-1", { design: DESIGN })).status, 503, "the owner is not locked out by a 409, only the shared place is full");
+  taskStopped = true;
+  await jobs.reap();
+  assert.equal((await jobs.status("user-1", body.job.id)).body.job.state, "CANCELLED", "settled once AWS says it stopped");
+  assert.equal((await jobs.start("user-3", { design: DESIGN })).status, 202);
 });
 
 test("the cleanup frees places held by stuck jobs", async () => {
@@ -559,6 +568,18 @@ test("fargate: a failed StopTask is reported, and a task that is already gone co
   // A wrong cluster setting must not look like a stopped task, or places are freed while tasks keep running.
   const noCluster = fargateDispatch({ ecs: { send: async () => { throw Object.assign(new Error("Cluster not found."), { name: "ClusterNotFoundException" }); } }, ...FARGATE });
   await assert.rejects(noCluster.stop({ id: "enc-aaaaaaaaaaaa", taskArn: "arn:x" }), /Cluster not found/);
+});
+
+test("fargate: isStopped asks AWS; stopped or unknown to AWS counts, running doesn't", async () => {
+  const reply = (body) => fargateDispatch({ ecs: { send: async (command) => {
+    assert.equal(command.constructor.name, "DescribeTasksCommand");
+    assert.deepEqual(command.input, { cluster: "makeable-enclosure", tasks: ["arn:x"] });
+    return body;
+  } }, ...FARGATE });
+  assert.equal(await reply({ tasks: [{ lastStatus: "STOPPED" }] }).isStopped({ taskArn: "arn:x" }), true);
+  assert.equal(await reply({ tasks: [], failures: [{ reason: "MISSING" }] }).isStopped({ taskArn: "arn:x" }), true);
+  assert.equal(await reply({ tasks: [{ lastStatus: "RUNNING" }] }).isStopped({ taskArn: "arn:x" }), false);
+  assert.equal(await reply({ tasks: [{ lastStatus: "DEPROVISIONING" }] }).isStopped({ taskArn: "arn:x" }), false);
 });
 
 function fakeS3(objects = {}) {

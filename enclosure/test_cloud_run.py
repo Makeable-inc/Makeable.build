@@ -1,6 +1,7 @@
 """Tests for the cloud wrapper: picture in, progress and result out, with S3 and the generator faked. Run: .venv/Scripts/python -W ignore -m unittest test_cloud_run"""
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -70,6 +71,22 @@ class CloudRun(unittest.TestCase):
         result = json.loads(s3.objects[PREFIX + "result.json"])
         self.assertEqual((result["status"], calls), ("FAIL", []))
         self.assertIn("picture", result["message"])
+
+    def test_a_run_past_its_deadline_writes_a_plain_failure_and_ends_the_task(self):
+        # Fargate has no time limit of its own, so the task enforces one; the API's cleanup relies on tasks ending.
+        s3, exits, done = FakeS3(), [], threading.Event()
+
+        def slow(*_a, **_k):
+            done.wait(5)
+            return {"status": "PASS", "model": None, "tokens": 1, "seconds": 1, "attempts": []}
+
+        def exit_task(code):
+            exits.append(code)
+            done.set()
+        cloud_run.run("base_designs/x.json", "enc-aaaaaaaaaaaa", s3=s3, bucket="b", prefix=PREFIX, generate=slow, deadline_seconds=0.2, exit_task=exit_task)
+        result = json.loads(s3.objects[PREFIX + "result.json"])
+        self.assertEqual((result["status"], exits), ("FAIL", [1]))
+        self.assertIn("too long", result["message"])
 
     def test_progress_is_uploaded_when_it_changes(self):
         s3 = FakeS3()

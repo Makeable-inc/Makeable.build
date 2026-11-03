@@ -212,7 +212,7 @@ Resources:
             Condition:
               ArnEquals: { ecs:cluster: !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/makeable-enclosure" }
           - Effect: Allow
-            Action: ecs:StopTask
+            Action: [ecs:StopTask, ecs:DescribeTasks]
             Resource: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/makeable-enclosure/*
           - Effect: Allow
             Action: iam:PassRole

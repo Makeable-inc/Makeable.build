@@ -23,6 +23,9 @@ HERE = Path(__file__).resolve().parent
 # The printable files, plus what rebuilds the 3D view with the real parts placed (design.json) and the view itself.
 FILES = ("PRINT_Shell.stl", "PRINT_Base.stl", "preview.png", "report.json", "design.json", "viewer.html")
 PROGRESS_SECONDS = 30
+# Fargate tasks have no time limit of their own, so the task keeps one: it ends before the API's 60-minute limit,
+# and the API frees a job's place only once AWS confirms the task stopped. The slowest real run so far took 31 minutes.
+DEADLINE_SECONDS = int(os.environ.get("ENCLOSURE_MAX_SECONDS") or 55 * 60)
 TYPES = {".stl": "model/stl", ".png": "image/png", ".json": "application/json", ".html": "text/html"}
 
 
@@ -52,7 +55,7 @@ def log_peak_memory():
         pass
 
 
-def run(base, job, s3, bucket, prefix, picture_key=None, generate=None):
+def run(base, job, s3, bucket, prefix, picture_key=None, generate=None, deadline_seconds=None, exit_task=os._exit):
     if generate is None:
         from generate import generate
     progress = HERE / "runs" / "jobs" / f"{job}.progress.json"
@@ -69,9 +72,29 @@ def run(base, job, s3, bucket, prefix, picture_key=None, generate=None):
 
     sender = threading.Thread(target=keep_sending, daemon=True)
     sender.start()
+
+    def failed(message):
+        return {"job": job, "status": "FAIL", "model": None, "tokens": 0, "seconds": 0, "attempts": [], "message": f"No case was made. {message}"}
+
+    # Past the deadline: write a plain failure and end the task, whatever the generator is doing.
+    lock, state = threading.Lock(), {"finished": False, "timed_out": False}
+
+    def on_deadline():
+        with lock:
+            if state["finished"]:
+                return
+            state["timed_out"] = True
+        print("deadline reached, ending the task", flush=True)
+        try:
+            s3.put_object(Bucket=bucket, Key=prefix + "result.json", ContentType="application/json",
+                          Body=json.dumps(failed("This job took too long, so it was stopped. You can start it again.")).encode())
+        finally:
+            exit_task(1)
+
+    deadline = threading.Timer(DEADLINE_SECONDS if deadline_seconds is None else deadline_seconds, on_deadline)
+    deadline.daemon = True
+    deadline.start()
     try:
-        def failed(message):
-            return {"job": job, "status": "FAIL", "model": None, "tokens": 0, "seconds": 0, "attempts": [], "message": f"No case was made. {message}"}
 
         picture, record = None, None
         if picture_key:
@@ -89,6 +112,10 @@ def run(base, job, s3, bucket, prefix, picture_key=None, generate=None):
             except Exception as error:
                 print(f"generator crashed: {error!r}", flush=True)
                 record = failed("The case maker hit an error. You can start it again.")
+        with lock:
+            if state["timed_out"]:
+                return None
+            state["finished"] = True
         if record.get("model"):
             folder = HERE / record["model"]
             for name in FILES:
@@ -97,6 +124,7 @@ def run(base, job, s3, bucket, prefix, picture_key=None, generate=None):
                     s3.put_object(Bucket=bucket, Key=f"{prefix}files/{name}", Body=path.read_bytes(), ContentType=TYPES[path.suffix])
         s3.put_object(Bucket=bucket, Key=prefix + "result.json", Body=json.dumps(record).encode(), ContentType="application/json")
     finally:
+        deadline.cancel()
         stop.set()
         log_peak_memory()
         try:
