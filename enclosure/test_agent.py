@@ -28,6 +28,7 @@ class Loop(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.folder = Path(temporary.name)
         self.prompts = []
+        agent.start_job()
 
     def run_loop(self, replies, failures=(), max_tries=agent.MAX_TRIES_PER_PART, tokens=100):
         replies = iter(replies)
@@ -88,9 +89,16 @@ class Loop(unittest.TestCase):
         self.assertEqual(result["outcome"], f"stopped: used all {agent.MAX_TRIES_PER_PART} tries")
 
     def test_token_limit_stops(self):
-        result = self.run_loop(["```python\nprint(1)\n```"] * 3, [[("clearance", 0.01)], [("clearance", 0.02)]], tokens=agent.MAX_TOKENS)
+        result = self.run_loop(["```python\nprint(1)\n```"] * 3, [[("clearance", 0.01)], [("clearance", 0.02)]], tokens=agent.JOB_TOKEN_LIMIT)
         self.assertIn("tokens", result["outcome"])
         self.assertEqual(result["tries"], 1)
+
+    def test_the_limit_counts_what_earlier_stages_of_the_job_used(self):
+        # The body stage already spent most of the job's tokens, so the case stage gets only what is left.
+        agent.spend(agent.JOB_TOKEN_LIMIT - 30_000)
+        result = self.run_loop(["```python\nprint(1)\n```"] * 4, [[("clearance", 0.01)], [("clearance", 0.02)], [("clearance", 0.03)]], tokens=20_000)
+        self.assertEqual(result["tries"], 2)
+        self.assertIn(str(agent.JOB_TOKEN_LIMIT), result["outcome"])
 
     def test_crash_goes_back_as_an_error(self):
         result = self.run_loop([CRASHES, "```python\nprint(1)\n```"], [[]])
@@ -158,8 +166,46 @@ class Loop(unittest.TestCase):
             if isinstance(answer, Exception):
                 raise answer
             return answer
-        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent, "MODEL_RETRY_WAIT_SECONDS", 0):
+        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent.time, "sleep", lambda _s: None):
             self.assertEqual(agent.send_with_retries("request"), {"ok": 1})
+
+    def test_a_server_outage_waits_longer_each_time_then_gives_up(self):
+        timeouts, waits = [], []
+
+        def fake_open(_request, timeout=0):
+            timeouts.append(timeout)
+            raise urllib.error.HTTPError("u", 503, "down", None, None)
+        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent.time, "sleep", waits.append):
+            with self.assertRaises(urllib.error.HTTPError):
+                agent.send_with_retries("request")
+        self.assertEqual(waits, [15, 30, 60])
+        self.assertEqual(timeouts, [420] * 4)
+
+    def test_a_timed_out_request_is_retried_only_once(self):
+        # It may already be billed, and two waits of 420 s are enough to say the provider is stuck.
+        calls, waits = [], []
+
+        def fake_open(_request, timeout=0):
+            calls.append(1)
+            raise TimeoutError("read timed out")
+        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent.time, "sleep", waits.append):
+            with self.assertRaises(TimeoutError):
+                agent.send_with_retries("request")
+        self.assertEqual(len(calls), 2)
+
+    def test_files_left_by_an_earlier_run_are_gone_before_the_checks(self):
+        # Same job name run twice: the new code writes nothing, so nothing from the first run may be checked.
+        old = self.folder / "try-1"
+        old.mkdir()
+        (old / "PRINT_Shell.stl").write_text("from the earlier run")
+        seen = []
+
+        def check_design(folder, _stage="carrier"):
+            seen.append(sorted(p.name for p in Path(folder).iterdir()))
+            return {"passed": True, "failed": [], "results": []}
+        with mock.patch.object(agent, "ask_model", lambda _i, _t: ("```python\nprint(1)\n```", {"total_tokens": 1})), mock.patch.object(agent.checks, "check_design", check_design):
+            agent.design_part("brief", self.folder, 1)
+        self.assertNotIn("PRINT_Shell.stl", seen[0])
 
     def test_a_bad_request_is_not_retried(self):
         calls = []
@@ -167,7 +213,7 @@ class Loop(unittest.TestCase):
         def fake_open(_request, timeout=0):
             calls.append(1)
             raise urllib.error.HTTPError("u", 400, "bad", None, None)
-        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent, "MODEL_RETRY_WAIT_SECONDS", 0):
+        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent.time, "sleep", lambda _s: None):
             with self.assertRaises(urllib.error.HTTPError):
                 agent.send_with_retries("request")
         self.assertEqual(len(calls), 1)

@@ -107,13 +107,13 @@ def design_body(base, picture, folder):
     text = brief
     best, tokens, started, tries = None, 0, time.time(), []
     number, valid, crashes = 0, 0, 0
-    while valid < MAX_BODY_TRIES and crashes < MAX_BODY_CRASHES:
+    while valid < MAX_BODY_TRIES and crashes < MAX_BODY_CRASHES and not agent.job_out_of_tokens():
         number += 1
-        attempt = folder / f"try-{number}"
-        attempt.mkdir(parents=True, exist_ok=True)
+        attempt = agent.fresh_folder(folder / f"try-{number}")
         (attempt / "prompt.txt").write_text(text, encoding="utf-8")
         reply, usage = agent.ask_model(BODY_SYSTEM, text, picture)
         tokens += usage.get("total_tokens", 0)
+        agent.spend(usage)
         code = agent.extract_code(reply)
         ran, message = run_design(code, attempt)
         note = {"try": number, "ran": ran, "tokens": usage.get("total_tokens")}
@@ -129,6 +129,8 @@ def design_body(base, picture, folder):
             if not problems:
                 render(mesh, attempt / "preview.png")
                 look = look_check(picture, attempt)
+                agent.spend(look.get("tokens") or 0)
+                tokens += look.get("tokens") or 0
                 note["score"] = look.get("score")
                 note["differences"] = look.get("differences")
                 score = look.get("score") or 0

@@ -43,11 +43,14 @@ def should_retry(outcome):
 def generate(base_path, job, attempts=MAX_ATTEMPTS, design_case=None):
     design_case = design_case or agent.design_case
     record = {"job": job, "attempts": []}
+    agent.start_job()
     for number in range(1, attempts + 1):
         run = job if number == 1 else f"{job}-retry{number - 1}"
+        before = agent.job_tokens()
         summary = design_case(base_path, None, run) or {}
         outcome = summary.get("outcome", "stopped: unknown")
-        attempt = {"run": run, "outcome": outcome, "tokens": summary.get("tokens", 0), "seconds": summary.get("seconds", 0)}
+        # Every stage counts against the job, so the attempt's tokens come from the job meter, not one stage's summary.
+        attempt = {"run": run, "outcome": outcome, "tokens": agent.job_tokens() - before, "seconds": summary.get("seconds", 0)}
         record["attempts"].append(attempt)
         if outcome in PASSING:
             best = summary.get("best_try") or summary.get("tries")
@@ -55,12 +58,12 @@ def generate(base_path, job, attempts=MAX_ATTEMPTS, design_case=None):
                           message="Your case is ready." + (" Check the print checklist before printing." if outcome == "pass_with_warnings" else ""))
             break
         attempt["reason"] = reason_for(outcome, summary.get("history", []))
-        if not should_retry(outcome):
+        if not should_retry(outcome) or agent.job_out_of_tokens():
             break
     if "status" not in record:
         last = record["attempts"][-1]
         record.update(status="FAIL", model=None, message=f"No case was made. {last['reason']} Nothing is shown, because it did not pass every must-pass check." + (f" It was tried {len(record['attempts'])} times." if len(record["attempts"]) > 1 else ""))
-    record["tokens"] = sum(a["tokens"] for a in record["attempts"])
+    record["tokens"] = agent.job_tokens()
     record["seconds"] = round(sum(a["seconds"] for a in record["attempts"]), 1)
     folder = agent.HERE / "runs" / "jobs"
     folder.mkdir(parents=True, exist_ok=True)

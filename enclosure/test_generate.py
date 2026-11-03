@@ -12,6 +12,7 @@ def fake(outcomes):
 
     def design_case(base, look, run):
         calls.append(run)
+        generate.agent.spend(50_000)
         outcome = outcomes[len(calls) - 1]
         history = [{"ran": True, "failed": ["assembly", "screw_grip"]}] if outcome.startswith("stopped: same") else []
         return {"outcome": outcome, "tokens": 50_000, "seconds": 300, "tries": 3, "best_try": 3, "history": history}
@@ -57,6 +58,33 @@ class Retry(unittest.TestCase):
         self.assertIsNone(record["model"])
         self.assertIn("parts collide on the way in", record["message"])
         self.assertIn("tried 2 times", record["message"])
+
+    def test_the_total_counts_every_stage_of_the_job(self):
+        # The case stage's own summary leaves out the body stage and the look checks; the job total must not.
+        def design_case(base, look, run):
+            generate.agent.spend(30_000)  # body tries and look checks
+            generate.agent.spend(20_000)  # case tries
+            return {"outcome": "pass", "tokens": 20_000, "seconds": 300, "tries": 1, "best_try": 1}
+        record = generate.generate("x.json", "job", design_case=design_case)
+        self.assertEqual(record["tokens"], 50_000)
+        self.assertEqual(record["attempts"][0]["tokens"], 50_000)
+
+    def test_no_retry_starts_once_the_job_has_used_its_tokens(self):
+        calls = []
+
+        def design_case(base, look, run):
+            calls.append(run)
+            generate.agent.spend(260_000)
+            return {"outcome": "stopped: same failure twice", "tokens": 260_000, "seconds": 900, "tries": 4, "history": []}
+        record = generate.generate("x.json", "job", design_case=design_case)
+        self.assertEqual(calls, ["job"])
+        self.assertEqual(record["status"], "FAIL")
+        self.assertEqual(record["tokens"], 260_000)
+
+    def test_a_new_job_starts_from_zero(self):
+        generate.agent.spend(200_000)
+        design_case, _ = fake(["pass"])
+        self.assertEqual(generate.generate("x.json", "job", design_case=design_case)["tokens"], 50_000)
 
     def test_the_result_is_saved(self):
         design_case, _ = fake(["pass"])

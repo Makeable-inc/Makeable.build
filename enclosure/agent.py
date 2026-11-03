@@ -23,12 +23,41 @@ MAX_TRIES_PER_PART = 3
 MAX_CASE_TRIES = 6
 MAX_TOTAL_TRIES = 8
 WORSE_BY = 3
-MODEL_RETRIES = 4
-MODEL_RETRY_WAIT_SECONDS = 20
+# Waits before each retry of a server or rate-limit error, growing each time; then it gives up.
+MODEL_RETRY_WAITS = (15, 30, 60)
+# The slowest of 386 real calls took 324 s, so this only ends a stuck one.
+MODEL_TIMEOUT_SECONDS = 420
+# A call that timed out may already be billed, so it is tried once more, not again and again.
+MODEL_TIMEOUT_RETRIES = 1
 PASSING_OUTCOMES = {"passed", "pass", "pass_with_warnings"}
 MAX_CODE_FAILURES = 6
 NO_PROGRESS_TRIES = 2
-MAX_TOKENS = 400_000
+# One token limit for the whole job: every stage, every look check and the automatic retry. Passing jobs used
+# 25k to 90k on AWS, the hardest pass 195k; the one that reached 392k failed anyway.
+JOB_TOKEN_LIMIT = 250_000
+_job = {"tokens": 0}
+
+
+def start_job():
+    """Called once per customer job (generate.generate), so each job starts from zero."""
+    _job["tokens"] = 0
+
+
+def spend(usage):
+    """Counts one model call's tokens against the job. Takes the reply's usage, or a number."""
+    _job["tokens"] += usage if isinstance(usage, int) else (usage or {}).get("total_tokens") or 0
+
+
+def job_tokens():
+    return _job["tokens"]
+
+
+def job_out_of_tokens():
+    return _job["tokens"] >= JOB_TOKEN_LIMIT
+
+
+def token_limit_reason():
+    return f"used {job_tokens()} tokens in this job, limit {JOB_TOKEN_LIMIT}"
 MAX_SECONDS = 1800
 OCCUPIED_MIN_SIZE = 2.0
 
@@ -65,21 +94,40 @@ def api_key():
     raise SystemExit("OPENAI_API_KEY is not in .env")
 
 
+def fresh_folder(folder):
+    """An empty folder for one try. A rerun with the same job name must never have its checks read files an earlier run left."""
+    folder = Path(folder)
+    if folder.exists():
+        shutil.rmtree(folder)
+    folder.mkdir(parents=True)
+    return folder
+
+
 def send_with_retries(request):
-    """A short outage at the model provider must not end a whole run. Only server and rate-limit errors and dropped connections retry."""
-    for attempt in range(MODEL_RETRIES + 1):
+    """A short outage at the model provider must not end a whole run. Server and rate-limit errors and dropped connections retry
+    with growing waits. A call that timed out retries once, so a stuck provider costs at most about two timeouts."""
+    retries = timeouts = 0
+    while True:
         try:
-            with urllib.request.urlopen(request, timeout=900) as response:
+            with urllib.request.urlopen(request, timeout=MODEL_TIMEOUT_SECONDS) as response:
                 return json.load(response)
         except urllib.error.HTTPError as error:
-            if error.code != 429 and error.code < 500 or attempt == MODEL_RETRIES:
+            if error.code != 429 and error.code < 500 or retries == len(MODEL_RETRY_WAITS):
                 raise
             print(f"model error {error.code}, waiting to retry", flush=True)
         except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
-            if attempt == MODEL_RETRIES:
+            # urllib reports a timeout while connecting as a URLError around it.
+            if isinstance(error, TimeoutError) or isinstance(getattr(error, "reason", None), TimeoutError):
+                if timeouts == MODEL_TIMEOUT_RETRIES:
+                    raise
+                timeouts += 1
+                print("model call timed out, trying once more", flush=True)
+                continue
+            if retries == len(MODEL_RETRY_WAITS):
                 raise
             print(f"model connection problem: {error}, waiting to retry", flush=True)
-        time.sleep(MODEL_RETRY_WAIT_SECONDS * (attempt + 1))
+        time.sleep(MODEL_RETRY_WAITS[retries])
+        retries += 1
 
 
 def ask_model(instructions, text, picture=None):
@@ -215,8 +263,8 @@ def signature(report):
 def stop_reason(history, tokens, started):
     """Why the loop must stop now, or None. These rules are the only thing that ends a failing run."""
     last = history[-1]
-    if tokens >= MAX_TOKENS:
-        return f"used {tokens} tokens, limit {MAX_TOKENS}"
+    if job_out_of_tokens():
+        return token_limit_reason()
     if time.time() - started >= MAX_SECONDS:
         return f"ran past {MAX_SECONDS} seconds"
     if len(history) >= 2:
@@ -281,8 +329,7 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
         best = {"code": (earlier / "design.py").read_text(encoding="utf-8"), "report": report, "failed": len(report["failed"])}
         text = retry_text(brief, best["code"], failure_text(True, "", report))
     while True:
-        attempt = folder / f"try-{len(history) + 1}"
-        attempt.mkdir(parents=True, exist_ok=True)
+        attempt = fresh_folder(folder / f"try-{len(history) + 1}")
         (attempt / "prompt.txt").write_text(text, encoding="utf-8")
         began = time.time()
         if body_stl:
@@ -294,6 +341,7 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
             write_data(library_parts, attempt)
         reply, usage = ask_model(system or SYSTEM, text, picture) if picture else ask_model(system or SYSTEM, text)
         tokens += usage.get("total_tokens", 0)
+        spend(usage)
         code = extract_code(reply)
         ran, message = run_design(code, attempt)
         if base:
@@ -324,8 +372,8 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
             reason = "same crash twice"
         elif real:
             reason = stop_reason(real, tokens, started) if ran else None
-        if not reason and tokens >= MAX_TOKENS:
-            reason = f"used {tokens} tokens, limit {MAX_TOKENS}"
+        if not reason and job_out_of_tokens():
+            reason = token_limit_reason()
         if not reason and time.time() - started >= MAX_SECONDS:
             reason = f"ran past {MAX_SECONDS} seconds"
         if reason:
