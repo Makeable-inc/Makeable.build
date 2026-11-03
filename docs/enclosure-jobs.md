@@ -232,6 +232,33 @@ docker push <RepositoryUri>:latest
 
 Then add `EnclosureSubnets=<Subnets> EnclosureSecurityGroup=<SecurityGroup>` (the stack's outputs) to `parameter_overrides` in `samconfig.toml`. The next deploy of `makeable-prod` turns jobs on.
 
+### Before merging the PR that turns it on
+
+Merging into `staging` deploys `makeable-prod`, the backend behind the staging Amplify URL. With `EnclosureSubnets` set in `samconfig.toml`, that deploy turns enclosure jobs on.
+
+| Needed | State on 3 Nov |
+|---|---|
+| Stack `makeable-enclosure` deployed from `infra/enclosure.yml` | Done |
+| Its outputs in `samconfig.toml` (`EnclosureSubnets`, `EnclosureSecurityGroup`) | Done |
+| The image in ECR as `makeable-enclosure:latest` | Done. It includes the screw-gap and see-through checks |
+| `OPENAI_API_KEY` in the `makeable/prod` secret | Done. Tasks have used it |
+| The PRs below this one merged first (generator, then job API) | Pending |
+
+What the deploy adds to `makeable-prod`: settings on `ApiFunction`, the `EnclosureTasksPolicy` permission, and `EnclosureReapFunction` with its log group and 5-minute schedule. If any of these fails, the workflow puts `aws-last-good` back and the site is unchanged.
+
+After the deploy, check it from a laptop:
+
+```
+MAKEABLE_SESSION_COOKIE='<a signed-in cookie from the Amplify site>' \
+  node scripts/enclosure-job.mjs start --design s3-devkit-bar-touch --wait --base <Amplify URL>
+aws ecs list-tasks --cluster makeable-enclosure --started-by <job id>     # the task the deployed API started
+aws logs tail /makeable/makeable-prod/enclosure-reap --since 15m          # the reaper ran
+```
+
+To turn jobs off again, set `EnclosureSubnets=` (empty) and deploy. The routes then answer 503 and nothing else changes.
+
+The image is not built by CI. After a change under `enclosure/`, build and push it by hand (the commands above). Tasks always pull `:latest`, so the next job uses it.
+
 ## Try it locally
 
 ```
