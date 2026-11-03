@@ -1,5 +1,6 @@
 """Stop rule tests with a fake AI, so the loop can be tested for free. Run: .venv/Scripts/python -W ignore -m unittest test_agent"""
 import io
+import json
 import tempfile
 import urllib.error
 import unittest
@@ -206,6 +207,34 @@ class Loop(unittest.TestCase):
         with mock.patch.object(agent, "ask_model", lambda _i, _t: ("```python\nprint(1)\n```", {"total_tokens": 1})), mock.patch.object(agent.checks, "check_design", check_design):
             agent.design_part("brief", self.folder, 1)
         self.assertNotIn("PRINT_Shell.stl", seen[0])
+
+    def test_every_try_leaves_one_trace_line_with_why_it_failed(self):
+        # A cloud job must be explainable afterwards: stage, try, tokens, failed checks, crash text, the model's reasoning.
+        replies = iter([CRASHES, "```python\nprint(1)\n```", "```python\nprint(2)\n```"])
+        failed = {"passed": False, "failed": [{"check": "clearance", "part": "PRINT_Shell", "measured": 0.01, "limit": "limit", "where": [1, 2, 3], "fix": "fix it", "ok": False}], "results": []}
+        reports = iter([failed, failed])
+
+        def fake_model(_i, _t):
+            return next(replies), {"total_tokens": 1200, "reasoning_summary": "Moved the board 2 mm left."}
+        with mock.patch.object(agent, "ask_model", fake_model), mock.patch.object(agent.checks, "check_design", lambda _f, _s="carrier": next(reports)):
+            agent.design_part("brief", self.folder / "case", 2)
+        lines = [json.loads(l) for l in (self.folder / "case" / "trace.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([(l["stage"], l["try"], l["ran"]) for l in lines], [("carrier", 1, False), ("carrier", 2, True), ("carrier", 3, True)], "one line per AI call")
+        self.assertIn("boom", lines[0]["crash"])
+        self.assertEqual(lines[1]["failed"], ["clearance"])
+        self.assertEqual((lines[1]["tokens"], lines[1]["reasoning"]), (1200, "Moved the board 2 mm left."))
+
+    def test_the_model_call_asks_for_and_returns_a_reasoning_summary(self):
+        sent = []
+
+        def fake_open(request, timeout=0):
+            sent.append(json.loads(request.data))
+            return io.BytesIO(json.dumps({"output": [{"type": "reasoning", "summary": [{"type": "summary_text", "text": "Checked the gap."}]},
+                                                     {"type": "message", "content": [{"text": "done"}]}], "usage": {"total_tokens": 9}}).encode())
+        with mock.patch("urllib.request.urlopen", fake_open), mock.patch.object(agent, "api_key", lambda: "test"):
+            reply, usage = agent.ask_model("system", "text")
+        self.assertEqual(sent[0]["reasoning"], {"effort": "medium", "summary": "auto"})
+        self.assertEqual((reply, usage["reasoning_summary"], usage["total_tokens"]), ("done", "Checked the gap.", 9))
 
     def test_a_bad_request_is_not_retried(self):
         calls = []

@@ -100,7 +100,7 @@ Check every 5 seconds and stop at a final state. A job takes 4 to 20 minutes. Ch
 GET /api/enclosure-jobs/enc-f08ls3w083gh/files/PRINT_Shell.stl
 ```
 
-Use the links in `files`. Locally the file comes back directly. On AWS the reply is `302` to a download link that works for 5 minutes, so ask for a new one each time and don't store it. Browsers and `fetch` follow the 302 by themselves, so an `<img src>` or `<a href>` works the same in both places. Files of a job that did not pass answer 404.
+Use the links in `files`. Locally the file comes back directly. On AWS the reply is `302` to a download link that works for 5 minutes, so ask for a new one each time and don't store it. An `<img src>` or `<a href>` follows the 302 by itself, so it works the same in both places. A script can't read the file with `fetch()` on AWS yet: the data bucket has no CORS rule, so the browser blocks the read (see Known debt). Files of a job that did not pass answer 404.
 
 ### Cancel
 
@@ -292,6 +292,48 @@ The CLI signs in as the local test user. For another server, pass `--base <url>`
 - Pictures: only the owner's saved picture is accepted, and anything that is not an image is refused. The docker command doesn't change without a picture.
 
 The generator side is in `enclosure/test_generate.py` and `enclosure/test_agent.py`. They check that without a picture the call is unchanged and a picture is still generated. With one, it reaches every attempt and none is generated. A file that is not an image fails before any AI call. `enclosure/test_cloud_run.py` checks the files are uploaded before the result, the picture is fetched, a crash still writes a plain failure, and progress is sent only when it changes. `enclosure/test_sandbox.py` checks the runner user.
+
+## Explaining a run afterwards
+
+Every try leaves one line in `trace.jsonl`, in its stage's folder (`runs/agent/<job>/body/` and `.../case/`):
+
+| Field | What it holds |
+|---|---|
+| `stage`, `try` | `body` or `case` (`carrier` in the older path), and the try number |
+| `ran`, `status`, `failed` | Whether the script ran, the check result, and the names of the failed must-pass checks |
+| `crash` | The error text when the script crashed or timed out (up to 4,000 characters) |
+| `tokens`, `seconds`, `look_tokens` | What the call cost; for the body, the look review's tokens too |
+| `reasoning` | The model's own short summary of its reasoning (the Responses API's `reasoning.summary: "auto"`) |
+| `problems`, `score` | Body only: the plain rule problems and the look score |
+
+On AWS, `cloud_run.py` zips the whole run folder at the end of every job, whether it passed, failed or hit the deadline. That's every try of every attempt (`runs/agent/<job>*`) and the job record. It's uploaded as `makeable-enclosure-runs/<job>/run.zip`, before `result.json`. A zip that can't be sent never blocks the result. It holds prompts and code, so it isn't one of the user's files: read it with the AWS CLI.
+
+```
+aws s3 cp s3://<data bucket>/makeable-enclosure-runs/<job>/run.zip . && unzip run.zip
+cat agent/<job>/case/trace.jsonl
+```
+
+## Known debt
+
+These were found in review and left on purpose: the code works and is tested, and changing it now risks changing results. Fix them when there's a reason to touch that code.
+
+**Generator (`enclosure/`)**
+- **Two "warning-only" lists.** `checks.py` (carrier stage) and `severity.py` (case stage) each have one, and they differ. The product uses only the case stage today. Merge them into `severity.py` if the carrier stage comes back.
+- **The look check has its own AI call.** `look_check.py` builds its own request rather than using `agent.ask_model`, because it sends two pictures and `ask_model` takes one. Its tokens are counted against the job. Merge them if `ask_model` learns to send several pictures, and check the look scores don't move.
+- **The case try budget after crashes.** In the carrier path, the case stage gets `MAX_TOTAL_TRIES` minus the carrier's tries, and that count includes crashes. It doesn't affect the parts-library path the product uses.
+- **`best_try` when continuing a run.** With `earlier_run`, a stopped run can report its latest try rather than the earlier best. That's only used by hand, for tuning.
+- **Fixed build order in `finish()`.** `case_parts.finish` always assembles base, controller, then shell from `-y`. A design built the other way (screen controller held by the shell) would be judged on the wrong order. Revisit with a real print.
+- **The job token counter is module-level** (`agent.start_job`). It's fine for one job per container, which is how both Docker and Fargate run.
+
+**Job API (`lib/enclosure-jobs.mjs`)**
+- **The cancel and stop logic is dense.** Places, `phase/<id>` and `STOPPING` each close a real race and took three review rounds. Split it into named helpers only with the tests as the guard, and recheck the race scenarios after.
+- **Two crash windows.** If the API Lambda dies between taking a place and recording the job for the cleanup, or between RunTask returning and the phase write, the job can hold a place until it's cleared by hand. The task itself still ends at 55 minutes.
+
+**AWS and the site**
+- **Files can't be read with `fetch()` from the page.** The data bucket has no CORS rule, so `<img>` and download links work but JavaScript reads are blocked. Add a `GET` rule for the site origins before a 3D viewer loads STLs.
+- **The image is pushed by hand.** CI doesn't build `makeable-enclosure:latest`, and tasks always pull `:latest`. After a change under `enclosure/` is merged, build and push it (see Setup). Don't push before the merge, or staging runs unreviewed code.
+- **No picture upload route.** `pictureId` works, but only pictures the server saved can be chosen.
+- **Before rollout** (issue #34): PostHog events for generate started, passed, failed with reason, retried and downloaded, and CloudWatch alarms on failed or stuck jobs and on daily token spend.
 
 ## Not built yet
 

@@ -1,8 +1,10 @@
 """Tests for the cloud wrapper: picture in, progress and result out, with S3 and the generator faked. Run: .venv/Scripts/python -W ignore -m unittest test_cloud_run"""
+import io
 import json
 import tempfile
 import threading
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -71,6 +73,42 @@ class CloudRun(unittest.TestCase):
         result = json.loads(s3.objects[PREFIX + "result.json"])
         self.assertEqual((result["status"], calls), ("FAIL", []))
         self.assertIn("picture", result["message"])
+
+    def zip_names(self, s3):
+        return sorted(zipfile.ZipFile(io.BytesIO(s3.objects[PREFIX + "run.zip"])).namelist())
+
+    def test_the_whole_run_folder_is_zipped_and_uploaded_before_the_result(self):
+        s3 = FakeS3()
+        cloud_run.run("base_designs/x.json", "enc-aaaaaaaaaaaa", s3=s3, bucket="b", prefix=PREFIX, generate=self.passing_generate([]))
+        self.assertLess(s3.order.index(PREFIX + "run.zip"), s3.order.index(PREFIX + "result.json"))
+        self.assertIn("agent/enc-aaaaaaaaaaaa/case/try-1/design.json", self.zip_names(s3))
+
+    def test_a_failed_run_and_its_retry_are_zipped_too(self):
+        s3 = FakeS3()
+
+        def crash(base, job, picture=None):
+            for run in (job, f"{job}-retry1"):
+                folder = self.here / "runs" / "agent" / run / "case"
+                folder.mkdir(parents=True)
+                (folder / "trace.jsonl").write_text('{"stage": "case", "try": 1, "crash": "boom"}\\n')
+            raise RuntimeError("boom")
+        cloud_run.run("base_designs/x.json", "enc-aaaaaaaaaaaa", s3=s3, bucket="b", prefix=PREFIX, generate=crash)
+        names = self.zip_names(s3)
+        self.assertIn("agent/enc-aaaaaaaaaaaa/case/trace.jsonl", names)
+        self.assertIn("agent/enc-aaaaaaaaaaaa-retry1/case/trace.jsonl", names)
+        self.assertEqual(json.loads(s3.objects[PREFIX + "result.json"])["status"], "FAIL")
+
+    def test_a_zip_that_cannot_be_sent_never_stops_the_result(self):
+        s3 = FakeS3()
+        put = s3.put_object
+
+        def put_object(Bucket, Key, Body, **kw):
+            if Key.endswith("run.zip"):
+                raise RuntimeError("S3 refused")
+            put(Bucket=Bucket, Key=Key, Body=Body, **kw)
+        s3.put_object = put_object
+        cloud_run.run("base_designs/x.json", "enc-aaaaaaaaaaaa", s3=s3, bucket="b", prefix=PREFIX, generate=self.passing_generate([]))
+        self.assertEqual(json.loads(s3.objects[PREFIX + "result.json"])["status"], "PASS")
 
     def test_a_run_past_its_deadline_writes_a_plain_failure_and_ends_the_task(self):
         # Fargate has no time limit of its own, so the task enforces one; the API's cleanup relies on tasks ending.
