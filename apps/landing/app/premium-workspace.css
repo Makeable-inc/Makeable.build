@@ -1766,3 +1766,10 @@
 }
 .mk-topbar-utilities .mk-topbar-signout:hover { color: #fff; border-color: #5b6164; }
 .mk-topbar-signout-error { margin: 0; max-width: 16rem; color: #ffb4bd; font-size: 11px; }
+
+.mk-topbar-utilities a.mk-topbar-signout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}

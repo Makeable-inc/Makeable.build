@@ -172,14 +172,16 @@ export function WorkspaceTopBar({
             </div>
           </details>
         )}
-        <ProfileChip
+        {!user && !accountLoading && !accountUnavailable ? (
+          <a className="mk-topbar-signout" href="/?signin=1">Sign in</a>
+        ) : <ProfileChip
           user={user}
           remaining={remaining}
           limit={limit}
           loading={accountLoading}
           unavailable={accountUnavailable}
           showBalance={showBalance}
-        />
+        />}
         {user && onSignOut && !building && (
           <button className="mk-topbar-signout" type="button" onClick={onSignOut} disabled={signingOut}>
             {signingOut ? "Logging out..." : "Log out"}
