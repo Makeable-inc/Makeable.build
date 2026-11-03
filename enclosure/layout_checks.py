@@ -141,7 +141,7 @@ def check_layout(design, cards, transforms, union):
     # The parts block the view too: a wire behind the board is not visible through the window.
     parts = [part_surface(design["purchased"][n]["part_id"])[0].copy().apply_transform(transforms[n]) for n in transforms]
     from space_checks import check_openings, check_wire_room, opening_corridors
-    corridors = [mesh for _, mesh in opening_corridors(design, cards, transforms)]
+    corridors = [mesh for _, mesh in opening_corridors(design, cards, transforms, union)]
     walls = trimesh.util.concatenate([union] + parts + corridors)
     results = check_wire_crossing(design) + check_wire_hidden(design, walls)
     purchased = design["purchased"]

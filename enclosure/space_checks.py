@@ -11,7 +11,7 @@ from card import DIRECTIONS, load_nodes
 from case_checks import MAX_WINDOW_GAP, SCREW, cylinder, merged
 from checks import apply, direction_vector, part_surface, port_room_box, result, rounded, thin_out
 from parts import ensure_part
-from wiring_checks import KNOB_WALL_RING, PLUG, WIRE_RADIUS, plug_box, plug_local, wires_for
+from wiring_checks import FINGER_WIDTH, KNOB_WALL_RING, PLUG, WIRE_RADIUS, plug_box, plug_local, wires_for
 
 PITCH = 1.0
 CORRIDOR_LENGTH = 80.0
@@ -25,6 +25,11 @@ BUNDLE_PACKING = 0.3
 WIRE_SEED_REACH = 4.0
 # These sit outside the case by design, so seeing them from outside says nothing about an opening.
 OUTSIDE_FEATURES = ("knob", "shaft", "bushing")
+# See-through: straight sight lines from outside, this far apart, so a slot about a millimetre wide is always crossed.
+SIGHT_SPACING = 0.4
+# About 3 mm2 of part showing, to allow a sliver at the edge of a planned opening. A slot runs to hundreds.
+MAX_SIGHT_LINES = 20
+TOUCH_SLACK = 0.5
 
 
 def local_box_corridor(low, high, transform):
@@ -34,8 +39,9 @@ def local_box_corridor(low, high, transform):
     return box
 
 
-def opening_corridors(design, cards, transforms):
-    """The only places the case may be open, each sized from its part: window, USB plug, knob bushing, button pin hole and screwdriver path."""
+def opening_corridors(design, cards, transforms, union=None):
+    """The only places the case may be open, each sized from its part: window, USB plug, knob bushing, button pin hole, touch finger opening
+    and screwdriver path. The touch opening needs the case (union), to tell which side of the sensor was opened."""
     corridors = []
     for name, card in cards.items():
         if name not in transforms:
@@ -73,6 +79,15 @@ def opening_corridors(design, cards, transforms):
             outward = transform[:3, :3] @ direction_vector(shaft["points"])
             radius = max(bushing["size"][i] for i in others) / 2 + KNOB_WALL_RING
             corridors.append(("knob", cylinder(radius, apply(transform, center[None])[0], outward, CORRIDOR_LENGTH)))
+        if "touch" in features and union is not None:
+            touch = features["touch"]
+            center = (np.array(touch["min"], dtype=float) + np.array(touch["max"], dtype=float)) / 2
+            start = apply(transform, center[None])[0]
+            for side in touch.get("may_face_out") or []:
+                outward = transform[:3, :3] @ direction_vector(side)
+                # The opened side is the one a sight line from the sensor's middle leaves by without meeting plastic.
+                if not union.ray.intersects_any(start[None], outward[None])[0]:
+                    corridors.append(("touch", cylinder(FINGER_WIDTH / 2 + TOUCH_SLACK, start - outward, outward, CORRIDOR_LENGTH)))
         for button in card.get("buttons") or []:
             axis, side = DIRECTIONS[button["press_from"]]
             center = (np.array(button["min"]) + np.array(button["max"])) / 2
@@ -197,8 +212,74 @@ def case_openness(union, corridors, seeds):
     return leak_path(grid, solid, reached[0])
 
 
+def check_see_through(union, parts, corridors, spacing=SIGHT_SPACING):
+    """Straight sight lines into the case from all six sides. One that reaches a part before any plastic found an opening
+    nobody planned: a slot, a seam left open, a wall cut through. The planned openings (corridors) count as solid here,
+    so a window or a touch opening is never reported. Lines that meet nothing at all are not counted: they pass a dip or
+    step in the outside shape."""
+    walls = merged([union] + list(corridors))
+    inside = merged(parts) if parts else None
+    hull = union.convex_hull
+    low, high = union.bounds
+    found = []
+    for axis in range(3):
+        across = [i for i in range(3) if i != axis]
+        # Off the round numbers, so no sight line runs exactly along a face.
+        grids = [np.arange(low[i] + 0.137, high[i], spacing) for i in across]
+        a, b = np.meshgrid(*grids, indexing="ij")
+        for sign, side in ((1, "-"), (-1, "+")):
+            origins = np.zeros((a.size, 3))
+            origins[:, across[0]], origins[:, across[1]] = a.ravel(), b.ravel()
+            # Start beyond the planned openings, which reach CORRIDOR_LENGTH out, so each line meets them from outside.
+            far = CORRIDOR_LENGTH + 10
+            origins[:, axis] = low[axis] - far if sign > 0 else high[axis] + far
+            rays = np.zeros_like(origins)
+            rays[:, axis] = sign
+            crossing = hull.ray.intersects_any(origins, rays)
+            origins, rays = origins[crossing], rays[crossing]
+            if not len(origins):
+                continue
+            wall = np.full(len(origins), np.inf)
+            hits, which, _ = walls.ray.intersects_location(origins, rays, multiple_hits=False)
+            wall[which] = np.abs(hits[:, axis] - origins[which, axis])
+            part = np.full(len(origins), np.inf)
+            if inside is not None:
+                hits, which, _ = inside.ray.intersects_location(origins, rays, multiple_hits=False)
+                part[which] = np.abs(hits[:, axis] - origins[which, axis])
+            open_lines = part < wall
+            for origin in origins[open_lines]:
+                at = origin.copy()
+                at[axis] = low[axis] if sign > 0 else high[axis]
+                found.append((side + "xyz"[axis], at))
+    limit = f"at most {MAX_SIGHT_LINES} sight lines into the case outside the planned openings"
+    if len(found) <= MAX_SIGHT_LINES:
+        return result("see_through", "case", True, measured=len(found), limit=limit)
+    sides = [side for side, _ in found]
+    side = max(set(sides), key=sides.count)
+    points = np.array([point for s, point in found if s == side])
+    place, span = rounded(np.median(points, axis=0)), f"{rounded(points.min(axis=0))} to {rounded(points.max(axis=0))}"
+    return result("see_through", "case", False, measured=len(found), limit=limit, where=place,
+                  fix=f"From the {side} side you can see into the case near {place} (across {span}), where no opening was planned: a slot, an open seam or a wall cut through. "
+                      "The parts must be fully housed. Close it with at least 1.6 mm of plastic. Often a rounded edge, chamfer or rim does not quite meet the wall beside it, "
+                      "or the case is too short for the part behind it: make them meet, or make the case bigger there.")
+
+
+def part_meshes(cards, transforms, purchased):
+    """The purchased parts as placed, without the pieces that belong outside the case (a knob)."""
+    meshes = []
+    for name, card in cards.items():
+        if name not in transforms:
+            continue
+        excluded = {node for feature in OUTSIDE_FEATURES if feature in card["features"] for node in card["features"][feature].get("nodes", [])}
+        nodes = load_nodes(ensure_part(purchased[name]["part_id"]))
+        kept = [mesh for key, mesh in nodes.items() if key not in excluded]
+        if kept:
+            meshes.append(merged(kept).copy().apply_transform(transforms[name]))
+    return meshes
+
+
 def check_openings(design, cards, transforms, purchased, union):
-    corridors = opening_corridors(design, cards, transforms)
+    corridors = opening_corridors(design, cards, transforms, union)
     walls = merged([union] + [mesh for _, mesh in corridors])
     allowed = sorted({label for label, _ in corridors})
     limit = f"open only at: {', '.join(allowed)}. USB {PORT_NOTE}, button hole {BUTTON_HOLE_DIAMETER} mm (assumed)"
@@ -225,6 +306,7 @@ def check_openings(design, cards, transforms, purchased, union):
             place = rounded(path[inside][-1]) if inside.any() else rounded(path[0])
         results.append(result("case_closed", "case", path is None, measured=None if path is None else f"open route of {len(path)} mm from inside to outside", limit=f"no open route from the parts to outside, except through: {limit}", where=place,
                               fix=f"Air can get from the parts to the outside near {place}, through an opening that is not fitted to a part. Close it, or shrink it to its allowed size. A gap left at the seam counts too."))
+    results.append(check_see_through(union, part_meshes(cards, transforms, purchased), [mesh for _, mesh in corridors]))
     return results
 
 

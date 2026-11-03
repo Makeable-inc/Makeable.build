@@ -21,6 +21,8 @@ export async function buildLambdaBundle(outDir = path.join(ROOT, ".aws-sam-src")
     "aws/functions",
     "netlify/functions",
     "prompts/production",
+    // The enclosure job API checks a design name against these files before it starts a task.
+    "enclosure/base_designs",
     `artifacts/aws-assembly-release/${release}`,
   ]) {
     cpSync(path.join(ROOT, entry), path.join(outDir, entry), { recursive: true });

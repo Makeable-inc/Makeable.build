@@ -14,7 +14,7 @@ CHECK_NAMES = {
     "assembly": "parts collide on the way in", "clearance": "parts too close to the plastic", "parts_gap": "printed parts touch",
     "retained": "a part is loose", "held": "a board is loose in its holder", "sealed": "a printed part is not a closed solid",
     "wall": "walls too thin to print", "screw_seat": "a screw has nothing to sit on", "screw_grip": "a screw has nothing to bite into",
-    "screw_spread": "screws are all on one side", "screw_driver": "a screwdriver cannot reach a screw", "flat_on_bed": "a part has no flat side for the print bed",
+    "screw_spread": "screws are all on one side", "screw_gap": "two screws are too close together", "screw_count": "the case has too few screws or snaps", "screw_driver": "a screwdriver cannot reach a screw", "flat_on_bed": "a part has no flat side for the print bed",
     "outer_parts": "an inner part shows on the outside", "access": "something you need to reach is covered", "usb_access": "the USB plug is blocked",
     "plug_room": "a jumper plug has no room", "plug_inside": "a jumper plug sticks out of the case", "plug_clear_parts": "a jumper plug hits another part",
     "shaft_hole": "the knob has no proper hole", "touch_opening": "the touch sensor is covered",

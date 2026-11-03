@@ -85,7 +85,39 @@ Without a `pictureId`, the job and the `docker run` command are exactly as befor
 `MAKEABLE_ENCLOSURE_DISPATCH` picks the dispatch. Without it, the routes answer 503.
 
 - `docker`: on a laptop, set by `npm run dev:local`. It runs the `makeable-enclosure` image (`enclosure/Dockerfile`) with `docker run`, passing `OPENAI_API_KEY` by name so the key never appears in a command line. The container writes to `enclosure/runs` (or `MAKEABLE_ENCLOSURE_RUNS_DIR`).
-- AWS (planned): one Fargate task per job runs the same image, and files go to S3. Only the dispatch and the file reads change.
+- `fargate`: on AWS, set by `template.yaml` once `EnclosureSubnets` is filled in. One Fargate task per job runs the same image with `cloud_run.py`. Results and files go to the data bucket, and a file request redirects to a 5-minute download link, because files can be 35 MB and a Lambda reply can't exceed 6 MB.
+
+## AWS
+
+```
+ makeable-prod (template.yaml)                     makeable-enclosure (infra/enclosure.yml, by hand)
+ ┌──────────────────────────────────┐   RunTask   ┌──────────────────────────────────────────┐
+ │ ApiFunction ─────────────────────┼───────────▶ │ cluster ─▶ one Fargate task per job       │
+ │ EnclosureReapFunction (5 min)    │  StopTask   │   image: ECR makeable-enclosure           │
+ │                                  │             │   key: makeable/prod OPENAI_API_KEY field │
+ │ DataBucket                       │ ◀───────────┼── writes makeable-enclosure-runs/<job>/    │
+ │  makeable-enclosure-jobs/  (API) │   S3 only   │   reads makeable-enclosure-pictures/      │
+ │  makeable-enclosure-runs/  (task)│             │ network: no inbound, HTTPS out, no NAT    │
+ │  makeable-enclosure-pictures/    │             └──────────────────────────────────────────┘
+ └──────────────────────────────────┘
+```
+
+- **Separate stack.** `infra/enclosure.yml` holds the network, cluster, image repository, task definition and its two roles. It is deployed by hand and uses fixed names (`makeable-enclosure*`), so `template.yaml` needs only two settings: `EnclosureSubnets` and `EnclosureSecurityGroup`. While they are empty, enclosure jobs are off and nothing new is created in `makeable-prod`.
+- **The task's access.** Its own role may only write `makeable-enclosure-runs/*` and read `makeable-enclosure-pictures/*`. ECS reads the OpenAI key from Secrets Manager with a separate role that the container never sees.
+- **The AI's code.** It runs as the `runner` user, which can't read the generator's environment, so it can't see the key. The import screen blocks network modules, so the code can't reach the task's role either.
+- **The API's access.** `ApiFunction` and the reaper may run and stop only the `makeable-enclosure` task family on that cluster, and pass only the two enclosure roles.
+- **Cost.** About $0.03 of compute per job (4 vCPU, 8 GB, about 10 minutes) and about $0.25 a month for images. There's no NAT gateway, and S3 traffic goes through a free gateway endpoint.
+
+Setup, once, with an admin login:
+
+```
+aws cloudformation deploy --stack-name makeable-enclosure --template-file infra/enclosure.yml   --capabilities CAPABILITY_NAMED_IAM   --parameter-overrides DataBucketName=<makeable-prod DataBucketName> SecretArn=<full makeable/prod ARN>
+docker build --platform linux/amd64 -f enclosure/Dockerfile -t <RepositoryUri>:latest .
+aws ecr get-login-password | docker login --username AWS --password-stdin <account>.dkr.ecr.us-east-1.amazonaws.com
+docker push <RepositoryUri>:latest
+```
+
+Then add `EnclosureSubnets=<Subnets> EnclosureSecurityGroup=<SecurityGroup>` (the stack's outputs) to `parameter_overrides` in `samconfig.toml`. The next deploy of `makeable-prod` turns jobs on.
 
 ## Try it locally
 
@@ -100,7 +132,7 @@ The CLI signs in as the local test user. For another server, pass `--base <url>`
 
 ## Tests
 
-`node --test tests/enclosure-jobs.test.mjs` runs 25 tests with a fake dispatch and the in-memory store. They use no Docker or AI. They cover:
+`node --test tests/enclosure-jobs.test.mjs` runs 29 tests with a fake dispatch and the in-memory store. They use no Docker or AI. They cover:
 
 - Sign-in: signed-out requests get 401 on every route.
 - Requests: another site's origin gets 403, wrong methods get 405, bad or oversized bodies get 400, and the site API answers 503 when jobs are not set up.
@@ -110,14 +142,14 @@ The CLI signs in as the local test user. For another server, pass `--base <url>`
 - Cleanup: stuck jobs and jobs that run too long are stopped, and the cleanup frees their places.
 - Results: a late result is ignored after a stop.
 - Safety: file names and paths are checked, and the public view hides private fields.
+- AWS: the Fargate request (its command, prefix and picture key, and never the key), a task that can't start, cancel by task ARN, status and files from S3, and the file redirect.
 - Pictures: only the owner's saved picture is accepted, and anything that is not an image is refused. The docker command doesn't change without a picture.
 
-The generator side is in `enclosure/test_generate.py` and `enclosure/test_agent.py`. They check that without a picture the call is unchanged and a picture is still generated. With one, it reaches every attempt and none is generated. A file that is not an image fails before any AI call.
+The generator side is in `enclosure/test_generate.py` and `enclosure/test_agent.py`. They check that without a picture the call is unchanged and a picture is still generated. With one, it reaches every attempt and none is generated. A file that is not an image fails before any AI call. `enclosure/test_cloud_run.py` checks the files are uploaded before the result, the picture is fetched, a crash still writes a plain failure, and progress is sent only when it changes. `enclosure/test_sandbox.py` checks the runner user.
 
 ## Not built yet
 
 - The picture-options step: generating 3 looks from the user's answers for them to choose from.
-
-- The Fargate dispatch and S3 file reads.
-- A schedule that calls `reap()`. Today, cleanup happens when someone reads a status or starts a job.
+- Full isolation of the AI's code in its own runner with no internet. Today it runs in the task as a separate user.
+- Failing a job as soon as its task stops without a result. Today the 20-minute no-progress rule catches it.
 - Rate limits on status reads. They are cheap and owner-only, so only starts are limited.
