@@ -1,6 +1,7 @@
 import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
 import { backgroundDispatchFetch } from "../../lib/aws/background-invoke.mjs";
 import { openStore } from "../../lib/storage/index.mjs";
+import { createEnclosureJobs, dockerDispatch, enclosureJobsRoute, ENCLOSURE_JOB_STORE, fargateDispatch, s3Outputs } from "../../lib/enclosure-jobs.mjs";
 import { getGalleryThumbnail } from "../../lib/build-thumbnails.mjs";
 import { OAuth2Client } from "google-auth-library";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -277,6 +278,10 @@ export default async function handler(req, context = {}) {
         });
       }
       return await publicPartPrices(url, context);
+    }
+
+    if (localApiPath === "/api/enclosure-jobs" || localApiPath.startsWith("/api/enclosure-jobs/")) {
+      return await enclosureJobs(req, context, localApiPath);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -2090,6 +2095,54 @@ function requestError(message, status) {
   const error = new Error(message);
   error.status = status;
   return error;
+}
+
+// Enclosure jobs (lib/enclosure-jobs.mjs, docs/enclosure-jobs.md). MAKEABLE_ENCLOSURE_DISPATCH picks where the
+// generator runs: "docker" on a laptop (dev:local), "fargate" on AWS (template.yaml). Anything else: not set up here.
+let enclosureJobsService;
+async function enclosureJobsFor() {
+  const where = process.env.MAKEABLE_ENCLOSURE_DISPATCH || "";
+  if (where !== "docker" && where !== "fargate") return null;
+  if (!enclosureJobsService) {
+    const store = openStore({ name: ENCLOSURE_JOB_STORE, consistency: "strong" });
+    let jobs;
+    if (where === "docker") {
+      const runsDir = process.env.MAKEABLE_ENCLOSURE_RUNS_DIR || new URL("../../enclosure/runs", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+      jobs = createEnclosureJobs({ store, dispatch: dockerDispatch({ runsDir }), runsDir });
+    } else {
+      const [{ ECSClient }, { S3Client }, { getSignedUrl }] = await Promise.all([
+        import("@aws-sdk/client-ecs"), import("@aws-sdk/client-s3"), import("@aws-sdk/s3-request-presigner"),
+      ]);
+      const bucket = process.env.MAKEABLE_STORAGE_BUCKET;
+      jobs = createEnclosureJobs({
+        store,
+        dispatch: fargateDispatch({
+          ecs: new ECSClient({}),
+          cluster: process.env.MAKEABLE_ENCLOSURE_CLUSTER,
+          taskDefinition: process.env.MAKEABLE_ENCLOSURE_TASK_DEFINITION,
+          subnets: String(process.env.MAKEABLE_ENCLOSURE_SUBNETS || "").split(",").filter(Boolean),
+          securityGroups: [process.env.MAKEABLE_ENCLOSURE_SECURITY_GROUP].filter(Boolean),
+          bucket,
+        }),
+        outputs: s3Outputs({ client: new S3Client({}), bucket, sign: getSignedUrl }),
+      });
+    }
+    enclosureJobsService = jobs;
+  }
+  return enclosureJobsService;
+}
+
+// Run on a schedule on AWS (aws/functions/enclosure-reap.mjs): stops jobs that went quiet, so their users and places are freed.
+export async function reapEnclosureJobs() {
+  const jobs = await enclosureJobsFor();
+  return Response.json({ stopped: jobs ? await jobs.reap() : [] });
+}
+
+async function enclosureJobs(req, context, localApiPath) {
+  const jobs = await enclosureJobsFor();
+  const route = jobs && enclosureJobsRoute({ jobs, authenticate: (request) => requireBuilderSession(request, context) });
+  if (!route) return jsonResponse({ error: "Enclosure generation is not set up on this server." }, 503, { "Cache-Control": "no-store" });
+  return route(req, localApiPath);
 }
 
 async function proxyMakeableApi(req, env) {

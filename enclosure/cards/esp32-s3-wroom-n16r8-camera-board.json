@@ -1,0 +1,69 @@
+{
+ "part_id": "esp32-s3-wroom-n16r8-camera-board",
+ "sha256": "b4a4473578c16b7d12e501c9c012d8e498836107097659d6e75ec848d4e77532",
+ "role": "controller",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb:exact-catalog-camera-carrier"
+   ]
+  },
+  "usb": {
+   "nodes": [
+    "usb-c:native:shell",
+    "usb-c:native:mouth"
+   ],
+   "connector": "usb-c",
+   "opens_toward": "-y"
+  },
+  "pin_rows": {
+   "nodes": [
+    "header:left:pin:1",
+    "header:left:pin:10",
+    "header:left:pin:11",
+    "header:left:pin:12",
+    "header:left:pin:13",
+    "header:left:pin:14",
+    "header:left:pin:15",
+    "header:left:pin:16",
+    "header:left:pin:17",
+    "header:left:pin:18",
+    "header:left:pin:19",
+    "header:left:pin:2",
+    "header:left:pin:20",
+    "header:left:pin:21",
+    "header:left:pin:22",
+    "header:left:pin:3",
+    "header:left:pin:4",
+    "header:left:pin:5",
+    "header:left:pin:6",
+    "header:left:pin:7",
+    "header:left:pin:8",
+    "header:left:pin:9",
+    "header:right:pin:1",
+    "header:right:pin:10",
+    "header:right:pin:11",
+    "header:right:pin:12",
+    "header:right:pin:13",
+    "header:right:pin:14",
+    "header:right:pin:15",
+    "header:right:pin:16",
+    "header:right:pin:17",
+    "header:right:pin:18",
+    "header:right:pin:19",
+    "header:right:pin:2",
+    "header:right:pin:20",
+    "header:right:pin:21",
+    "header:right:pin:22",
+    "header:right:pin:3",
+    "header:right:pin:4",
+    "header:right:pin:5",
+    "header:right:pin:6",
+    "header:right:pin:7",
+    "header:right:pin:8",
+    "header:right:pin:9"
+   ]
+  }
+ }
+}

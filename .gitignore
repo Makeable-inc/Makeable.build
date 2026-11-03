@@ -26,3 +26,8 @@ apps/landing/AGENTS.md
 apps/landing/CLAUDE.md
 .aws-sam/
 .aws-sam-src/
+
+# Enclosure pipeline: paid Meshy results, part models, runs and the Python env stay local
+enclosure/.cache/
+enclosure/runs/
+enclosure/.venv/

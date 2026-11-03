@@ -1,0 +1,42 @@
+{
+  "name": "Desk companion with a click knob",
+  "parts": "seeed-xiao-esp32s3,ssd1309-242-oled,ky-040-rotary-encoder",
+  "look": "a small retro tabletop device with soft rounded corners, a wide screen on the left and a chunky knob that turns and clicks on a raised control panel on the right",
+  "picture_prompt": "Product concept render of a small 3D-printable desk device, seen from the front and slightly to one side. It is wider than it is tall, with soft rounded corners and one smooth continuous body. On the left of the front is a flat wide rectangular screen, about 55 mm wide and 27 mm tall, in a slim even bezel. On the right, the front steps forward into a raised control panel running the full height of the case, with a clean curved transition, and one chunky round knob stands out of it. One matte plastic colour with a dark screen and a dark knob. Soft studio light, plain light background. Flat bottom, no text, no logos, no fake buttons, no speaker holes, no feet, no visible seams, no cables.",
+  "sheet": [
+    "Front faces -y and stands upright. World +z is up.",
+    "Left about 70% of the front: the screen, landscape, with its long side along x. It is a separate board, wired to the controller, and sits just behind the front wall.",
+    "Right about 30% of the front: a raised control panel. The front steps forward here by as much as the knob's plugs need, across the full height of the case, with a rounded transition. It must read as a deliberate part of the body, not a bump.",
+    "The knob comes straight out of that panel toward -y, in a shallow round recess if that is what gives it finger room. It is also the button: pressing it clicks. Its pins point -y too, and the plugs and their first turn sit inside the raised panel.",
+    "The controller is a small separate board behind the screen, near the left wall, so its USB reaches that wall. Its top faces the back (+y) and its pins point forward (-y), with their plugs between it and the screen.",
+    "USB opens on the left side (-x), away from the knob.",
+    "The wires run behind the screen board and behind the panel as one neat bundle, side by side, and do not show from outside.",
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover.",
+    "The controller sits on a holder built into the rear cover. The rear cover is a flat plate with holder and stops on it, and it closes from +y."
+  ],
+  "body_first": true,
+  "front": "-y",
+  "width_to_height": [
+    1.6,
+    2.6
+  ],
+  "max_depth": 70,
+  "usb_side": "-x",
+  "place": {
+    "PURCHASE_Part2": {
+      "feature": "screen",
+      "across": [
+        0.2,
+        0.5
+      ]
+    },
+    "PURCHASE_Part3": {
+      "feature": "shaft",
+      "across": [
+        0.65,
+        0.95
+      ]
+    }
+  },
+  "use_library": true
+}

@@ -1,0 +1,65 @@
+{
+ "part_id": "waveshare-esp32-s3-eth-ov5640-camera-board",
+ "sha256": "10298cad615f02d92a5bd65d56000022c611cb20df9a3fd91a4a5ae8ef51c2c8",
+ "role": "controller",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb:esp32-s3-eth"
+   ]
+  },
+  "usb": {
+   "nodes": [
+    "usb-c:metal-shell",
+    "usb-c:opening"
+   ],
+   "connector": "usb-c",
+   "opens_toward": "+y"
+  },
+  "pin_rows": {
+   "nodes": [
+    "header:left:01:gold-pin",
+    "header:left:02:gold-pin",
+    "header:left:03:gold-pin",
+    "header:left:04:gold-pin",
+    "header:left:05:gold-pin",
+    "header:left:06:gold-pin",
+    "header:left:07:gold-pin",
+    "header:left:08:gold-pin",
+    "header:left:09:gold-pin",
+    "header:left:10:gold-pin",
+    "header:left:11:gold-pin",
+    "header:left:12:gold-pin",
+    "header:left:13:gold-pin",
+    "header:left:14:gold-pin",
+    "header:left:15:gold-pin",
+    "header:left:16:gold-pin",
+    "header:left:17:gold-pin",
+    "header:left:18:gold-pin",
+    "header:left:19:gold-pin",
+    "header:left:20:gold-pin",
+    "header:right:01:gold-pin",
+    "header:right:02:gold-pin",
+    "header:right:03:gold-pin",
+    "header:right:04:gold-pin",
+    "header:right:05:gold-pin",
+    "header:right:06:gold-pin",
+    "header:right:07:gold-pin",
+    "header:right:08:gold-pin",
+    "header:right:09:gold-pin",
+    "header:right:10:gold-pin",
+    "header:right:11:gold-pin",
+    "header:right:12:gold-pin",
+    "header:right:13:gold-pin",
+    "header:right:14:gold-pin",
+    "header:right:15:gold-pin",
+    "header:right:16:gold-pin",
+    "header:right:17:gold-pin",
+    "header:right:18:gold-pin",
+    "header:right:19:gold-pin",
+    "header:right:20:gold-pin"
+   ]
+  }
+ }
+}

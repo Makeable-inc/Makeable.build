@@ -1,0 +1,25 @@
+{
+  "name": "Kitchen timer",
+  "parts": "esp32-c6-1-3inch-lcd-display-development-board-with-pre-soldered-header,ky-040-rotary-encoder",
+  "look": "a small upright kitchen timer with a soft pebble-like body, a square screen at the top and one chunky turn knob below it",
+  "picture_prompt": "Product concept render of a small 3D-printable kitchen timer, seen from the front and slightly to one side. It is taller than it is wide, about 40 mm wide and 58 mm tall, with one smooth continuous pebble-like body and very soft rounded corners. At the top of the front is a flat square screen, about 23 mm on each side, in a slim even bezel, filling most of the front's width. Below it the front swells gently forward into a soft rounded chin, and one chunky round knob stands straight out of it. One matte plastic colour with a dark screen and a dark knob. Soft studio light, plain light background. Flat bottom, no text, no logos, no fake buttons, no feet, no visible seams, no cables.",
+  "sheet": [
+    "Front faces -y and stands upright. World +z is up. The screen is the main feature, and the front stays compact around it: about 40 mm wide and at most 58 mm tall.",
+    "Top of the front: the square screen, centred left to right.",
+    "Bottom of the front: a raised chin that swells forward as much as the knob's plugs need, with a broad rounded blend into the upper body. It must read as a deliberate part of the body, not a bump.",
+    "The knob comes straight out of that chin toward -y, centred left to right. Its pins point -y too, and the plugs and their first turn sit inside the chin.",
+    "USB opens on the right side (+x), so the board's USB edge points +x. The plug must stay above the desk.",
+    "The wires run behind the board as one neat bundle, side by side, and do not show from outside.",
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover."
+  ],
+  "body_first": true,
+  "min_body": {"width": 36, "height": 52, "depth": 42},
+  "front": "-y",
+  "width_to_height": [0.6, 0.9],
+  "max_depth": 65,
+  "usb_side": "+x",
+  "place": {
+    "PURCHASE_Board": {"feature": "screen", "across": [0.3, 0.7]},
+    "PURCHASE_Part2": {"feature": "shaft", "across": [0.3, 0.7]}
+  }
+}

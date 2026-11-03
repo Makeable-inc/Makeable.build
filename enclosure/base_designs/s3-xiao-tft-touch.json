@@ -1,0 +1,34 @@
+{
+  "name": "Small square companion",
+  "parts": "seeed-xiao-esp32s3,tft-154-lcd-display-module,ttp223-touch",
+  "look": "a small soft-cornered desk companion with a square screen on the left and a round touch button on the right",
+  "picture_prompt": "Product concept render of a small 3D-printable desk device, seen from the front and slightly to one side. It is only a little wider than it is tall. One smooth continuous body with soft rounded corners. On the left of the front is a flat square screen, about 28 mm across, in a slim even bezel. On the right of the front is one shallow round dimple about 12 mm across, used as a touch button, with no knobs. One matte plastic colour with a dark screen. Soft studio light, plain light background. Flat bottom, flat back, no text, no logos, no speaker holes, no feet, no visible seams, no cables.",
+  "sheet": [
+    "Front faces -y and stands upright. World +z is up.",
+    "Left about 60% of the front: the screen, a separate board with its long side along z, just behind the front wall.",
+    "Right about 40% of the front: the touch sensor, flat behind the front wall, reached through a round opening in a shallow dimple. Its pins point into the case, toward +y.",
+    "The controller is a small separate board behind the screen, near the left wall, so its USB reaches that wall. Its top faces the back (+y) and its pins point forward (-y), with their plugs between it and the screen.",
+    "USB opens on the left side (-x).",
+    "The wires run behind the screen board as one neat bundle, side by side, and do not show from outside.",
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover.",
+    "The controller sits on a holder built into the rear cover. The rear cover is a flat plate with holder and stops on it, and it closes from +y."
+  ],
+  "body_first": true,
+  "front": "-y",
+  "width_to_height": [
+    1.1,
+    1.6
+  ],
+  "max_depth": 70,
+  "usb_side": "-x",
+  "place": {
+    "PURCHASE_Part2": {
+      "feature": "screen",
+      "across": [
+        0.2,
+        0.5
+      ]
+    }
+  },
+  "use_library": true
+}

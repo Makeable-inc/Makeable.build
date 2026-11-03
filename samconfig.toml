@@ -17,5 +17,7 @@ fail_on_empty_changeset = false
 # TrustedProxyHops=1: Amplify and the Function URL both set x-forwarded-for to the
 # real client IP and drop any value the visitor sent (checked 27 Oct).
 # PublicOrigin is the Amplify test URL until cutover, then https://makeable.build.
-parameter_overrides = "TrustedProxyHops=1 PublicOrigin=https://main.d1pesirg786fm3.amplifyapp.com LogClientIp=0"
+# EnclosureSubnets / EnclosureSecurityGroup: outputs of the makeable-enclosure stack (infra/enclosure.yml).
+# They turn on enclosure jobs on Fargate; leave EnclosureSubnets empty to turn them off.
+parameter_overrides = "TrustedProxyHops=1 PublicOrigin=https://main.d1pesirg786fm3.amplifyapp.com LogClientIp=0 EnclosureSubnets=subnet-04d02757f84ea8686,subnet-0e9e249c294bd7ea8 EnclosureSecurityGroup=sg-08aa9afde768340eb"
 

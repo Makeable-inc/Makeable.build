@@ -29,11 +29,22 @@ Parameters:
   SecretName:
     Type: String
     Default: makeable/prod
+  EnclosureSubnets:
+    Type: String
+    Default: ""
+    Description: Subnets for enclosure tasks, comma-separated (infra/enclosure.yml output Subnets). Empty turns enclosure jobs off.
+  EnclosureSecurityGroup:
+    Type: String
+    Default: ""
+    Description: Security group for enclosure tasks (infra/enclosure.yml output SecurityGroup).
   SchedulesState:
     Type: String
     AllowedValues: [ENABLED, DISABLED]
     Default: DISABLED
     Description: Cleanup and social refresh. Keep DISABLED until cutover; Netlify runs the same jobs until then.
+
+Conditions:
+  HasEnclosure: !Not [!Equals [!Ref EnclosureSubnets, ""]]
 
 Globals:
   Function:
@@ -52,6 +63,12 @@ Globals:
         MAKEABLE_PUBLIC_ORIGIN: !Ref PublicOrigin
         MAKEABLE_TRUSTED_PROXY_HOPS: !Ref TrustedProxyHops
         MAKEABLE_LOG_CLIENT_IP: !Ref LogClientIp
+        # Enclosure jobs run as Fargate tasks from infra/enclosure.yml (fixed names makeable-enclosure*).
+        MAKEABLE_ENCLOSURE_DISPATCH: !If [HasEnclosure, fargate, ""]
+        MAKEABLE_ENCLOSURE_CLUSTER: makeable-enclosure
+        MAKEABLE_ENCLOSURE_TASK_DEFINITION: makeable-enclosure
+        MAKEABLE_ENCLOSURE_SUBNETS: !Ref EnclosureSubnets
+        MAKEABLE_ENCLOSURE_SECURITY_GROUP: !Ref EnclosureSecurityGroup
 
 Resources:
   # All app data (was Netlify Blobs), stored as "<store name>/<key>".
@@ -157,6 +174,54 @@ Resources:
             RetryPolicy:
               MaximumRetryAttempts: 0
 
+  # Stops enclosure jobs that went quiet (lib/enclosure-jobs.mjs reap). Status reads and starts also do this.
+  EnclosureReapFunction:
+    Type: AWS::Serverless::Function
+    Condition: HasEnclosure
+    Properties:
+      LoggingConfig:
+        LogGroup: !Ref EnclosureReapLogs
+      Handler: aws/functions/enclosure-reap.handler
+      Timeout: 60
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref DataBucket }
+        - *ReadSecret
+      Events:
+        Every5Minutes:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(5 minutes)
+            State: ENABLED
+            RetryPolicy:
+              MaximumRetryAttempts: 0
+
+  # The API starts and stops enclosure tasks; the reaper stops them. Only that task family, on that cluster,
+  # with only the two enclosure roles passed to ECS.
+  EnclosureTasksPolicy:
+    Type: AWS::IAM::Policy
+    Condition: HasEnclosure
+    Properties:
+      PolicyName: enclosure-tasks
+      Roles: [!Ref ApiFunctionRole, !Ref EnclosureReapFunctionRole]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: ecs:RunTask
+            Resource: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/makeable-enclosure:*
+            Condition:
+              ArnEquals: { ecs:cluster: !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/makeable-enclosure" }
+          - Effect: Allow
+            Action: [ecs:StopTask, ecs:DescribeTasks]
+            Resource: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/makeable-enclosure/*
+          - Effect: Allow
+            Action: iam:PassRole
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/makeable-enclosure-execution
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/makeable-enclosure-task
+            Condition:
+              StringEquals: { iam:PassedToService: ecs-tasks.amazonaws.com }
+
   # Own names (not /aws/lambda/...) so they exist before the functions run;
   # otherwise a first invoke auto-creates the group and the deploy fails.
   ApiLogs:
@@ -178,6 +243,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /makeable/${AWS::StackName}/social-refresh
+      RetentionInDays: 30
+  EnclosureReapLogs:
+    Type: AWS::Logs::LogGroup
+    Condition: HasEnclosure
+    Properties:
+      LogGroupName: !Sub /makeable/${AWS::StackName}/enclosure-reap
       RetentionInDays: 30
 
 Outputs:

@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Makeable enclosure generator on Fargate: one task per case job (docs/enclosure-jobs.md).
+  A network with no inbound access and HTTPS-only egress, a cluster, the image repository,
+  the task definition and its two roles. Deployed by hand, separately from makeable-prod.
+
+# Deploy (admin login, once, then on change):
+#   aws cloudformation deploy --stack-name makeable-enclosure --template-file infra/enclosure.yml \
+#     --capabilities CAPABILITY_NAMED_IAM --parameter-overrides DataBucketName=<bucket> SecretArn=<full secret arn>
+# Then set EnclosureSubnets and EnclosureSecurityGroup in samconfig.toml from this stack's outputs.
+# Names are fixed (makeable-enclosure*) so template.yaml can refer to them without imports.
+
+Parameters:
+  DataBucketName:
+    Type: String
+    Description: The makeable-prod data bucket. Tasks write only under makeable-enclosure-runs/ and read only makeable-enclosure-pictures/.
+  SecretArn:
+    Type: String
+    Description: Full ARN of the makeable/prod secret (with its random suffix). The task gets only its OPENAI_API_KEY field.
+  ImageTag:
+    Type: String
+    Default: latest
+  TaskCpu:
+    Type: String
+    Default: "4096"
+  TaskMemory:
+    Type: String
+    Default: "8192"
+
+Resources:
+  # Public subnets with no NAT gateway: each task gets a public IP for outbound HTTPS only (OpenAI, S3, image pull).
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.40.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: makeable-enclosure }]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.40.0.0/20
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags: [{ Key: Name, Value: makeable-enclosure-a }]
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.40.16.0/20
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags: [{ Key: Name, Value: makeable-enclosure-b }]
+  SubnetARoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetA
+      RouteTableId: !Ref RouteTable
+  SubnetBRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetB
+      RouteTableId: !Ref RouteTable
+  # S3 traffic stays inside AWS (no data charge, no public internet).
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref RouteTable]
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: makeable-enclosure-task
+      GroupDescription: Enclosure tasks. Nothing inbound; outbound HTTPS only.
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: makeable-enclosure
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: >-
+          {"rules":[{"rulePriority":1,"description":"keep the last 5 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: makeable-enclosure
+      CapacityProviders: [FARGATE]
+
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /makeable/enclosure
+      RetentionInDays: 30
+
+  # Used by ECS itself to pull the image, write logs and read the key. The container never gets these credentials.
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: makeable-enclosure-execution
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-openai-key
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref SecretArn
+
+  # The container's own credentials: write this job's output, read chosen pictures. Nothing else.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: makeable-enclosure-task
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: job-output
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${DataBucketName}/makeable-enclosure-runs/*
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${DataBucketName}/makeable-enclosure-pictures/*
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: makeable-enclosure
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      RuntimePlatform: { OperatingSystemFamily: LINUX, CpuArchitecture: X86_64 }
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: generator
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/makeable-enclosure:${ImageTag}
+          Essential: true
+          # The API overrides this with the job's design and id.
+          Command: [python, -W, ignore, cloud_run.py]
+          Secrets:
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub "${SecretArn}:OPENAI_API_KEY::"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref Logs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job
+
+Outputs:
+  Subnets:
+    Description: EnclosureSubnets in samconfig.toml
+    Value: !Join [",", [!Ref SubnetA, !Ref SubnetB]]
+  SecurityGroup:
+    Description: EnclosureSecurityGroup in samconfig.toml
+    Value: !Ref TaskSecurityGroup
+  RepositoryUri:
+    Value: !GetAtt Repository.RepositoryUri

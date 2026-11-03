@@ -1,0 +1,48 @@
+{
+ "part_id": "ky-040-rotary-encoder-sideways-test",
+ "sha256": "b1206502ca31670518143f7924eb074a31c02af9e8c3f603e7ade1c35869b372",
+ "role": "input",
+ "front": "+z",
+ "pins_point": "+x",
+ "pins_note": "TEST VARIANT, pending a decision: the team's decision for the product is still pins up as in the AWS model. This card tests right-angle pins, the direction the compiler's normal already gives. Everything except the pins is the AWS model. The bend height and pin reach are assumed until a right-angle module is measured.",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb:mtdele-b0d949dpr1-ky040"
+   ]
+  },
+  "can": {
+   "nodes": [
+    "encoder:metal-can"
+   ]
+  },
+  "bushing": {
+   "nodes": [
+    "encoder:threaded-bushing"
+   ]
+  },
+  "shaft": {
+   "nodes": [
+    "encoder:shaft"
+   ],
+   "points": "+z"
+  },
+  "knob": {
+   "nodes": [
+    "included-knob:body",
+    "included-knob:top",
+    "included-knob:index-mark"
+   ],
+   "fitted_last": true
+  },
+  "pin_rows": {
+   "nodes": [
+    "ky040-j1:pin:01:CLK:metal",
+    "ky040-j1:pin:02:DT:metal",
+    "ky040-j1:pin:03:SW:metal",
+    "ky040-j1:pin:04:PLUS:metal",
+    "ky040-j1:pin:05:GND:metal"
+   ]
+  }
+ }
+}

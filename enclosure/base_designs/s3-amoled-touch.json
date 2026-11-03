@@ -1,0 +1,23 @@
+{
+  "name": "Desk companion",
+  "parts": "waveshare-esp32-s3-1-91-amoled-display-board,ttp223-touch",
+  "look": "a small desk companion with soft rounded corners, a long wide screen on the left and a round touch button on the right of the same front",
+  "picture_prompt": "Product concept render of a small 3D-printable desk companion, seen from the front and slightly to one side. It is a low, wide, soft-cornered tabletop device, about two and a half times as wide as it is tall, with one smooth continuous body and gently curved surfaces. On the left of the front is a flat, long rectangular screen, about 55 mm wide and 22 mm tall, in a slim even bezel. On the right of the front is one shallow round dimple about 12 mm across, used as a touch button. One matte plastic colour with a dark screen. Soft studio light, plain light background. Flat bottom, no text, no logos, no knobs, no speaker holes, no feet, no visible seams, no cables.",
+  "sheet": [
+    "Front faces -y and stands upright. World +z is up.",
+    "Left about 65% of the front: the screen, landscape, with the board turned so its long side runs along x.",
+    "Right about 35% of the front: the touch sensor, flat behind the front wall, reached through a round opening in a shallow dimple. Its pins point into the case, toward +y.",
+    "USB opens on the left side (-x), away from the touch sensor.",
+    "The wires run behind the board as one neat bundle, side by side, and do not show from outside.",
+    "The seam is a flat plane near the back, so from the front the Shell looks like one continuous body and the Base is only a rear cover."
+  ],
+  "body_first": true,
+  "min_body": {"width": 94, "height": 34, "depth": 38},
+  "front": "-y",
+  "width_to_height": [1.9, 3.2],
+  "max_depth": 60,
+  "usb_side": "-x",
+  "place": {
+    "PURCHASE_Board": {"feature": "screen", "across": [0.2, 0.5]}
+  }
+}

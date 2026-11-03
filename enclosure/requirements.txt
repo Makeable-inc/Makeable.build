@@ -1,0 +1,15 @@
+build123d==0.13.0
+cadquery-ocp-novtk==8.0.1.1.0
+embreex==4.4.0.post1
+manifold3d==3.5.4
+networkx==3.6.1
+numpy==2.4.6
+pillow==13.0.0
+pyvista==0.49.2
+rtree==1.4.1
+scikit-image==0.26.0
+scikit-learn==1.9.1
+scipy==1.17.1
+shapely==2.2.0
+trimesh==5.2.0
+boto3==1.43.120

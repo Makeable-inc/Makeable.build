@@ -1,0 +1,63 @@
+{
+ "part_id": "esp32-c6-1-47inch-ips-touch-display-development-board-with-pre-soldered-header",
+ "sha256": "bc5372fa209a83df07e12b41b86b261b8c3bc46b558cd5d735ee9d2380580934",
+ "front": "+z",
+ "features": {
+  "frame": {
+   "nodes": [
+    "0002"
+   ]
+  },
+  "pcb": {
+   "nodes": [
+    "0003"
+   ]
+  },
+  "glass": {
+   "nodes": [
+    "0001"
+   ]
+  },
+  "screen": {
+   "nodes": [
+    "finish:display:neutral-unpowered-touch-glass"
+   ]
+  },
+  "usb": {
+   "nodes": [
+    "0106"
+   ],
+   "connector": "usb-c",
+   "opens_toward": "-y"
+  },
+  "pin_rows": {
+   "nodes": [
+    "0240",
+    "0241"
+   ]
+  },
+  "corner_posts": {
+   "nodes": [
+    "0236",
+    "0237",
+    "0238",
+    "0239"
+   ]
+  }
+ },
+ "role": "controller",
+ "buttons": [
+  {
+   "nodes": [
+    "0007"
+   ],
+   "press_from": "-x"
+  },
+  {
+   "nodes": [
+    "0008"
+   ],
+   "press_from": "+x"
+  }
+ ]
+}

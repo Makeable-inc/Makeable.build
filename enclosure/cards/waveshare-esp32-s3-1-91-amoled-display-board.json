@@ -1,0 +1,65 @@
+{
+ "part_id": "waveshare-esp32-s3-1-91-amoled-display-board",
+ "sha256": "dd5e02306d81e25f7d0d3099c790f7f6a5d417a66bd7ea6af8cc9515ae6a0dcd",
+ "role": "controller",
+ "front": "+z",
+ "features": {
+  "frame": {
+   "nodes": [
+    "0016"
+   ]
+  },
+  "glass": {
+   "nodes": [
+    "0016"
+   ]
+  },
+  "pcb": {
+   "nodes": [
+    "0000"
+   ]
+  },
+  "screen": {
+   "box": {
+    "min": [
+     -11.25,
+     -27.75,
+     0.9
+    ],
+    "max": [
+     11.25,
+     27.25,
+     0.9
+    ]
+   },
+   "estimate": "The model does not mark the screen. 22.5 x 55 mm is an estimate and needs a datasheet."
+  },
+  "usb": {
+   "nodes": [
+    "0001"
+   ],
+   "connector": "usb-c",
+   "opens_toward": "+y"
+  },
+  "pin_rows": {
+   "nodes": [
+    "0002",
+    "0003"
+   ]
+  }
+ },
+ "buttons": [
+  {
+   "nodes": [
+    "0004"
+   ],
+   "press_from": "-x"
+  },
+  {
+   "nodes": [
+    "0005"
+   ],
+   "press_from": "+x"
+  }
+ ]
+}

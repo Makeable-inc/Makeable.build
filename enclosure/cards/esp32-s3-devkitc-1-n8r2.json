@@ -1,0 +1,71 @@
+{
+ "part_id": "esp32-s3-devkitc-1-n8r2",
+ "sha256": "027017fb2b7859fc4842d482760f557447930441242ba4beaca152f19ec2262c",
+ "role": "controller",
+ "front": "+z",
+ "features": {
+  "pcb": {
+   "nodes": [
+    "pcb:center-field",
+    "pcb:left-edge",
+    "pcb:right-edge"
+   ]
+  },
+  "usb": {
+   "nodes": [
+    "usb:usb-direct:shell"
+   ],
+   "connector": "usb-c",
+   "opens_toward": "-y",
+   "note": "The board has two USB-C sockets at this end. This one is the case opening."
+  },
+  "pin_rows": {
+   "nodes": [
+    "pin:left:10:GPIO17",
+    "pin:left:11:GPIO18",
+    "pin:left:12:GPIO8",
+    "pin:left:13:GPIO3",
+    "pin:left:14:GPIO46",
+    "pin:left:15:GPIO9",
+    "pin:left:16:GPIO10",
+    "pin:left:17:GPIO11",
+    "pin:left:18:GPIO12",
+    "pin:left:19:GPIO13",
+    "pin:left:1:3V3",
+    "pin:left:20:GPIO14",
+    "pin:left:21:5V",
+    "pin:left:22:GND_L",
+    "pin:left:2:3V3_2",
+    "pin:left:3:EN",
+    "pin:left:4:GPIO4",
+    "pin:left:5:GPIO5",
+    "pin:left:6:GPIO6",
+    "pin:left:7:GPIO7",
+    "pin:left:8:GPIO15",
+    "pin:left:9:GPIO16",
+    "pin:right:10:GPIO38",
+    "pin:right:11:GPIO37",
+    "pin:right:12:GPIO36",
+    "pin:right:13:GPIO35",
+    "pin:right:14:GPIO0",
+    "pin:right:15:GPIO45",
+    "pin:right:16:GPIO48",
+    "pin:right:17:GPIO47",
+    "pin:right:18:GPIO21",
+    "pin:right:19:GPIO20",
+    "pin:right:1:GND_R1",
+    "pin:right:20:GPIO19",
+    "pin:right:21:GND_R2",
+    "pin:right:22:GND_R3",
+    "pin:right:2:TX",
+    "pin:right:3:RX",
+    "pin:right:4:GPIO1",
+    "pin:right:5:GPIO2",
+    "pin:right:6:GPIO42",
+    "pin:right:7:GPIO41",
+    "pin:right:8:GPIO40",
+    "pin:right:9:GPIO39"
+   ]
+  }
+ }
+}
