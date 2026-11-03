@@ -19,6 +19,119 @@ All routes need a signed-in session. Requests other than GET must come from the 
 
 A 429 or 503 reply has a `Retry-After` header. Other users' jobs always answer 404, so a job id tells an outsider nothing.
 
+## Calling the API
+
+For anyone building a page or tool that makes a case. The flow is: start a job, check it every few seconds until it ends, then download the files.
+
+```
+POST /api/enclosure-jobs ──▶ 202 { job: RUNNING }
+GET  /api/enclosure-jobs/:id  every 5 s ──▶ RUNNING + progress ... ──▶ PASS / PASS WITH WARNINGS / FAIL
+GET  /api/enclosure-jobs/:id/files/PRINT_Shell.stl ──▶ the file (302 to a download link on AWS)
+```
+
+**Signing in.** Use the site's normal session cookie (the same sign-in as the builder). From a page on the site, `fetch` sends it by itself. POST and DELETE must come from the same site, so call the API from the site's own origin. Locally, `http://localhost:3001/__local-login` signs in as a test user.
+
+**Errors.** Every error is JSON `{ "error": "<plain sentence for the user>" }`, and some also carry the `job`. The sentence is safe to show as it is.
+
+### Start a job
+
+```http
+POST /api/enclosure-jobs
+Content-Type: application/json
+
+{ "design": "s3-devkit-bar-touch", "requestId": "ui-7f3c9a21b4" }
+```
+
+- `design`: a file name in `enclosure/base_designs/`, without `.json`. An unknown name gives 400.
+- `requestId` (optional, recommended): 8 to 64 letters, digits, `-` or `_`, new for each click. If the request fails on the network, send it again with the same id: you get the same job back (200), never a second one.
+- `pictureId` (optional): a picture saved for this user (see [A chosen picture](#a-chosen-picture)). There is no upload route yet.
+
+Reply `202`:
+
+```json
+{ "job": { "id": "enc-f08ls3w083gh", "design": "s3-devkit-bar-touch", "state": "RUNNING", "createdAt": "2026-11-03T08:41:12.000Z", "progress": null } }
+```
+
+Refusals: `409` you already have a job running (`job` is that job, so you can show it), `429` today's limit is reached (`limit` in the body), `503` busy or the job could not start. 429 and 503 have `Retry-After` in seconds.
+
+### Check a job
+
+```http
+GET /api/enclosure-jobs/enc-f08ls3w083gh
+```
+
+While it runs, `progress` says where it is. It changes about every 30 s on AWS:
+
+```json
+{ "job": { "id": "enc-f08ls3w083gh", "design": "s3-devkit-bar-touch", "state": "RUNNING", "createdAt": "2026-11-03T08:41:12.000Z",
+           "progress": { "stage": "case", "attempt": 1, "attempt_try": 3, "failed": [], "tokens_so_far": 41210, "updated": "2026-11-03T08:46:40Z" } } }
+```
+
+- `stage`: `body` (the outer shape) then `case` (holes, parts, screws). `done` at the end.
+- `attempt`: 1, or 2 when the generator started again by itself. `attempt_try`: which try within that attempt.
+- `tokens_so_far`: AI tokens used so far.
+
+When it ends, `state` is one of the final states and `progress` is `null`:
+
+```json
+{ "job": { "id": "enc-f08ls3w083gh", "design": "s3-devkit-bar-touch", "state": "PASS WITH WARNINGS", "createdAt": "2026-11-03T08:41:12.000Z", "progress": null,
+           "message": "Your case is ready. Check the print checklist before printing.",
+           "tokens": 52025, "seconds": 386,
+           "attempts": [{ "outcome": "pass_with_warnings", "reason": null }],
+           "files": ["/api/enclosure-jobs/enc-f08ls3w083gh/files/PRINT_Shell.stl", "/api/enclosure-jobs/enc-f08ls3w083gh/files/PRINT_Base.stl",
+                     "/api/enclosure-jobs/enc-f08ls3w083gh/files/preview.png", "/api/enclosure-jobs/enc-f08ls3w083gh/files/report.json"] } }
+```
+
+| `state` | Final | Show the user |
+|---|---|---|
+| `STARTING`, `RUNNING` | no | "Making your case" and the progress |
+| `PASS` | yes | `message` and the files |
+| `PASS WITH WARNINGS` | yes | `message`, the files, and the warnings in `report.json` as a print checklist |
+| `FAIL` | yes | `message`. No files. They can start again |
+| `CANCELLED` | yes | Cancelled |
+| `REFUSED` | yes | `message` (a limit was reached; nothing ran) |
+
+Check every 5 seconds and stop at a final state. A job takes 4 to 20 minutes. Checks are cheap, so the page can be left open.
+
+### Download a file
+
+```http
+GET /api/enclosure-jobs/enc-f08ls3w083gh/files/PRINT_Shell.stl
+```
+
+Use the links in `files`. Locally the file comes back directly. On AWS the reply is `302` to a download link that works for 5 minutes, so ask for a new one each time and don't store it. Browsers and `fetch` follow the 302 by themselves, so an `<img src>` or `<a href>` works the same in both places. Files of a job that did not pass answer 404.
+
+### Cancel
+
+```http
+DELETE /api/enclosure-jobs/enc-f08ls3w083gh
+```
+
+Stops the container and answers with the job, now `CANCELLED`. A finished job is returned unchanged.
+
+### Example from a page
+
+```js
+async function makeCase(design, onProgress) {
+  const requestId = "ui-" + crypto.randomUUID().slice(0, 12);
+  let reply = await fetch("/api/enclosure-jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ design, requestId }) });
+  let data = await reply.json();
+  if (!reply.ok && reply.status !== 409) throw new Error(data.error);
+  const id = data.job.id;
+  const final = ["PASS", "PASS WITH WARNINGS", "FAIL", "CANCELLED", "REFUSED"];
+  while (!final.includes(data.job.state)) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    data = await (await fetch(`/api/enclosure-jobs/${id}`)).json();
+    onProgress(data.job);
+  }
+  return data.job; // data.job.files has the download links when it passed
+}
+```
+
+### Test page
+
+`npm run dev:local`, then open `http://localhost:3001/__enclosure-test` (`scripts/enclosure-test.html`). It starts a job, shows its progress, can cancel it, and shows the preview and links when it passes. The local server serves it only; it is not part of the site. To run jobs on AWS from a laptop, start `dev:local` with an AWS login (`AWS_PROFILE=makeable`) and `MAKEABLE_ENCLOSURE_DISPATCH=fargate`, `MAKEABLE_ENCLOSURE_CLUSTER=makeable-enclosure`, `MAKEABLE_ENCLOSURE_TASK_DEFINITION=makeable-enclosure`, `MAKEABLE_ENCLOSURE_SUBNETS`, `MAKEABLE_ENCLOSURE_SECURITY_GROUP` (the `makeable-enclosure` stack's outputs) and `MAKEABLE_STORAGE_BUCKET` (the data bucket). Job records stay in memory, so restarting the server forgets running jobs, though their tasks carry on.
+
 ## How a job moves
 
 ```
