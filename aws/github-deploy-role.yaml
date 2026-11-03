@@ -105,6 +105,23 @@ Resources:
                   - !Sub arn:${AWS::Partition}:s3:::${AppStack}-databucket-*
                   - !Sub arn:${AWS::Partition}:s3:::${AppStack}-databucket-*/*
 
+              # Pushes the enclosure generator's image (scripts/ci-enclosure-image.sh). Only to that one repository.
+              - Sid: EnclosureImageLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: EnclosureImagePush
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                Resource: !Sub arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/makeable-enclosure
+
   # Used by CloudFormation (not by GitHub) to create and change the app stack's resources.
   ExecutionRole:
     Type: AWS::IAM::Role

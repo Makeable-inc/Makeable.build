@@ -263,7 +263,11 @@ aws logs tail /makeable/makeable-prod/enclosure-reap --since 15m          # the 
 
 To turn jobs off again, set `EnclosureSubnets=` (empty) and deploy. The routes then answer 503 and nothing else changes.
 
-The image is not built by CI. After a change under `enclosure/`, build and push it by hand (the commands above). Tasks always pull `:latest`, so the next job uses it.
+The deploy workflow builds and pushes the image (`scripts/ci-enclosure-image.sh`), after a successful deploy and only when something under `enclosure/` changed since `aws-last-good`. Each image is tagged with its commit and `latest`, and tasks always pull `:latest`, so the next job uses it. To go back to an older image, point `latest` at an older commit's tag (the script's header has the two commands; ECR keeps the last 5). The deploy role needs ECR push rights for this (`aws/github-deploy-role.yaml`, statements `EnclosureImageLogin` and `EnclosureImagePush`). The role is applied by hand, not by the workflow, so apply it once before the first deploy that builds an image:
+
+```
+aws cloudformation deploy --template-file aws/github-deploy-role.yaml --stack-name makeable-github-deploy --capabilities CAPABILITY_NAMED_IAM --profile makeable
+```
 
 ## Try it locally
 

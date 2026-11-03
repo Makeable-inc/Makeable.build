@@ -40,6 +40,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.sha }}
+          # The enclosure image step compares with the aws-last-good tag.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -77,6 +79,13 @@ jobs:
       - name: Roll back to last good deploy
         if: failure() && steps.deploy.outcome == 'failure' && inputs.ref != 'aws-last-good'
         run: bash scripts/ci-rollback.sh
+
+      # The enclosure generator's container isn't part of the SAM stack. It is rebuilt only when enclosure/
+      # changed, and only after the deploy worked, so a failed deploy never leaves a new image behind.
+      # If this step fails, the commit isn't marked good, so the next deploy builds the image again.
+      - name: Push enclosure image
+        if: success()
+        run: bash scripts/ci-enclosure-image.sh
 
       - name: Mark as last good deploy
         if: success()
