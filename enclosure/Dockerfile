@@ -26,5 +26,8 @@ COPY lib /app/lib
 COPY artifacts/aws-assembly-release /app/artifacts/aws-assembly-release
 COPY enclosure /app/enclosure
 
-ENV PYTHONUNBUFFERED=1 MPLBACKEND=Agg
+# The AI's design code runs as this user, which cannot read the generator's environment (the OpenAI key) or files.
+RUN useradd --system --no-create-home --shell /usr/sbin/nologin runner
+
+ENV PYTHONUNBUFFERED=1 MPLBACKEND=Agg ENCLOSURE_RUNNER_USER=runner
 CMD ["python", "-W", "ignore", "generate.py"]

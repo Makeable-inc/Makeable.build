@@ -19,6 +19,119 @@ All routes need a signed-in session. Requests other than GET must come from the 
 
 A 429 or 503 reply has a `Retry-After` header. Other users' jobs always answer 404, so a job id tells an outsider nothing.
 
+## Calling the API
+
+For anyone building a page or tool that makes a case. The flow is: start a job, check it every few seconds until it ends, then download the files.
+
+```
+POST /api/enclosure-jobs ──▶ 202 { job: RUNNING }
+GET  /api/enclosure-jobs/:id  every 5 s ──▶ RUNNING + progress ... ──▶ PASS / PASS WITH WARNINGS / FAIL
+GET  /api/enclosure-jobs/:id/files/PRINT_Shell.stl ──▶ the file (302 to a download link on AWS)
+```
+
+**Signing in.** Use the site's normal session cookie (the same sign-in as the builder). From a page on the site, `fetch` sends it by itself. POST and DELETE must come from the same site, so call the API from the site's own origin. Locally, `http://localhost:3001/__local-login` signs in as a test user.
+
+**Errors.** Every error is JSON `{ "error": "<plain sentence for the user>" }`, and some also carry the `job`. The sentence is safe to show as it is.
+
+### Start a job
+
+```http
+POST /api/enclosure-jobs
+Content-Type: application/json
+
+{ "design": "s3-devkit-bar-touch", "requestId": "ui-7f3c9a21b4" }
+```
+
+- `design`: a file name in `enclosure/base_designs/`, without `.json`. An unknown name gives 400.
+- `requestId` (optional, recommended): 8 to 64 letters, digits, `-` or `_`, new for each click. If the request fails on the network, send it again with the same id: you get the same job back (200), never a second one.
+- `pictureId` (optional): a picture saved for this user (see [A chosen picture](#a-chosen-picture)). There is no upload route yet.
+
+Reply `202`:
+
+```json
+{ "job": { "id": "enc-f08ls3w083gh", "design": "s3-devkit-bar-touch", "state": "RUNNING", "createdAt": "2026-11-03T08:41:12.000Z", "progress": null } }
+```
+
+Refusals: `409` you already have a job running (`job` is that job, so you can show it), `429` today's limit is reached (`limit` in the body), `503` busy or the job could not start. 429 and 503 have `Retry-After` in seconds.
+
+### Check a job
+
+```http
+GET /api/enclosure-jobs/enc-f08ls3w083gh
+```
+
+While it runs, `progress` says where it is. It changes about every 30 s on AWS:
+
+```json
+{ "job": { "id": "enc-f08ls3w083gh", "design": "s3-devkit-bar-touch", "state": "RUNNING", "createdAt": "2026-11-03T08:41:12.000Z",
+           "progress": { "stage": "case", "attempt": 1, "attempt_try": 3, "failed": [], "tokens_so_far": 41210, "updated": "2026-11-03T08:46:40Z" } } }
+```
+
+- `stage`: `body` (the outer shape) then `case` (holes, parts, screws). `done` at the end.
+- `attempt`: 1, or 2 when the generator started again by itself. `attempt_try`: which try within that attempt.
+- `tokens_so_far`: AI tokens used so far.
+
+When it ends, `state` is one of the final states and `progress` is `null`:
+
+```json
+{ "job": { "id": "enc-f08ls3w083gh", "design": "s3-devkit-bar-touch", "state": "PASS WITH WARNINGS", "createdAt": "2026-11-03T08:41:12.000Z", "progress": null,
+           "message": "Your case is ready. Check the print checklist before printing.",
+           "tokens": 52025, "seconds": 386,
+           "attempts": [{ "outcome": "pass_with_warnings", "reason": null }],
+           "files": ["/api/enclosure-jobs/enc-f08ls3w083gh/files/PRINT_Shell.stl", "/api/enclosure-jobs/enc-f08ls3w083gh/files/PRINT_Base.stl",
+                     "/api/enclosure-jobs/enc-f08ls3w083gh/files/preview.png", "/api/enclosure-jobs/enc-f08ls3w083gh/files/report.json"] } }
+```
+
+| `state` | Final | Show the user |
+|---|---|---|
+| `STARTING`, `RUNNING` | no | "Making your case" and the progress |
+| `PASS` | yes | `message` and the files |
+| `PASS WITH WARNINGS` | yes | `message`, the files, and the warnings in `report.json` as a print checklist |
+| `FAIL` | yes | `message`. No files. They can start again |
+| `CANCELLED` | yes | Cancelled |
+| `REFUSED` | yes | `message` (a limit was reached; nothing ran) |
+
+Check every 5 seconds and stop at a final state. A job takes 4 to 20 minutes. Checks are cheap, so the page can be left open.
+
+### Download a file
+
+```http
+GET /api/enclosure-jobs/enc-f08ls3w083gh/files/PRINT_Shell.stl
+```
+
+Use the links in `files`. Locally the file comes back directly. On AWS the reply is `302` to a download link that works for 5 minutes, so ask for a new one each time and don't store it. Browsers and `fetch` follow the 302 by themselves, so an `<img src>` or `<a href>` works the same in both places. Files of a job that did not pass answer 404.
+
+### Cancel
+
+```http
+DELETE /api/enclosure-jobs/enc-f08ls3w083gh
+```
+
+Stops the container and answers with the job, now `CANCELLED`. A finished job is returned unchanged.
+
+### Example from a page
+
+```js
+async function makeCase(design, onProgress) {
+  const requestId = "ui-" + crypto.randomUUID().slice(0, 12);
+  let reply = await fetch("/api/enclosure-jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ design, requestId }) });
+  let data = await reply.json();
+  if (!reply.ok && reply.status !== 409) throw new Error(data.error);
+  const id = data.job.id;
+  const final = ["PASS", "PASS WITH WARNINGS", "FAIL", "CANCELLED", "REFUSED"];
+  while (!final.includes(data.job.state)) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    data = await (await fetch(`/api/enclosure-jobs/${id}`)).json();
+    onProgress(data.job);
+  }
+  return data.job; // data.job.files has the download links when it passed
+}
+```
+
+### Test page
+
+`npm run dev:local`, then open `http://localhost:3001/__enclosure-test` (`scripts/enclosure-test.html`). It starts a job, shows its progress, can cancel it, and shows the preview and links when it passes. The local server serves it only; it is not part of the site. To run jobs on AWS from a laptop, start `dev:local` with an AWS login (`AWS_PROFILE=makeable`) and `MAKEABLE_ENCLOSURE_DISPATCH=fargate`, `MAKEABLE_ENCLOSURE_CLUSTER=makeable-enclosure`, `MAKEABLE_ENCLOSURE_TASK_DEFINITION=makeable-enclosure`, `MAKEABLE_ENCLOSURE_SUBNETS`, `MAKEABLE_ENCLOSURE_SECURITY_GROUP` (the `makeable-enclosure` stack's outputs) and `MAKEABLE_STORAGE_BUCKET` (the data bucket). Job records stay in memory, so restarting the server forgets running jobs, though their tasks carry on.
+
 ## How a job moves
 
 ```
@@ -85,7 +198,66 @@ Without a `pictureId`, the job and the `docker run` command are exactly as befor
 `MAKEABLE_ENCLOSURE_DISPATCH` picks the dispatch. Without it, the routes answer 503.
 
 - `docker`: on a laptop, set by `npm run dev:local`. It runs the `makeable-enclosure` image (`enclosure/Dockerfile`) with `docker run`, passing `OPENAI_API_KEY` by name so the key never appears in a command line. The container writes to `enclosure/runs` (or `MAKEABLE_ENCLOSURE_RUNS_DIR`).
-- AWS (planned): one Fargate task per job runs the same image, and files go to S3. Only the dispatch and the file reads change.
+- `fargate`: on AWS, set by `template.yaml` once `EnclosureSubnets` is filled in. One Fargate task per job runs the same image with `cloud_run.py`. Results and files go to the data bucket, and a file request redirects to a 5-minute download link, because files can be 35 MB and a Lambda reply can't exceed 6 MB.
+
+## AWS
+
+```
+ makeable-prod (template.yaml)                     makeable-enclosure (infra/enclosure.yml, by hand)
+ ┌──────────────────────────────────┐   RunTask   ┌──────────────────────────────────────────┐
+ │ ApiFunction ─────────────────────┼───────────▶ │ cluster ─▶ one Fargate task per job       │
+ │ EnclosureReapFunction (5 min)    │  StopTask   │   image: ECR makeable-enclosure           │
+ │                                  │             │   key: makeable/prod OPENAI_API_KEY field │
+ │ DataBucket                       │ ◀───────────┼── writes makeable-enclosure-runs/<job>/    │
+ │  makeable-enclosure-jobs/  (API) │   S3 only   │   reads makeable-enclosure-pictures/      │
+ │  makeable-enclosure-runs/  (task)│             │ network: no inbound, HTTPS out, no NAT    │
+ │  makeable-enclosure-pictures/    │             └──────────────────────────────────────────┘
+ └──────────────────────────────────┘
+```
+
+- **Separate stack.** `infra/enclosure.yml` holds the network, cluster, image repository, task definition and its two roles. It is deployed by hand and uses fixed names (`makeable-enclosure*`), so `template.yaml` needs only two settings: `EnclosureSubnets` and `EnclosureSecurityGroup`. While they are empty, enclosure jobs are off and nothing new is created in `makeable-prod`.
+- **The task's access.** Its own role may only write `makeable-enclosure-runs/*` and read `makeable-enclosure-pictures/*`. ECS reads the OpenAI key from Secrets Manager with a separate role that the container never sees.
+- **The AI's code.** It runs as the `runner` user, which can't read the generator's environment, so it can't see the key. The import screen blocks network modules, so the code can't reach the task's role either.
+- **The API's access.** `ApiFunction` and the reaper may run and stop only the `makeable-enclosure` task family on that cluster, and pass only the two enclosure roles.
+- **Cost.** About $0.03 of compute per job (4 vCPU, 8 GB, about 10 minutes) and about $0.25 a month for images. There's no NAT gateway, and S3 traffic goes through a free gateway endpoint.
+
+Setup, once, with an admin login:
+
+```
+aws cloudformation deploy --stack-name makeable-enclosure --template-file infra/enclosure.yml   --capabilities CAPABILITY_NAMED_IAM   --parameter-overrides DataBucketName=<makeable-prod DataBucketName> SecretArn=<full makeable/prod ARN>
+docker build --platform linux/amd64 -f enclosure/Dockerfile -t <RepositoryUri>:latest .
+aws ecr get-login-password | docker login --username AWS --password-stdin <account>.dkr.ecr.us-east-1.amazonaws.com
+docker push <RepositoryUri>:latest
+```
+
+Then add `EnclosureSubnets=<Subnets> EnclosureSecurityGroup=<SecurityGroup>` (the stack's outputs) to `parameter_overrides` in `samconfig.toml`. The next deploy of `makeable-prod` turns jobs on.
+
+### Before merging the PR that turns it on
+
+Merging into `staging` deploys `makeable-prod`, the backend behind the staging Amplify URL. With `EnclosureSubnets` set in `samconfig.toml`, that deploy turns enclosure jobs on.
+
+| Needed | State on 3 Nov |
+|---|---|
+| Stack `makeable-enclosure` deployed from `infra/enclosure.yml` | Done |
+| Its outputs in `samconfig.toml` (`EnclosureSubnets`, `EnclosureSecurityGroup`) | Done |
+| The image in ECR as `makeable-enclosure:latest` | Done. It includes the screw-gap and see-through checks |
+| `OPENAI_API_KEY` in the `makeable/prod` secret | Done. Tasks have used it |
+| The PRs below this one merged first (generator, then job API) | Pending |
+
+What the deploy adds to `makeable-prod`: settings on `ApiFunction`, the `EnclosureTasksPolicy` permission, and `EnclosureReapFunction` with its log group and 5-minute schedule. If any of these fails, the workflow puts `aws-last-good` back and the site is unchanged.
+
+After the deploy, check it from a laptop:
+
+```
+MAKEABLE_SESSION_COOKIE='<a signed-in cookie from the Amplify site>' \
+  node scripts/enclosure-job.mjs start --design s3-devkit-bar-touch --wait --base <Amplify URL>
+aws ecs list-tasks --cluster makeable-enclosure --started-by <job id>     # the task the deployed API started
+aws logs tail /makeable/makeable-prod/enclosure-reap --since 15m          # the reaper ran
+```
+
+To turn jobs off again, set `EnclosureSubnets=` (empty) and deploy. The routes then answer 503 and nothing else changes.
+
+The image is not built by CI. After a change under `enclosure/`, build and push it by hand (the commands above). Tasks always pull `:latest`, so the next job uses it.
 
 ## Try it locally
 
@@ -100,7 +272,7 @@ The CLI signs in as the local test user. For another server, pass `--base <url>`
 
 ## Tests
 
-`node --test tests/enclosure-jobs.test.mjs` runs 25 tests with a fake dispatch and the in-memory store. They use no Docker or AI. They cover:
+`node --test tests/enclosure-jobs.test.mjs` runs 29 tests with a fake dispatch and the in-memory store. They use no Docker or AI. They cover:
 
 - Sign-in: signed-out requests get 401 on every route.
 - Requests: another site's origin gets 403, wrong methods get 405, bad or oversized bodies get 400, and the site API answers 503 when jobs are not set up.
@@ -110,14 +282,14 @@ The CLI signs in as the local test user. For another server, pass `--base <url>`
 - Cleanup: stuck jobs and jobs that run too long are stopped, and the cleanup frees their places.
 - Results: a late result is ignored after a stop.
 - Safety: file names and paths are checked, and the public view hides private fields.
+- AWS: the Fargate request (its command, prefix and picture key, and never the key), a task that can't start, cancel by task ARN, status and files from S3, and the file redirect.
 - Pictures: only the owner's saved picture is accepted, and anything that is not an image is refused. The docker command doesn't change without a picture.
 
-The generator side is in `enclosure/test_generate.py` and `enclosure/test_agent.py`. They check that without a picture the call is unchanged and a picture is still generated. With one, it reaches every attempt and none is generated. A file that is not an image fails before any AI call.
+The generator side is in `enclosure/test_generate.py` and `enclosure/test_agent.py`. They check that without a picture the call is unchanged and a picture is still generated. With one, it reaches every attempt and none is generated. A file that is not an image fails before any AI call. `enclosure/test_cloud_run.py` checks the files are uploaded before the result, the picture is fetched, a crash still writes a plain failure, and progress is sent only when it changes. `enclosure/test_sandbox.py` checks the runner user.
 
 ## Not built yet
 
 - The picture-options step: generating 3 looks from the user's answers for them to choose from.
-
-- The Fargate dispatch and S3 file reads.
-- A schedule that calls `reap()`. Today, cleanup happens when someone reads a status or starts a job.
+- Full isolation of the AI's code in its own runner with no internet. Today it runs in the task as a separate user.
+- Failing a job as soon as its task stops without a result. Today the 20-minute no-progress rule catches it.
 - Rate limits on status reads. They are cheap and owner-only, so only starts are limited.

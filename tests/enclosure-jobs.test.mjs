@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { createMemoryStore } from "../lib/storage/memory-store.mjs";
 import { EventEmitter } from "node:events";
-import { createEnclosureJobs, dockerDispatch, enclosureJobsRoute, isJobId, newJobId, publicJob } from "../lib/enclosure-jobs.mjs";
+import { createEnclosureJobs, dockerDispatch, enclosureJobsRoute, fargateDispatch, isJobId, newJobId, publicJob, s3Outputs } from "../lib/enclosure-jobs.mjs";
 import handler from "../netlify/functions/api.mjs";
 
 const MINUTE = 60_000;
@@ -19,7 +19,7 @@ function setup(options = {}) {
   const clock = { at: Date.parse("2026-11-03T10:00:00Z") };
   const dispatch = options.dispatch || { start: async (job) => started.push(job.id) && (options.seen || []).push(job), stop: async (job) => stopped.push(job.id) };
   const store = createMemoryStore();
-  const jobs = createEnclosureJobs({ store, dispatch, runsDir, now: () => new Date(clock.at), limits: options.limits });
+  const jobs = createEnclosureJobs({ store, dispatch, runsDir, now: () => new Date(clock.at), limits: options.limits, ...(options.outputs ? { outputs: options.outputs } : {}) });
   const write = (name, value) => writeFileSync(path.join(runsDir, "jobs", name), JSON.stringify(value));
   const finish = (id, result) => write(`${id}.json`, result);
   const progress = (id, at) => write(`${id}.progress.json`, { stage: "case", updated: new Date(at).toISOString() });
@@ -311,4 +311,95 @@ test("the docker command is unchanged without a picture, and adds only the pictu
 test("routes: pictureId is passed through, and a bad one gets 400", async () => {
   const { call } = routeSetup();
   assert.equal((await call("POST", "/api/enclosure-jobs", { body: { design: DESIGN, pictureId: "pic-aaaaaaaaaaaa" } })).status, 400);
+});
+
+// AWS: one Fargate task per job, output in S3. Clients are faked; the real ones are checked on AWS.
+function fakeEcs({ fail = false } = {}) {
+  const sent = [];
+  return {
+    sent,
+    async send(command) {
+      sent.push({ name: command.constructor.name, input: command.input });
+      if (command.constructor.name === "RunTaskCommand") {
+        return fail ? { tasks: [], failures: [{ reason: "RESOURCE:CPU" }] } : { tasks: [{ taskArn: `arn:aws:ecs:task/${command.input.startedBy}` }] };
+      }
+      return {};
+    },
+  };
+}
+
+const FARGATE = { cluster: "makeable-enclosure", taskDefinition: "makeable-enclosure", subnets: ["subnet-a", "subnet-b"], securityGroups: ["sg-1"], bucket: "data-bucket" };
+
+test("fargate: a job runs one task with its own output prefix, and no picture key unless one was chosen", async () => {
+  const ecs = fakeEcs();
+  const dispatch = fargateDispatch({ ecs, ...FARGATE });
+  assert.deepEqual(await dispatch.start({ id: "enc-aaaaaaaaaaaa", design: DESIGN }), { taskArn: "arn:aws:ecs:task/enc-aaaaaaaaaaaa" });
+  const input = ecs.sent[0].input;
+  assert.equal(input.launchType, "FARGATE");
+  assert.deepEqual(input.networkConfiguration.awsvpcConfiguration, { subnets: ["subnet-a", "subnet-b"], securityGroups: ["sg-1"], assignPublicIp: "ENABLED" });
+  const override = input.overrides.containerOverrides[0];
+  assert.deepEqual(override.command, ["python", "-W", "ignore", "cloud_run.py", `base_designs/${DESIGN}.json`, "enc-aaaaaaaaaaaa"]);
+  assert.deepEqual(override.environment, [{ name: "ENCLOSURE_BUCKET", value: "data-bucket" }, { name: "ENCLOSURE_PREFIX", value: "makeable-enclosure-runs/enc-aaaaaaaaaaaa/" }]);
+  assert.equal(JSON.stringify(input).includes("OPENAI"), false, "the key is never in the request; the task definition reads it from Secrets Manager");
+  await dispatch.start({ id: "enc-bbbbbbbbbbbb", design: DESIGN, pictureFile: "pic-cccccccccccc.png" });
+  assert.deepEqual(ecs.sent[1].input.overrides.containerOverrides[0].environment.at(-1), { name: "ENCLOSURE_PICTURE_KEY", value: "makeable-enclosure-pictures/pic-cccccccccccc.png" });
+});
+
+test("fargate: a task that cannot start fails the job, and cancel stops the task by its arn", async () => {
+  const failing = fargateDispatch({ ecs: fakeEcs({ fail: true }), ...FARGATE });
+  await assert.rejects(failing.start({ id: "enc-aaaaaaaaaaaa", design: DESIGN }), /RESOURCE:CPU/);
+  const ecs = fakeEcs();
+  const { jobs, store } = setup({ dispatch: fargateDispatch({ ecs, ...FARGATE }) });
+  const { body } = await jobs.start("user-1", { design: DESIGN });
+  assert.equal((await store.get(`job/${body.job.id}`, { type: "json" })).taskArn, `arn:aws:ecs:task/${body.job.id}`);
+  assert.equal(JSON.stringify(body).includes("arn:aws"), false, "the task arn is not shown to the user");
+  await jobs.cancel("user-1", body.job.id);
+  assert.deepEqual(ecs.sent.at(-1), { name: "StopTaskCommand", input: { cluster: "makeable-enclosure", task: `arn:aws:ecs:task/${body.job.id}`, reason: "Stopped by the enclosure job API" } });
+});
+
+function fakeS3(objects = {}) {
+  const sent = [];
+  return {
+    objects,
+    sent,
+    async send(command) {
+      const { Key, Body } = command.input;
+      sent.push(command.constructor.name);
+      if (command.constructor.name === "PutObjectCommand") { objects[Key] = Body; return {}; }
+      if (!(Key in objects)) throw Object.assign(new Error("missing"), { name: "NoSuchKey", $metadata: { httpStatusCode: 404 } });
+      return { Body: { transformToString: async () => objects[Key] } };
+    },
+  };
+}
+
+test("s3: status, files and pictures come from the bucket, and files are short-lived links", async () => {
+  const client = fakeS3();
+  const signed = [];
+  const outputs = s3Outputs({ client, bucket: "data-bucket", sign: async (_c, command, options) => { signed.push([command.input, options]); return "https://signed.example/file"; } });
+  const { jobs } = setup({ outputs });
+  const { body } = await jobs.start("user-1", { design: DESIGN });
+  const id = body.job.id;
+  assert.equal((await jobs.status("user-1", id)).body.job.state, "RUNNING", "no result yet in S3");
+  client.objects[`makeable-enclosure-runs/${id}/progress.json`] = JSON.stringify({ stage: "body", updated: "2026-11-03T10:00:00Z" });
+  assert.equal((await jobs.status("user-1", id)).body.job.progress.stage, "body");
+  client.objects[`makeable-enclosure-runs/${id}/result.json`] = JSON.stringify(passed(id));
+  assert.equal((await jobs.status("user-1", id)).body.job.state, "PASS");
+  const file = await jobs.file("user-1", id, "PRINT_Shell.stl");
+  assert.deepEqual(file, { status: 200, url: "https://signed.example/file" });
+  assert.equal(signed[0][0].Key, `makeable-enclosure-runs/${id}/files/PRINT_Shell.stl`);
+  assert.equal(signed[0][1].expiresIn, 300);
+  assert.equal((await jobs.file("user-2", id, "PRINT_Shell.stl")).status, 404, "never signed for another user");
+  assert.equal(signed.length, 1);
+  const picture = await jobs.savePicture("user-1", PNG);
+  assert.ok(client.objects[`makeable-enclosure-pictures/${picture.pictureId}.png`]);
+});
+
+test("routes: on AWS a file request redirects to the short-lived link", async () => {
+  const route = enclosureJobsRoute({
+    jobs: { file: async () => ({ status: 200, url: "https://signed.example/file" }) },
+    authenticate: async () => ({ ok: true, user: { sub: "user-1" } }),
+  });
+  const response = await route(new Request("https://makeable.build/api/enclosure-jobs/enc-aaaaaaaaaaaa/files/PRINT_Shell.stl"), "/api/enclosure-jobs/enc-aaaaaaaaaaaa/files/PRINT_Shell.stl");
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get("location"), "https://signed.example/file");
 });

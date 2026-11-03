@@ -16,7 +16,7 @@
 // GET /__local-login signs in as a test user (?user=2 or ?user=3 for others;
 // &keep=1 keeps the browser's saved data, like a real sign-in). It
 // exists only in this script, which no deploy ships, and the server listens on
-// 127.0.0.1 only.
+// 127.0.0.1 only. GET /__enclosure-test is a test page for the enclosure job API.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
@@ -88,6 +88,10 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin);
     if (url.pathname === "/__local-login") return await localLogin(url, res);
     if (url.pathname === "/__outside-calls" && outside) return outsideCalls(req, res);
+    if (url.pathname === "/__enclosure-test") {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(readFileSync(path.join(ROOT, "scripts", "enclosure-test.html")));
+    }
     if (url.pathname === "/.netlify/functions/build-background") return await startPipeline(req, res);
     if (url.pathname === "/config.local.js" || url.pathname.startsWith("/api/")) {
       return await callApi(req, url, res);
