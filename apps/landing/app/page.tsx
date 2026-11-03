@@ -31,6 +31,7 @@ import {
 import { projectDisplayIdentity, withProjectDisplayIdentity } from "./project-identity.mjs";
 import { RetailerBrand } from "./retailer-brand";
 import { ProjectWiringGuide } from "./project-wiring-guide";
+import { CheckoutReturn } from "./checkout-return";
 import { LandingHowItWorks } from "./landing-how-it-works";
 import { LandingWalkthrough } from "./landing-walkthrough";
 import { projectWiringReady } from "./project-wiring-data.mjs";
@@ -1648,6 +1649,7 @@ export default function Home() {
 
   return (
     <main className="mk-page">
+      <CheckoutReturn apiOrigin={API_ORIGIN} />
       <section
         className="mk-hero"
         id="top"

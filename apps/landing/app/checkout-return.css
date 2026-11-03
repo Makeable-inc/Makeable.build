@@ -1,0 +1,72 @@
+.checkout-return {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  margin: auto;
+  width: min(510px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  padding: 36px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 20px;
+  background: var(--paper, #fffaf1);
+  color: var(--ink, #101316);
+  font-family: var(--font-sans, "Figtree", sans-serif);
+  box-shadow: 0 32px 80px rgb(0 0 0 / 42%);
+}
+.checkout-return::backdrop {
+  background: rgb(2 7 20 / 72%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.checkout-return-eyebrow {
+  display: block;
+  color: #bd175c;
+  font-size: 12px;
+  letter-spacing: .09em;
+  font-weight: 700;
+}
+.checkout-return h2 {
+  margin: 12px 0 16px;
+  font-family: var(--font-display, "Fredoka", sans-serif);
+  font-size: clamp(32px, 7vw, 42px);
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+.checkout-return h2:focus { outline: none; }
+.checkout-return p { margin: 0; color: #514b45; font-size: 16px; line-height: 1.55; }
+.checkout-return-check {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 24px;
+  border: 1px solid rgb(255 45 115 / 18%);
+  border-radius: 18px;
+  color: #bd175c;
+  background: rgb(255 45 115 / 9%);
+}
+.checkout-return-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 28px; }
+.checkout-return-actions button {
+  flex: 1 0 auto;
+  min-height: 54px;
+  padding: 14px 22px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 11px;
+  background: var(--sign-in-background, #ff2d73);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.checkout-return-actions button:hover { background: var(--sign-in-background-hover, #ff4381); }
+.checkout-return-actions button:active { transform: scale(.98); }
+.checkout-return-actions button + button { background: transparent; color: var(--ink, #101316); border-color: var(--line, #ded6cd); }
+.checkout-return-actions a { color: #bd175c; font-size: 14px; }
+.checkout-return-actions :focus-visible { outline: 3px solid #ff2d73; outline-offset: 4px; }
+@media (max-width: 600px) { .checkout-return { padding: 28px; } }
+@media (prefers-reduced-motion: reduce) { .checkout-return-actions button { transition: none; } }
