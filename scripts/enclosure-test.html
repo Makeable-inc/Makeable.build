@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enclosure job test</title>
+<!-- A test page for the enclosure job API, served only by scripts/dev-local.mjs at /__enclosure-test. Not the product UI. -->
+<style>
+  :root { color-scheme: light dark; --line: #8884; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; }
+  button, select { font: inherit; padding: 6px 12px; }
+  pre { background: #8881; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+  img { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; margin-top: 8px; }
+  .state { font-weight: 600; }
+  .muted { opacity: .7; }
+</style>
+</head>
+<body>
+<h1>Enclosure job test</h1>
+<p class="muted">Calls the real job API on this server: <code>POST /api/enclosure-jobs</code>, then <code>GET</code> every 5 s until it ends.
+Where the job runs (Docker or AWS) is set by <code>MAKEABLE_ENCLOSURE_DISPATCH</code> on the server. Each job calls OpenAI.</p>
+<p id="signin" hidden>Not signed in. <a href="/__local-login?next=/__enclosure-test">Sign in as the test user</a>.</p>
+
+<fieldset>
+  <legend>Start a job</legend>
+  <select id="design">
+    <option>s3-devkit-bar-touch</option><option>fresh-wroom-oled-touch</option><option>s3-devkit-oled-knob</option>
+    <option>s3-screen-button</option><option>new-n16r8-bar-touch</option><option>new-devkitc-tft-touch</option>
+    <option>fresh-wroom-bar-knob</option><option>c6-knob-timer</option>
+  </select>
+  <button id="start">Start</button>
+  <button id="cancel" disabled>Cancel</button>
+  <p>Or follow an existing job: <input id="follow" placeholder="enc-…" size="18"> <button id="go">Follow</button></p>
+</fieldset>
+
+<p>State: <span class="state" id="state">none</span> <span class="muted" id="elapsed"></span></p>
+<p id="message"></p>
+<div id="files"></div>
+<pre id="raw">No job yet.</pre>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let jobId = null, timer = null, startedAt = 0;
+const FINAL = ["PASS", "PASS WITH WARNINGS", "FAIL", "CANCELLED"];
+
+async function call(method, path, body) {
+  const response = await fetch(path, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  if (response.status === 401) $("signin").hidden = false;
+  const data = await response.json().catch(() => ({}));
+  return { status: response.status, data };
+}
+
+function show(status, data) {
+  $("raw").textContent = `HTTP ${status}\n` + JSON.stringify(data, null, 2);
+  const job = data.job;
+  $("message").textContent = data.error || job?.message || "";
+  if (!job) return;
+  jobId = job.id;
+  $("state").textContent = job.state + (job.progress ? ` · ${job.progress.stage}, attempt ${job.progress.attempt}, try ${job.progress.attempt_try}, ${job.progress.tokens_so_far ?? 0} tokens` : "");
+  const done = FINAL.includes(job.state);
+  $("cancel").disabled = done;
+  if (done) {
+    clearInterval(timer);
+    timer = null;
+    $("files").innerHTML = (job.files || []).map((f) => f.endsWith(".png") ? `<img src="${f}" alt="preview">` : `<a href="${f}">${f.split("/").pop()}</a>`).join(" · ");
+  }
+}
+
+function follow(id) {
+  jobId = id;
+  startedAt = Date.now();
+  $("files").innerHTML = "";
+  clearInterval(timer);
+  const poll = async () => {
+    const { status, data } = await call("GET", `/api/enclosure-jobs/${jobId}`);
+    $("elapsed").textContent = `(${Math.round((Date.now() - startedAt) / 1000)} s on this page)`;
+    show(status, data);
+  };
+  poll();
+  timer = setInterval(poll, 5000);
+}
+
+$("start").onclick = async () => {
+  const requestId = "test-" + crypto.randomUUID().slice(0, 12);
+  const { status, data } = await call("POST", "/api/enclosure-jobs", { design: $("design").value, requestId });
+  show(status, data);
+  if (data.job) follow(data.job.id);
+};
+$("cancel").onclick = async () => {
+  if (!jobId) return;
+  const { status, data } = await call("DELETE", `/api/enclosure-jobs/${jobId}`);
+  show(status, data);
+};
+$("go").onclick = () => $("follow").value.trim() && follow($("follow").value.trim());
+const fromUrl = new URLSearchParams(location.search).get("job");
+if (fromUrl) follow(fromUrl);
+</script>
+</body>
+</html>

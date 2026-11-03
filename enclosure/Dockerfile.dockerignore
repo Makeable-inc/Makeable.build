@@ -1,0 +1,25 @@
+# Used only by enclosure/Dockerfile (Docker reads <Dockerfile>.dockerignore).
+**/node_modules
+**/.git
+.github
+.env
+**/.env
+**/*.env
+.env.*
+apps
+release-dist
+dist
+.aws-sam
+.aws-sam-src
+pilot
+hardware
+hologram
+Holographic_Prism_Enclosure
+images
+assets
+enclosure/.venv
+enclosure/runs
+enclosure/zoo_agent.py
+enclosure/test_zoo_agent.py
+enclosure/**/__pycache__
+enclosure/.cache

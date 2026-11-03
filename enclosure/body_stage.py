@@ -146,6 +146,7 @@ def design_body(base, picture, folder):
             valid += 1
         else:
             crashes += 1
+        agent.report_progress(stage="body", attempt_try=number, ran=ran, failed=[])
         print(f"body try {number}: {json.dumps({k: note.get(k) for k in ('ran', 'score', 'problems', 'tokens')})[:400]}", flush=True)
         text = "\n\n".join([brief, "Your last script:\n```python\n" + code + "\n```", feedback, "Reply with the complete new script."])
     summary = {"tries": tries, "tokens": tokens, "seconds": round(time.time() - started, 1), "best_score": best[0] if best else None}

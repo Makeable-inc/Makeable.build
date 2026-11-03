@@ -4,10 +4,10 @@ import unittest
 import numpy as np
 import trimesh
 
-from case_checks import allow_glue, back_flat_share, check_assembly, check_flat_on_bed, check_screw_spread
+from case_checks import allow_glue, back_flat_share, check_assembly, check_flat_on_bed, check_screw_count, check_screw_gap, check_screw_spread
 from severity import is_warning
 from layout_checks import check_base_design, check_wire_crossing, check_wire_hidden
-from space_checks import case_openness, points_seeing_out
+from space_checks import case_openness, check_see_through, points_seeing_out
 
 BOX = {"min": [-1, -1, -1], "max": [1, 1, 1], "size": [2, 2, 2]}
 USB = {**BOX, "opens_toward": "-y"}
@@ -174,6 +174,33 @@ class ScrewSpread(unittest.TestCase):
         self.assertEqual(self.failed([[-30, 25, 4], [30, 25, 4]]), ["along z"])
 
 
+class ScrewCountAndGap(unittest.TestCase):
+    def screws(self, heads):
+        return [{"head_at": h, "drive_from": "+y", "through": "PRINT_Base", "into": "PRINT_Shell"} for h in heads]
+
+    def test_one_screw_and_one_snap_are_enough(self):
+        self.assertTrue(check_screw_count(self.screws([[30, 25, 5]]), [{"at": [-40, 20, 20]}])[0]["ok"])
+
+    def test_one_screw_alone_is_not_enough(self):
+        self.assertFalse(check_screw_count(self.screws([[30, 25, 5]]), [])[0]["ok"])
+
+    def test_snaps_alone_are_not_enough(self):
+        self.assertFalse(check_screw_count([], [{"at": [-40, 20, 20]}, {"at": [40, 20, 20]}])[0]["ok"])
+
+    def test_two_screws_side_by_side_fail_and_name_the_pair(self):
+        found = [r for r in check_screw_gap(self.screws([[18.1, 21.4, 3.6], [20.1, 21.4, 3.6]])) if not r["ok"]]
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["part"], "screws 1 and 2")
+        self.assertAlmostEqual(found[0]["measured"], 2.0, places=1)
+        self.assertFalse(is_warning(found[0]), "overlapping screws are a must-pass failure")
+
+    def test_two_screws_in_one_corner_fail(self):
+        self.assertFalse(all(r["ok"] for r in check_screw_gap(self.screws([[40, 25, 5], [45, 25, 10]]))))
+
+    def test_screws_10_mm_or_more_apart_pass(self):
+        self.assertTrue(all(r["ok"] for r in check_screw_gap(self.screws([[0, 25, 0], [10.2, 25, 0], [30, 25, 30]]))))
+
+
 class Layout(unittest.TestCase):
     def failed(self, base=BASE, transform=TURN):
         return {r["check"] for r in check_base_design(base, CARDS, {"PURCHASE_Board": transform}, hollow_box()) if not r["ok"]}
@@ -199,6 +226,31 @@ class Layout(unittest.TestCase):
 
     def test_usb_on_the_wrong_side_fails(self):
         self.assertEqual(self.failed(base={**BASE, "usb_side": "+x"}), {"base_usb"})
+
+
+
+class SeeThrough(unittest.TestCase):
+    """The parts must be housed: from outside, nothing but a planned hole may show a part or let light through."""
+
+    def setUp(self):
+        self.part = trimesh.creation.box(extents=(60, 8, 20))
+
+    def slit(self):
+        # A 1.3 mm slot through the front wall, most of its height: a rounded edge that missed the wall beside it.
+        return hollow_box().difference(trimesh.creation.box(extents=(1.3, 6, 36), transform=trimesh.transformations.translation_matrix((20, -8, 0))), engine="manifold")
+
+    def test_a_closed_case_passes(self):
+        self.assertTrue(check_see_through(hollow_box(), [self.part], [])["ok"])
+
+    def test_a_slot_through_the_front_fails_and_says_where(self):
+        found = check_see_through(self.slit(), [self.part], [])
+        self.assertFalse(found["ok"])
+        self.assertAlmostEqual(found["where"][0], 20, delta=1.5)
+        self.assertFalse(is_warning(found))
+
+    def test_a_planned_hole_passes(self):
+        hole = trimesh.creation.box(extents=(12, 12, 12), transform=trimesh.transformations.translation_matrix((0, 0, 18)))
+        self.assertTrue(check_see_through(hollow_box(hole=True), [self.part], [hole])["ok"])
 
 
 if __name__ == "__main__":

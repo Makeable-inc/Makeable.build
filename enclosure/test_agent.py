@@ -226,5 +226,35 @@ class Loop(unittest.TestCase):
         self.assertTrue((self.folder / "summary.json").exists())
 
 
+class ChosenPicture(unittest.TestCase):
+    def run_case(self, picture):
+        base = Path(tempfile.mkdtemp()) / "base.json"
+        base.write_text('{"name": "n", "parts": "a,b", "look": "l", "picture_prompt": "p", "use_library": true}', encoding="utf-8")
+        with mock.patch("concepts.base_picture", return_value=Path("generated.png")) as made, \
+                mock.patch("body_stage.screen_limits", return_value={}), mock.patch("part_data.required_space", return_value={}), \
+                mock.patch("part_data.space_conflict", return_value=None), mock.patch.object(agent, "design_with_library", return_value={"outcome": "pass"}) as design:
+            agent.design_case(str(base), None, "run-picture", picture=picture)
+        return made.call_count, design.call_args.args[2]
+
+    def test_without_a_chosen_picture_one_is_generated_as_before(self):
+        self.assertEqual(self.run_case(None), (1, Path("generated.png")))
+
+    def test_a_chosen_picture_is_used_and_none_is_generated(self):
+        self.assertEqual(self.run_case("chosen.png"), (0, Path("chosen.png")))
+
+
+class LibraryTotals(unittest.TestCase):
+    def test_the_body_stage_counts_toward_tokens_and_time(self):
+        body = ("code", Path("BODY.stl"), {"best_score": 1, "tokens": 20000, "seconds": 200.0})
+        case = {"outcome": "pass", "tries": 1, "best_try": 1, "tokens": 30000, "seconds": 300.0}
+        with mock.patch("body_stage.design_body", return_value=body), mock.patch("body_stage.frozen_body_brief", return_value="frozen"), \
+                mock.patch("library_brief.library_brief", return_value="brief"), mock.patch("part_data.required_space", return_value={}), \
+                mock.patch.object(agent, "base_brief", return_value="base"), mock.patch.object(agent, "design_part", return_value=dict(case)):
+            result = agent.design_with_library({}, [], None, Path(tempfile.mkdtemp()))
+        self.assertEqual(result["tokens"], 50000)
+        self.assertEqual(result["seconds"], 500.0)
+        self.assertEqual(result["body_tokens"], 20000)
+
+
 if __name__ == "__main__":
     unittest.main()

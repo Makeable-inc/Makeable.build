@@ -1,4 +1,4 @@
-"""Runs AI-written design code locally: no API keys in its environment, only allowed imports, and a hard time limit. AWS replaces this with one Fargate task per attempt."""
+"""Runs AI-written design code locally: no API keys in its environment, only allowed imports, and a hard time limit. In the container it also runs as a separate user (ENCLOSURE_RUNNER_USER)."""
 import ast
 import os
 import subprocess
@@ -34,6 +34,25 @@ def code_problem(code):
     return None
 
 
+def runner_account(name):
+    import pwd
+    return pwd.getpwnam(name)
+
+
+def runner_switch(folder):
+    """In the container the generator runs as root and the AI's code as ENCLOSURE_RUNNER_USER, which cannot read
+    the generator's environment (where the OpenAI key is) or its files. Returns subprocess options, or an error string."""
+    name = os.environ.get("ENCLOSURE_RUNNER_USER")
+    if not name:
+        return {}
+    if os.geteuid() != 0:
+        return "The runner user is set, but the generator is not running as root, so it cannot switch to it."
+    account = runner_account(name)
+    for path in [folder, *folder.rglob("*")]:
+        os.chown(path, account.pw_uid, account.pw_gid)
+    return {"user": account.pw_uid, "group": account.pw_gid, "extra_groups": []}
+
+
 def run_design(code, folder):
     """Writes the code to the attempt folder and runs it there. Returns (ok, message)."""
     folder = Path(folder)
@@ -45,8 +64,11 @@ def run_design(code, folder):
     environment = {k: os.environ[k] for k in ("SYSTEMROOT", "TEMP", "TMP", "PATH") if k in os.environ}
     # build123d's libraries want a home folder; the attempt folder keeps the real one out of reach of the environment.
     environment.update(HOME=str(folder.resolve()), USERPROFILE=str(folder.resolve()))
+    switch = runner_switch(folder.resolve())
+    if isinstance(switch, str):
+        return False, switch
     try:
-        done = subprocess.run([sys.executable, "-E", "-s", "design.py"], cwd=folder.resolve(), env=environment, capture_output=True, text=True, timeout=TIME_LIMIT_SECONDS)
+        done = subprocess.run([sys.executable, "-E", "-s", "design.py"], cwd=folder.resolve(), env=environment, capture_output=True, text=True, timeout=TIME_LIMIT_SECONDS, **switch)
     except subprocess.TimeoutExpired:
         return False, f"The code ran longer than the {TIME_LIMIT_SECONDS} second limit."
     (folder / "output.txt").write_text(done.stdout + done.stderr, encoding="utf-8")

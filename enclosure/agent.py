@@ -1,6 +1,7 @@
 """The AI designer loop: the AI writes CAD code, our checks judge the files, and hard stop rules end the run."""
 import base64
 import json
+import os
 import re
 import shutil
 import sys
@@ -87,7 +88,31 @@ Use simple blocks and cut-outs. Look at the occupied boxes and leave room for al
 SYSTEM = SYSTEM + "\n\n" + (HERE / "DESIGN_RULES.md").read_text(encoding="utf-8")
 
 
+PROGRESS = {}
+
+
+def report_progress(**fields):
+    """Where a running job has got to, for whoever started it. Written to ENCLOSURE_PROGRESS_PATH when that is set, and never stops a run."""
+    target = os.environ.get("ENCLOSURE_PROGRESS_PATH")
+    if not target:
+        return
+    PROGRESS.update(fields, updated=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    try:
+        path = Path(target)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = path.with_suffix(".tmp")
+        partial.write_text(json.dumps(PROGRESS), encoding="utf-8")
+        partial.replace(path)
+    except OSError as error:
+        print(f"progress not written: {error}", flush=True)
+
+
 def api_key():
+    """From the environment in the cloud, where the job's secret is passed in; from .env on a laptop."""
+    if os.environ.get("OPENAI_API_KEY"):
+        return os.environ["OPENAI_API_KEY"].strip()
+    if not ENV_FILE.exists():
+        raise SystemExit("OPENAI_API_KEY is not set and there is no .env")
     for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
         if line.startswith("OPENAI_API_KEY="):
             return line.split("=", 1)[1].strip().strip("\"'")
@@ -246,7 +271,7 @@ The closed case must also pass these checks:
 - Screen size: the active screen spans at least {c.MIN_SCREEN_SHARE_WIDEST} of the case front one way and {c.MIN_SCREEN_SHARE_OTHER} the other, so keep the front compact.
 - The screen faces between -5 and {c.MAX_SCREEN_TILT_UP} degrees above horizontal.
 - It stands: flat base, centre of weight at least {c.MIN_BALANCE_MARGIN} mm inside the footprint.
-- At least {c.MIN_SCREWS} screws, each an assumed M2 x {c.SCREW['length']:.0f} self-tapping. head_at is the point on the axis where the underside of the head sits. From there along the screw: a clear {c.SCREW['shank_radius'] * 2} mm hole for {c.SCREW['length'] - c.SCREW['grip']:.0f} mm through every part, then {c.SCREW['grip']:.0f} mm of {c.SCREW['pilot_radius'] * 2} mm pilot hole inside a solid post at least {c.SCREW['post_radius'] * 2} mm wide. At least 1 mm of the through part under the {c.SCREW['head_radius'] * 2} mm head, and a {c.SCREW['driver_radius'] * 2} mm wide clear path for {c.SCREW['driver_length']:.0f} mm for the screwdriver. Keep screws away from the board."""] + extra)
+- At least {c.MIN_FASTENERS} fasteners spread across the cover: screws, or screws and snap latches. At least {c.MIN_SCREWS} must be a screw, and screws are at least {c.MIN_SCREW_GAP:.0f} mm apart, never two in one corner. Each screw is an assumed M2 x {c.SCREW['length']:.0f} self-tapping. head_at is the point on the axis where the underside of the head sits. From there along the screw: a clear {c.SCREW['shank_radius'] * 2} mm hole for {c.SCREW['length'] - c.SCREW['grip']:.0f} mm through every part, then {c.SCREW['grip']:.0f} mm of {c.SCREW['pilot_radius'] * 2} mm pilot hole inside a solid post at least {c.SCREW['post_radius'] * 2} mm wide. At least 1 mm of the through part under the {c.SCREW['head_radius'] * 2} mm head, and a {c.SCREW['driver_radius'] * 2} mm wide clear path for {c.SCREW['driver_length']:.0f} mm for the screwdriver. Keep screws away from the board."""] + extra)
 
 
 def failure_text(ok, message, report):
@@ -354,6 +379,7 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
         if ran and stage == "case":
             draw(attempt)
         history.append({"try": len(history) + 1, "ran": ran, "message": message, "report": report, "usage": usage, "seconds": round(time.time() - began, 1)})
+        report_progress(stage=stage, attempt_try=len(history), ran=ran, failed=[r["check"] for r in report["failed"]], tokens_so_far=tokens)
         print(f"try {len(history)}: ran={ran} passed={report['passed']} status={report.get('status')} failed={[r['check'] for r in report['failed']]} tokens={usage.get('total_tokens')} {history[-1]['seconds']}s", flush=True)
         if report["passed"]:
             return summary(folder, history, tokens, started, report.get("status") or "passed")
@@ -418,7 +444,8 @@ def design_case(parts, look, name, earlier_run=None, picture=None):
             if conflict:
                 print(f"stopped: parts do not fit: {conflict}", flush=True)
                 return {"outcome": f"stopped: parts do not fit: {conflict}", "tokens": 0}
-        picture = base_picture(base)
+        # A picture the user chose is used as it is. Without one, it is generated from the design, as before.
+        picture = Path(picture) if picture else base_picture(base)
         print(f"base design: {base['name']}, picture: {picture}", flush=True)
     part_ids = parts.split(",")
     part_id = part_ids[0]
@@ -466,7 +493,12 @@ def design_with_library(base, part_ids, picture, folder):
     if body_code is None:
         return {"outcome": "stopped: no valid body", **body_summary}
     brief = "\n\n".join([library_brief(part_ids, frozen_body_brief(body_code)), base_brief(base)])
-    return design_part(brief, folder / "case", MAX_CASE_TRIES, stage="case", picture=picture, base=base, body_stl=body_stl, system=LIBRARY_SYSTEM, library_parts=part_ids)
+    result = design_part(brief, folder / "case", MAX_CASE_TRIES, stage="case", picture=picture, base=base, body_stl=body_stl, system=LIBRARY_SYSTEM, library_parts=part_ids)
+    # The job's cost and time include the body stage, not only the case.
+    result["body_tokens"], result["body_seconds"] = body_summary.get("tokens", 0), body_summary.get("seconds", 0)
+    result["tokens"] = result.get("tokens", 0) + result["body_tokens"]
+    result["seconds"] = round(result.get("seconds", 0) + result["body_seconds"], 1)
+    return result
 
 
 if __name__ == "__main__":

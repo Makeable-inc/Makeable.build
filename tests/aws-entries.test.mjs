@@ -29,7 +29,7 @@ function urlEvent(overrides = {}) {
   };
 }
 
-for (const name of ["api", "pipeline", "cleanup", "social-refresh"]) {
+for (const name of ["api", "pipeline", "cleanup", "social-refresh", "enclosure-reap"]) {
   test(`aws/functions/${name}.mjs exports a Lambda handler`, async () => {
     const entry = await import(`../aws/functions/${name}.mjs`);
     assert.equal(typeof entry.handler, "function");

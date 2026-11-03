@@ -16,7 +16,11 @@ MIN_SCREEN_SHARE_WIDEST = 0.5
 MIN_SCREEN_SHARE_OTHER = 0.4
 MAX_SCREEN_TILT_UP = 70
 MIN_BALANCE_MARGIN = 2.0
-MIN_SCREWS = 2
+MIN_SCREWS = 1
+# Screws and snap latches together. A snap holds its side, so one screw and one snap are enough.
+MIN_FASTENERS = 2
+# Centre to centre. A second screw beside the first holds nothing more and weakens the post they share.
+MIN_SCREW_GAP = 10.0
 REQUIRED_PARTS = ["PRINT_Shell", "PRINT_Base"]
 MIN_COVER_FLAT = 0.9
 MIN_PART_CONTACT = 0.25
@@ -197,8 +201,33 @@ def check_screw_spread(screws, meshes, snaps=()):
     return results
 
 
+def check_screw_count(screws, snaps=()):
+    total = len(screws) + len(snaps)
+    ok = len(screws) >= MIN_SCREWS and total >= MIN_FASTENERS
+    return [result("screw_count", "case", ok, measured=f"{len(screws)} screws, {len(snaps)} snaps", limit=f"at least {MIN_FASTENERS} fasteners, at least {MIN_SCREWS} of them a screw",
+                   fix=f"Hold the case shut with at least {MIN_FASTENERS} fasteners, spread across the cover: screws, or a screw and a snap latch on the side with no room for a post.")]
+
+
+def check_screw_gap(screws):
+    """Every pair of screws at least MIN_SCREW_GAP apart. Two screws side by side are one fastening spot, not two."""
+    heads = []
+    for screw in screws:
+        try:
+            heads.append(np.array(screw["head_at"], dtype=float))
+        except (KeyError, TypeError, ValueError):
+            return []
+    results = []
+    for i in range(len(heads)):
+        for j in range(i + 1, len(heads)):
+            gap = float(np.linalg.norm(heads[i] - heads[j]))
+            results.append(result("screw_gap", f"screws {i + 1} and {j + 1}", gap >= MIN_SCREW_GAP, measured=round(gap, 1), limit=f"at least {MIN_SCREW_GAP:.0f} mm apart, centre to centre",
+                                  where=f"{heads[i].round(1).tolist()} and {heads[j].round(1).tolist()}",
+                                  fix=f"Screws {i + 1} and {j + 1} are only {gap:.1f} mm apart, so they hold the same spot. Move one to another corner, or drop it and hold that side with a snap latch."))
+    return results
+
+
 def check_screws(screws, meshes, part_points, snaps=()):
-    results = [result("screw_count", "case", len(screws) >= MIN_SCREWS, measured=len(screws), limit=f"at least {MIN_SCREWS}", fix=f"Hold the case shut with at least {MIN_SCREWS} screws.")]
+    results = check_screw_count(screws, snaps) + check_screw_gap(screws)
     results.extend(check_screw_spread(screws, meshes, snaps))
     for i, screw in enumerate(screws):
         label = f"screw {i + 1}"
