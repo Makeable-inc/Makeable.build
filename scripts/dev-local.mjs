@@ -84,6 +84,7 @@ const redirects = readRedirects(path.join(ROOT, "netlify.toml"));
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, origin);
+    if (url.pathname === "/__checkout-qc" && args.includes("--fake-stripe")) return checkoutQc(res);
     if (url.pathname === "/__local-login") return await localLogin(url, res);
     if (url.pathname === "/__outside-calls" && outside) return outsideCalls(req, res);
     if (url.pathname === "/.netlify/functions/build-background") return await startPipeline(req, res);
@@ -264,4 +265,16 @@ const CONTENT_TYPES = {
 
 function contentType(file) {
   return CONTENT_TYPES[path.extname(file).toLowerCase()] || "application/octet-stream";
+}
+
+function checkoutQc(res) {
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(`<!doctype html><meta name="viewport" content="width=device-width"><title>Checkout local QC</title>
+  <style>body{font:18px system-ui;max-width:720px;margin:60px auto;padding:24px;background:#faf9f5;color:#242822}li{margin:20px 0}a{color:#344332}</style>
+  <h1>Ember checkout · local QC</h1><p>Local simulation. No real payments or orders. These links exercise the real confirmation UI and status API with a fake Stripe response.</p><ul>
+  ${["paid", "pending", "error", "slow"].map((state) => `<li><a href="/?checkout=success&session_id=cs_test_localqc${state}">${state === "slow" ? "Loading for 5 seconds, then paid" : state}</a></li>`).join("")}
+  <li><a href="/?checkout=cancelled">Cancelled checkout</a></li>
+  <li><a href="/?checkout=success">Success flag without a session (must not confirm)</a></li>
+  <li><a href="/?checkout=success&session_id=invalid">Invalid session</a></li></ul>
+  <p>Use your browser’s Back button to return here. For each state, check desktop and phone widths, keyboard navigation, wording and dismissal.</p>`);
 }

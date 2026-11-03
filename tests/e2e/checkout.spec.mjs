@@ -79,7 +79,7 @@ test.describe("with a Stripe key (fake Stripe)", () => {
     });
   });
 
-  test("@desktop-only a paid order is confirmed, and a signed Stripe webhook records it", async ({ request }) => {
+  test("@desktop-only a paid order is confirmed, and a signed Stripe webhook records it", async ({ page, request }) => {
     await request.delete(`${PAYMENTS}/__outside-calls`);
     const started = await request.post("/api/checkout", {
       headers: sameOriginHeaders(PAYMENTS),
@@ -92,6 +92,10 @@ test.describe("with a Stripe key (fake Stripe)", () => {
     // Checkout status asks Stripe; the fake buyer has paid.
     const status = await request.get(`/api/checkout/status?session_id=${sessionId}`);
     expect(await status.json()).toEqual({ paid: true });
+
+    // The buyer sees confirmation after returning from Checkout.
+    await page.goto(`/?checkout=success&session_id=${sessionId}`);
+    await expect(page.getByRole("heading", { name: "Your Ember pre-order is confirmed.", exact: true })).toBeVisible();
 
     // Stripe's webhook for the paid session, with the metadata our API sent.
     const { calls } = await outsideCalls(request, PAYMENTS);

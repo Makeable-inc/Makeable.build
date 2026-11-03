@@ -287,7 +287,15 @@ function createFakeStripe(env) {
       }
       const sessionMatch = url.pathname.match(/^\/v1\/checkout\/sessions\/([^/]+)$/);
       if (request.method === "GET" && sessionMatch) {
-        const session = sessions.get(decodeURIComponent(sessionMatch[1]));
+        const id = decodeURIComponent(sessionMatch[1]);
+        // Reserved fixtures exist only in this local fake, never in the deployed API.
+        const scenario = id.match(/^cs_test_localqc(paid|pending|error|slow)$/)?.[1];
+        if (scenario) {
+          if (scenario === "error") return { logged, response: error(503, "Local verification failure") };
+          const response = Response.json({ status: "complete", payment_status: scenario === "pending" ? "unpaid" : "paid", metadata: { ember_color: "bone", market: "US" } });
+          return { logged, response: scenario === "slow" ? new Promise((resolve) => setTimeout(() => resolve(response), 5000)) : response };
+        }
+        const session = sessions.get(id);
         if (!session) return { logged, response: error(404, "No such checkout.session") };
         // The fake buyer always pays.
         return { logged, response: Response.json({ ...session, status: "complete", payment_status: "paid" }) };
