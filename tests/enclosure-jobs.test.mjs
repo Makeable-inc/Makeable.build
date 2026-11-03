@@ -172,6 +172,126 @@ test("only a set number of jobs run at once across all users", async () => {
   assert.equal((await jobs.start("user-3", { design: DESIGN })).status, 202, "a finished job frees a place");
 });
 
+test("the cap across all users holds when many users start at the same moment", async () => {
+  // Each start used to count the running jobs before taking its own place, so all of them saw room.
+  const { jobs, started, finish } = setup({ limits: { runningAtOnce: 3 } });
+  const replies = await Promise.all(Array.from({ length: 8 }, (_, i) => jobs.start(`user-${i + 1}`, { design: DESIGN })));
+  assert.equal(replies.filter((r) => r.status === 202).length, 3);
+  assert.equal(replies.filter((r) => r.status === 503).length, 5);
+  assert.equal(started.length, 3);
+  const winner = replies.findIndex((r) => r.status === 202);
+  const refused = replies.findIndex((r) => r.status === 503);
+  const first = replies[winner].body.job.id;
+  finish(first, passed(first));
+  await jobs.status(`user-${winner + 1}`, first);
+  assert.equal((await jobs.start(`user-${refused + 1}`, { design: DESIGN })).status, 202, "a refused user was not left holding a slot, and a finished job frees its place");
+});
+
+test("a place left by a job that crashed is freed by the cleanup, and a live job's place never is", async () => {
+  const { jobs, store, later } = setup({ limits: { runningAtOnce: 1 } });
+  const crashed = { id: "enc-crashed00000", owner: "user-9", design: DESIGN, state: "FAIL", createdAt: "2026-11-03T10:00:00.000Z", finishedAt: "2026-11-03T10:00:00.000Z" };
+  await store.setJSON(`job/${crashed.id}`, crashed);
+  await store.setJSON("place/0", { id: crashed.id, at: crashed.createdAt });
+  later(2 * MINUTE);
+  assert.equal((await jobs.start("user-1", { design: DESIGN })).status, 202, "start runs the cleanup first, which frees the stale place");
+  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 503, "the live job keeps its place");
+});
+
+// A dispatch whose start waits until the test lets it finish, as RunTask does while AWS places the task.
+function slowDispatch({ failStops = 0 } = {}) {
+  const stopped = [];
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  return {
+    stopped,
+    release: () => release(),
+    async start(job) {
+      await gate;
+      return { taskArn: `arn:task/${job.id}` };
+    },
+    async stop(job) {
+      if (failStops > 0) {
+        failStops -= 1;
+        throw new Error("StopTask failed");
+      }
+      stopped.push(job.taskArn || job.id);
+    },
+  };
+}
+
+async function onlyJobId(store) {
+  const { blobs } = await store.list({ prefix: "job/" });
+  return blobs[0].key.slice("job/".length);
+}
+
+test("a cancel while the task is still starting stops it once it has started, and holds its place until then", async () => {
+  const dispatch = slowDispatch();
+  const { jobs, store } = setup({ dispatch, limits: { runningAtOnce: 1, jobsPerUserPerDay: 1 } });
+  const starting = jobs.start("user-1", { design: DESIGN });
+  await new Promise((resolve) => setImmediate(resolve));
+  const id = await onlyJobId(store);
+  const cancelled = await jobs.cancel("user-1", id);
+  assert.equal(cancelled.body.job.state, "STOPPING");
+  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 503, "the task may still start, so its place is still taken");
+  dispatch.release();
+  await starting;
+  assert.deepEqual(dispatch.stopped, [`arn:task/${id}`], "the task that started after the cancel is stopped");
+  assert.equal((await jobs.status("user-1", id)).body.job.state, "CANCELLED");
+  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 202, "the place is free once the task is stopped");
+  assert.equal((await jobs.start("user-1", { design: DESIGN })).status, 429, "a task that did start counts toward the day");
+});
+
+test("a stop that fails keeps the job tracked and its place taken, and the cleanup retries it", async () => {
+  const dispatch = slowDispatch({ failStops: 2 }); // fails in cancel, and again in the cleanup that the next start runs;
+  dispatch.release();
+  const { jobs } = setup({ dispatch, limits: { runningAtOnce: 1 } });
+  const { body } = await jobs.start("user-1", { design: DESIGN });
+  const reply = await jobs.cancel("user-1", body.job.id);
+  assert.equal(reply.body.job.state, "STOPPING", "it is not reported stopped while AWS has not stopped it");
+  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 503);
+  await jobs.reap();
+  assert.deepEqual(dispatch.stopped, [`arn:task/${body.job.id}`]);
+  assert.equal((await jobs.status("user-1", body.job.id)).body.job.state, "CANCELLED");
+  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 202);
+});
+
+test("a failing stop on one job does not break the cleanup, status reads or other users' starts", async () => {
+  const dispatch = slowDispatch({ failStops: 1 });
+  dispatch.release();
+  const { jobs, later } = setup({ dispatch, limits: { runningAtOnce: 3 } });
+  const a = (await jobs.start("user-1", { design: DESIGN })).body.job.id;
+  await jobs.start("user-2", { design: DESIGN });
+  later(25 * MINUTE);
+  await jobs.reap();
+  assert.equal(dispatch.stopped.length, 1, "the second stuck job was still stopped after the first stop failed");
+  assert.equal((await jobs.status("user-1", a)).status, 200);
+  assert.equal((await jobs.start("user-3", { design: DESIGN })).status, 202);
+});
+
+test("a result written while a job is stopping does not make it a pass", async () => {
+  const dispatch = slowDispatch({ failStops: 1 });
+  dispatch.release();
+  const { jobs, finish } = setup({ dispatch });
+  const { body } = await jobs.start("user-1", { design: DESIGN });
+  await jobs.cancel("user-1", body.job.id);
+  finish(body.job.id, passed(body.job.id));
+  const job = (await jobs.status("user-1", body.job.id)).body.job;
+  assert.equal(job.state, "CANCELLED");
+  assert.equal(job.files, undefined);
+});
+
+test("a job that never confirms its stop does not stay stopping for ever", async () => {
+  const dispatch = slowDispatch({ failStops: 1000 });
+  dispatch.release();
+  const { jobs, later } = setup({ dispatch, limits: { runningAtOnce: 1 } });
+  const { body } = await jobs.start("user-1", { design: DESIGN });
+  await jobs.cancel("user-1", body.job.id);
+  later(61 * MINUTE);
+  await jobs.reap();
+  assert.equal((await jobs.status("user-1", body.job.id)).body.job.state, "CANCELLED", "past the longest run the task has ended by itself");
+  assert.equal((await jobs.start("user-2", { design: DESIGN })).status, 202);
+});
+
 test("the cleanup frees places held by stuck jobs", async () => {
   const { jobs, later } = setup({ limits: { runningAtOnce: 1 } });
   const { body } = await jobs.start("user-1", { design: DESIGN });
@@ -355,6 +475,13 @@ test("fargate: a task that cannot start fails the job, and cancel stops the task
   assert.equal(JSON.stringify(body).includes("arn:aws"), false, "the task arn is not shown to the user");
   await jobs.cancel("user-1", body.job.id);
   assert.deepEqual(ecs.sent.at(-1), { name: "StopTaskCommand", input: { cluster: "makeable-enclosure", task: `arn:aws:ecs:task/${body.job.id}`, reason: "Stopped by the enclosure job API" } });
+});
+
+test("fargate: a failed StopTask is reported, and a task that is already gone counts as stopped", async () => {
+  const failing = fargateDispatch({ ecs: { send: async () => { throw new Error("throttled"); } }, ...FARGATE });
+  await assert.rejects(failing.stop({ id: "enc-aaaaaaaaaaaa", taskArn: "arn:x" }), /throttled/);
+  const gone = fargateDispatch({ ecs: { send: async () => { throw Object.assign(new Error("The referenced task was not found."), { name: "InvalidParameterException" }); } }, ...FARGATE });
+  await gone.stop({ id: "enc-aaaaaaaaaaaa", taskArn: "arn:x" });
 });
 
 function fakeS3(objects = {}) {

@@ -88,6 +88,7 @@ When it ends, `state` is one of the final states and `progress` is `null`:
 | `PASS` | yes | `message` and the files |
 | `PASS WITH WARNINGS` | yes | `message`, the files, and the warnings in `report.json` as a print checklist |
 | `FAIL` | yes | `message`. No files. They can start again |
+| `STOPPING` | no | "Stopping the case maker". The server asked for the container to stop and waits until it has: it still counts toward the limits |
 | `CANCELLED` | yes | Cancelled |
 | `REFUSED` | yes | `message` (a limit was reached; nothing ran) |
 
@@ -163,7 +164,10 @@ A normal job takes 4 to 12 minutes. The generator writes progress at each body a
 
 - **One job per user, even under a race.** The user's slot (`active/<owner>`) is written only if new (S3 `IfNoneMatch`). When two starts arrive together, one gets the slot and the other gets 409. A slot with no job record is treated as a start still in progress for one minute, then cleared, so a crash cannot block a user for good.
 - **Safe retries from the client.** A client sends a `requestId`. The same id returns the same job and never starts a second container, so a dropped connection can be retried.
-- **Stuck jobs are cleaned up.** Every status read checks the job. Before counting running jobs, `reap()` checks all of them. A job that has gone quiet or run too long is stopped and failed, which frees the user and the place. `reap()` can also run on a schedule.
+- **The cap across users holds under a race.** There are `runningAtOnce` numbered places (`place/0`, `place/1`, ...), each written only if new. A start that gets none answers 503 `busy`, so eight users starting at the same moment start three jobs, not eight. A finished job frees its place. A place left by a crash (its job ended over a minute ago, or has no record) is freed only by `reap()`: the store has no conditional delete, so two starts freeing places at once could free a live one.
+- **Cancel and start can't both win.** Whichever writes `phase/<id>` first wins, and the key is written only if new. If cancel comes first while the container is still starting, the job becomes `STOPPING`, and the start stops the container the moment it has started. A container that started counts toward the day.
+- **A job is reported stopped only once it is.** `dispatch.stop` throws when AWS didn't stop the task (a task AWS no longer knows about counts as stopped). The job then stays `STOPPING`, keeps its places, hides any result, and `reap()` tries again. One job's failure never stops the sweep or another user's start. Past the longest run (60 min) a `STOPPING` job is settled anyway, because the container has ended by itself.
+- **Stuck jobs are cleaned up.** Every status read checks the job. `reap()` checks all of them, on every start and every 5 minutes on AWS. A job that has gone quiet or run too long is stopped and failed, which frees the user and the place.
 - **A late result is ignored.** After the server cancels or stops a job, a result file written later does not change the answer and gives no files.
 - **Files.** Only the listed names are served, only from that job's own model folder, only for its owner.
 - **Input.** The design name must match a fixed pattern and exist in `enclosure/base_designs/`. The body must be JSON under 2 KB.
@@ -188,7 +192,9 @@ Without a `pictureId`, the job and the `docker run` command are exactly as befor
 |---|---|
 | `job/<id>` | The job record: owner, design, state, reason, times |
 | `active/<owner>` | The user's one running job |
-| `running/<id>` | One per running job, counted for the cap across all users |
+| `running/<id>` | One per job that may still have a container, so `reap()` checks it |
+| `place/<n>` | One of the `runningAtOnce` shared places and the job holding it |
+| `phase/<id>` | Written once, by whichever of start (container started) and cancel came first |
 | `daily/<owner>/<YYYY-MM-DD>` | Jobs the user started that day |
 | `request/<owner>/<requestId>` | The job a client request id created |
 | `picture/<pictureId>` | A picture saved for one user, and its file name |
