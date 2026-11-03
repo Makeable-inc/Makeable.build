@@ -781,6 +781,16 @@ export default function Home() {
     });
   }, []);
 
+  useEffect(() => {
+    // Wait for the account response: a signed-in visitor should not see a login box.
+    if (!authResolved || authUnavailable || workspaceOpen) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("signin") !== "1") return;
+    url.searchParams.delete("signin");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    if (!authUser) openLogin("account");
+  }, [authResolved, authUnavailable, authUser, workspaceOpen, openLogin]);
+
   const selectHeroBuild = useCallback((buildId: string, writeUrl = true) => {
     const selectedBuild = heroBuilds.find((build) => build.id === buildId);
     if (!selectedBuild) return;

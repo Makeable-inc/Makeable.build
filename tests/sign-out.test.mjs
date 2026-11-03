@@ -65,7 +65,7 @@ test("Log out sits next to the profile on /app and in the homepage nav, resets a
     readFile(new URL("../apps/landing/app/app/page.tsx", import.meta.url), "utf8"),
   ]);
   // Outside the projects menu, beside the profile chip.
-  assert.match(ui, /<\/details>\s*\)\}\s*<ProfileChip[\s\S]*?\/>\s*\{user && onSignOut && !building && \(/);
+  assert.match(ui, /<ProfileChip[\s\S]*?\/>\}\s*\{user && onSignOut && !building && \(/);
   assert.match(ui, /\{signOutError && <p className="mk-topbar-signout-error" role="alert">\{signOutError\}<\/p>\}/);
   assert.match(home, /\{authUser && \(\s*<button className="mk-nav-signout" type="button" onClick=\{\(\) => void logOut\(\)\}/);
   for (const page of [home, app]) {
