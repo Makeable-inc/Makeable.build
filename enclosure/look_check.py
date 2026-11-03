@@ -18,6 +18,19 @@ def data_url(path):
     return "data:image/png;base64," + base64.b64encode(Path(path).read_bytes()).decode()
 
 
+def read_reply(reply):
+    """The score and differences, or no score when the reply can't be read. It never raises: the look check only reports."""
+    match = re.search(r"\{.*\}", reply, re.S)
+    try:
+        found = json.loads(match.group(0)) if match else None
+    except json.JSONDecodeError:
+        found = None
+    if not isinstance(found, dict) or not isinstance(found.get("score"), (int, float)):
+        return {"score": None, "differences": [], "unreadable_reply": reply[:500]}
+    differences = found.get("differences")
+    return {"score": found["score"], "differences": differences if isinstance(differences, list) else []}
+
+
 def look_check(picture, attempt):
     attempt = Path(attempt)
     content = [{"type": "input_text", "text": PROMPT}, {"type": "input_image", "image_url": data_url(picture)}, {"type": "input_image", "image_url": data_url(attempt / "preview.png")}]
@@ -25,8 +38,7 @@ def look_check(picture, attempt):
     request = urllib.request.Request("https://api.openai.com/v1/responses", data=body, headers={"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"})
     data = send_with_retries(request)
     reply = "".join(c.get("text", "") for item in data["output"] if item["type"] == "message" for c in item["content"])
-    match = re.search(r"\{.*\}", reply, re.S)
-    result = json.loads(match.group(0)) if match else {"score": None, "differences": [], "unreadable_reply": reply[:500]}
+    result = read_reply(reply)
     result["tokens"] = data.get("usage", {}).get("total_tokens")
     (attempt / "look.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
     return result
