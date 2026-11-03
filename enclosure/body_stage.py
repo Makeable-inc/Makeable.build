@@ -100,6 +100,11 @@ def body_problems(mesh, base):
     return problems
 
 
+def body_trace(folder, note, ran, feedback, usage):
+    agent.trace(folder, stage="body", **{"try": note["try"]}, ran=ran, crash=None if ran else feedback, problems=note.get("problems"),
+                score=note.get("score"), tokens=note.get("tokens"), look_tokens=note.get("look_tokens"), seconds=note.get("seconds"))
+
+
 def design_body(base, picture, folder):
     """Returns (code, stl path, summary), keeping the best-scoring valid try. It never loops past the try limit, and a person sees every try."""
     folder = Path(folder)
@@ -111,6 +116,7 @@ def design_body(base, picture, folder):
         number += 1
         attempt = agent.fresh_folder(folder / f"try-{number}")
         (attempt / "prompt.txt").write_text(text, encoding="utf-8")
+        began = time.time()
         reply, usage = agent.ask_model(BODY_SYSTEM, text, picture)
         tokens += usage.get("total_tokens", 0)
         agent.spend(usage)
@@ -130,6 +136,7 @@ def design_body(base, picture, folder):
                 render(mesh, attempt / "preview.png")
                 look = look_check(picture, attempt)
                 agent.spend(look.get("tokens") or 0)
+                note["look_tokens"] = look.get("tokens")
                 tokens += look.get("tokens") or 0
                 note["score"] = look.get("score")
                 note["differences"] = look.get("differences")
@@ -138,6 +145,8 @@ def design_body(base, picture, folder):
                     best = (score, code, stl)
                 if score >= GOOD_ENOUGH_SCORE:
                     tries.append(note)
+                    note["seconds"] = round(time.time() - began, 1)
+                    body_trace(folder, note, ran, feedback, usage)
                     print(f"body try {number}: score {score}, good enough", flush=True)
                     break
                 feedback = f"A reviewer compared your render with the picture and scored it {score} out of 10. Make these changes, keeping the form valid:\n" + "\n".join(f"- {d}" for d in look.get("differences") or [])
@@ -148,6 +157,8 @@ def design_body(base, picture, folder):
             crashes += 1
         agent.report_progress(stage="body", attempt_try=number, ran=ran, failed=[])
         print(f"body try {number}: {json.dumps({k: note.get(k) for k in ('ran', 'score', 'problems', 'tokens')})[:400]}", flush=True)
+        note["seconds"] = round(time.time() - began, 1)
+        body_trace(folder, note, ran, feedback, usage)
         text = "\n\n".join([brief, "Your last script:\n```python\n" + code + "\n```", feedback, "Reply with the complete new script."])
     summary = {"tries": tries, "tokens": tokens, "seconds": round(time.time() - started, 1), "best_score": best[0] if best else None}
     (folder / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")

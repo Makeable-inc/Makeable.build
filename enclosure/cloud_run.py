@@ -16,7 +16,9 @@ Output, in this order, so a result is never seen before its files:
 import json
 import os
 import sys
+import io
 import threading
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -43,6 +45,43 @@ class ProgressUploader:
         if body != self.last:
             self.s3.put_object(Bucket=self.bucket, Key=self.key, Body=body, ContentType="application/json")
             self.last = body
+
+
+def zip_run(job):
+    """The whole run folder, every try of every attempt (runs/agent/<job>*), and the job record, as one zip.
+    Kept so a failed or stuck job on AWS can be explained afterwards. None if there is nothing to send."""
+    runs = HERE / "runs"
+    folders = [p for p in (runs / "agent").glob(f"{job}*") if p.is_dir() and (p.name == job or p.name.startswith(f"{job}-retry"))]
+    extra = [p for p in ((runs / "jobs" / f"{job}.json"), (runs / "jobs" / f"{job}.progress.json")) if p.exists()]
+    if not folders and not extra:
+        return None
+    # At the deadline the generator is still writing and deleting tries, so a file or folder can vanish mid-walk.
+    # os.walk skips folders that are gone, and a file that is gone is left out: the rest of the trail still counts.
+    def files():
+        for folder in folders:
+            for root, dirs, names in os.walk(folder):
+                dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+                for name in sorted(names):
+                    yield Path(root) / name
+        yield from extra
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as out:
+        for path in files():
+            try:
+                out.write(path, path.relative_to(runs).as_posix())
+            except OSError:
+                pass
+    return buffer.getvalue()
+
+
+def send_run_zip(s3, bucket, prefix, job):
+    try:
+        body = zip_run(job)
+        if body:
+            s3.put_object(Bucket=bucket, Key=prefix + "run.zip", Body=body, ContentType="application/zip")
+    except Exception as error:  # the trail is for us; never let it stop the user's result
+        print(f"run folder not sent: {error!r}", flush=True)
 
 
 def log_peak_memory():
@@ -86,8 +125,10 @@ def run(base, job, s3, bucket, prefix, picture_key=None, generate=None, deadline
             state["timed_out"] = True
         print("deadline reached, ending the task", flush=True)
         try:
+            # The user's answer first: the trail must never delay or block it.
             s3.put_object(Bucket=bucket, Key=prefix + "result.json", ContentType="application/json",
                           Body=json.dumps(failed("This job took too long, so it was stopped. You can start it again.")).encode())
+            send_run_zip(s3, bucket, prefix, job)
         finally:
             exit_task(1)
 
@@ -122,6 +163,7 @@ def run(base, job, s3, bucket, prefix, picture_key=None, generate=None, deadline
                 path = folder / name
                 if path.exists():
                     s3.put_object(Bucket=bucket, Key=f"{prefix}files/{name}", Body=path.read_bytes(), ContentType=TYPES[path.suffix])
+        send_run_zip(s3, bucket, prefix, job)
         s3.put_object(Bucket=bucket, Key=prefix + "result.json", Body=json.dumps(record).encode(), ContentType="application/json")
     finally:
         deadline.cancel()

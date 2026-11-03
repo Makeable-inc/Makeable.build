@@ -167,6 +167,23 @@ def ask_model(instructions, text, picture=None):
     return reply, data.get("usage", {})
 
 
+TRACE_TEXT_LIMIT = 4000
+
+
+def trace(folder, **entry):
+    """One line per AI call in <stage folder>/trace.jsonl, so a run can be explained afterwards, also on AWS
+    (cloud_run.py uploads the whole run folder). It only records what happened. Never stops a run.
+    Long text keeps its end, where a traceback's actual error is."""
+    entry = {k: (v[-TRACE_TEXT_LIMIT:] if isinstance(v, str) else v) for k, v in entry.items()}
+    entry["at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    try:
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        with open(Path(folder) / "trace.jsonl", "a", encoding="utf-8") as out:
+            out.write(json.dumps(entry, default=str) + "\n")
+    except OSError as error:
+        print(f"trace not written: {error}", flush=True)
+
+
 def extract_code(reply):
     match = re.search(r"```(?:python)?\s*\n(.*?)```", reply, re.S)
     return match.group(1) if match else reply
@@ -379,6 +396,8 @@ def design_part(brief, folder, max_tries=MAX_TRIES_PER_PART, stage="carrier", co
         if ran and stage == "case":
             draw(attempt)
         history.append({"try": len(history) + 1, "ran": ran, "message": message, "report": report, "usage": usage, "seconds": round(time.time() - began, 1)})
+        trace(folder, stage=stage, **{"try": len(history)}, ran=ran, status=report.get("status"), failed=[r["check"] for r in report["failed"]],
+              crash=None if ran else message, tokens=usage.get("total_tokens"), seconds=history[-1]["seconds"])
         report_progress(stage=stage, attempt_try=len(history), ran=ran, failed=[r["check"] for r in report["failed"]], tokens_so_far=tokens)
         print(f"try {len(history)}: ran={ran} passed={report['passed']} status={report.get('status')} failed={[r['check'] for r in report['failed']]} tokens={usage.get('total_tokens')} {history[-1]['seconds']}s", flush=True)
         if report["passed"]:
