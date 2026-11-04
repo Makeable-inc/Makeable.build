@@ -6,7 +6,8 @@ or raises a clear error; `try_join` never raises, so one awkward feature never s
 """
 import math
 
-from build123d import (Axis, Box, Cone, Cylinder, Ellipse, Plane, Pos, Rot, Sphere, fillet, loft, scale)
+from build123d import (Axis, Box, Cone, Cylinder, Ellipse, Kind, Plane, Polygon, Pos, Rot, Sphere, extrude, fillet, loft,
+                       offset, scale)
 
 BIG = 2000.0
 
@@ -81,25 +82,46 @@ def rounded_box(width, depth, height, radius, at=(0, 0, 0)):
 
 # ---------- features built from the primitives ----------
 
-def ear(width, height, thickness, at, tilt=(0, 0, 0), sharpness=0.25, sink=3.0):
-    """A rounded triangular ear standing on +z before turning, its base `sink` mm below `at` so it roots into the body.
-    sharpness: tip width as a share of the base (0.15 pointy cat, 0.5 round bear)."""
-    tip = max(width * sharpness / 2, 1.2)
-    base_z = -sink
-    top_z = height - tip
-    assert top_z > base_z + 2, "ear is too short for its tip"
-    faces = [Plane.XY.offset(base_z) * Ellipse(width / 2, thickness / 2),
-             Plane.XY.offset(base_z + 0.55 * (top_z - base_z)) * Ellipse(width / 2 * (0.5 + 0.6 * sharpness), thickness / 2 * 0.85),
-             Plane.XY.offset(top_z) * Ellipse(tip, min(tip, thickness / 2))]
-    # The tip sits a little below the top outline and a little larger, so the two never line up exactly.
-    cap = Pos(0, 0, top_z - 0.25 * tip) * scale(Sphere(1), by=(tip * 1.08, min(tip, thickness / 2) * 1.08, tip))
-    return placed(fuse(one_solid(loft(faces), "ear loft"), cap, "ear"), at, tilt)
+def ear(width, height, thickness, at, tilt=(0, 0, 0), sharpness=0.25, sink=3.0, inner=True, lean=0.0):
+    """A cat-style ear: a flat rounded triangle facing the front (-y), standing on +z before turning, its base `sink` mm
+    below `at` so it roots into the body. sharpness: tip roundness as a share of the base (0.15 pointy cat, 0.5 round
+    bear). lean: how far the tip leans sideways, as a share of the width (+ = toward +x). inner: a shallow inner-ear dip
+    on the front face (needs thickness of at least 4 mm)."""
+    assert width > 4 and height > 4 and thickness >= 2.5, "ear: at least 4 mm wide and tall, 2.5 mm thick"
+    round_r = max(0.8, min(width, height) * sharpness * 0.5)
+    tip_x = lean * width
+    outline = Polygon((-width / 2 + round_r, -sink), (width / 2 - round_r, -sink), (tip_x, height - round_r * 1.6), align=None)
+    face = offset(outline, round_r, kind=Kind.ARC)
+    flat = Plane.XZ * face  # in the x-z plane, so it faces the front
+    solid = one_solid(extrude(flat, thickness / 2, both=True), "ear plate")
+    solid = safe_fillet(solid, solid.edges().filter_by(Axis.Y, reverse=True), min(thickness * 0.42, round_r * 0.9), "ear")
+    if inner and thickness >= 4:
+        dip = offset(Polygon((-width / 4, height * 0.12), (width / 4, height * 0.12), (tip_x * 0.6, height * 0.62), align=None),
+                     round_r * 0.5, kind=Kind.ARC)
+        cut = extrude(Plane.XZ.offset(thickness / 2 + 0.01) * dip, 1.2)
+        try:
+            carved = one_solid(solid - cut, "inner ear")
+            if carved.volume > solid.volume * 0.8:
+                solid = carved
+        except Exception:
+            pass
+    return placed(solid, at, tilt)
 
 
-def paw(width, depth, height, at, tilt=(0, 0, 0)):
-    """A squashed dome. Put `at` on the floor (z = 0) and cut the sole flat afterwards so the case still stands flat.
-    Its middle sits 0.6 mm above `at`, so its widest outline never lines up with the body's flat bottom."""
-    return ellipsoid(width / 2, depth / 2, height, (at[0], at[1], at[2] + 0.6), tilt)
+def paw(width, depth, height, at, tilt=(0, 0, 0), toes=3):
+    """A paw: a squashed dome with a row of toe beans along its front edge. Put `at` on the floor (z = 0) and cut the
+    sole flat afterwards so the case still stands flat. Its middle sits 0.6 mm above `at`, so its widest outline never
+    lines up with the body's flat bottom. toes=0 gives a plain dome."""
+    x, y, z = at[0], at[1], at[2] + 0.6
+    pad = scale(Sphere(1), by=(width / 2, depth / 2, height))
+    if toes:
+        bean = min(width / (toes * 2.2), height * 0.55)
+        for i in range(toes):
+            t = 0.5 if toes == 1 else i / (toes - 1)
+            bx = (t - 0.5) * width * 0.62
+            toe = Pos(bx, -depth * 0.36, height * 0.42) * scale(Sphere(1), by=(bean, bean * 0.9, bean * 0.85))
+            pad = fuse(pad, toe, "paw toe")
+    return placed(one_solid(pad, "paw"), (x, y, z), tilt)
 
 
 def antenna(height, stalk_radius=1.6, ball_radius=3.5, at=(0, 0, 0), tilt=(0, 0, 0), sink=3.0):
