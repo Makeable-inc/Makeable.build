@@ -107,6 +107,10 @@ def body_trace(folder, note, ran, feedback, usage):
 
 def design_body(base, picture, folder):
     """Returns (code, stl path, summary), keeping the best-scoring valid try. It never loops past the try limit, and a person sees every try."""
+    if base.get("style") == "character":
+        # Ears, paws, antennas...: built from tested simple solids. Every other design is unchanged.
+        from character_body import design_character_body
+        return design_character_body(base, picture, folder)
     folder = Path(folder)
     brief = body_brief(base)
     text = brief

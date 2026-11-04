@@ -97,8 +97,9 @@ def ear(width, height, thickness, at, tilt=(0, 0, 0), sharpness=0.25, sink=3.0):
 
 
 def paw(width, depth, height, at, tilt=(0, 0, 0)):
-    """A squashed dome. Put its centre at the floor (z = 0) and cut the sole flat so the case still stands flat."""
-    return ellipsoid(width / 2, depth / 2, height, at, tilt)
+    """A squashed dome. Put `at` on the floor (z = 0) and cut the sole flat afterwards so the case still stands flat.
+    Its middle sits 0.6 mm above `at`, so its widest outline never lines up with the body's flat bottom."""
+    return ellipsoid(width / 2, depth / 2, height, (at[0], at[1], at[2] + 0.6), tilt)
 
 
 def antenna(height, stalk_radius=1.6, ball_radius=3.5, at=(0, 0, 0), tilt=(0, 0, 0), sink=3.0):
@@ -200,6 +201,25 @@ def bounds(body):
         return (b.min.X, b.min.Y, b.min.Z), (b.max.X, b.max.Y, b.max.Z)
     xs, ys, zs = [p.X for p in points], [p.Y for p in points], [p.Z for p in points]
     return (min(xs), min(ys), min(zs)), (max(xs), max(ys), max(zs))
+
+
+def section_area(body, y, thickness=0.2):
+    """Area (mm2) of the body's cross-section at depth y."""
+    try:
+        return (body & Pos(0, y, 0) * Box(BIG, thickness, BIG)).volume / thickness
+    except Exception:
+        return 0.0
+
+
+def broad_flat_back(body, share=0.8, step=1.0, max_cut=25.0):
+    """Cut the back flat, moving the cut forward until the flat plate is at least `share` of the body's biggest
+    cross-section, so the rear cover is broad, prints flat and has room for screws. Returns (body, y of the cut)."""
+    lo, hi = bounds(body)
+    biggest = max(section_area(body, lo[1] + f * (hi[1] - lo[1])) for f in (0.3, 0.45, 0.6, 0.75))
+    y = hi[1] - step
+    while y > hi[1] - max_cut and section_area(body, y) < share * biggest:
+        y -= step
+    return flat_back(body, y), y
 
 
 def size(body):
