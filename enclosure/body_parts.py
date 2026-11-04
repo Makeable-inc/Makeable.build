@@ -19,6 +19,14 @@ def one_solid(shape, name="part"):
     return solid
 
 
+def fuse(a, b, name="part"):
+    """a + b as one valid solid, checked: OpenCascade can silently drop most of a shape when two surfaces line up
+    exactly, so the result must keep at least the larger of the two volumes."""
+    out = one_solid(a + b, name)
+    assert out.volume >= max(a.volume, b.volume) - 0.5, f"{name}: the join lost volume ({out.volume:.0f} mm3 left of {max(a.volume, b.volume):.0f})"
+    return out
+
+
 def placed(solid, at=(0, 0, 0), tilt=(0, 0, 0)):
     """Turn (degrees about x, then y, then z) and then move."""
     return one_solid(Pos(*at) * (Rot(*tilt) * solid), "placed")
@@ -35,17 +43,17 @@ def ellipsoid(rx, ry, rz, at=(0, 0, 0), tilt=(0, 0, 0)):
 def capsule(radius, length, at=(0, 0, 0), tilt=(0, 0, 0)):
     """A rod with round ends, along z before turning: arms, legs, tails, handles, antenna stalks."""
     assert radius > 0 and length >= 0, "capsule needs a positive radius"
-    rod = Cylinder(radius, length) + Pos(0, 0, length / 2) * Sphere(radius) + Pos(0, 0, -length / 2) * Sphere(radius)
-    return placed(one_solid(rod, "capsule"), at, tilt)
+    rod = fuse(Cylinder(radius, length), Pos(0, 0, length / 2) * Sphere(radius), "capsule")
+    rod = fuse(rod, Pos(0, 0, -length / 2) * Sphere(radius), "capsule")
+    return placed(rod, at, tilt)
 
 
 def cone_tip(base_radius, height, tip_radius=None, at=(0, 0, 0), tilt=(0, 0, 0)):
     """A cone with a rounded tip, base at z = 0 before turning: horns, spikes, beaks, rocket noses."""
     tip = tip_radius if tip_radius is not None else max(0.8, base_radius * 0.18)
     assert base_radius > tip > 0 and height > 2 * tip, "cone_tip: base must be wider than the tip and taller than it"
-    body = Pos(0, 0, height / 2) * Cone(base_radius, tip, height)
-    body = body + Pos(0, 0, height) * Sphere(tip)
-    return placed(one_solid(body, "cone_tip"), at, tilt)
+    body = fuse(Pos(0, 0, height / 2) * Cone(base_radius, tip, height), Pos(0, 0, height - 0.2 * tip) * Sphere(tip * 1.05), "cone_tip")
+    return placed(body, at, tilt)
 
 
 def oval_loft(sections, dome=0.0):
@@ -61,7 +69,7 @@ def oval_loft(sections, dome=0.0):
     if dome > 0:
         z, rx, ry = sections[-1]
         cap = Pos(0, 0, z) * scale(Sphere(1), by=(rx, ry, dome))
-        body = one_solid(body + cap, "oval_loft dome")
+        body = fuse(body, cap, "oval_loft dome")
     return body
 
 
@@ -83,8 +91,9 @@ def ear(width, height, thickness, at, tilt=(0, 0, 0), sharpness=0.25, sink=3.0):
     faces = [Plane.XY.offset(base_z) * Ellipse(width / 2, thickness / 2),
              Plane.XY.offset(base_z + 0.55 * (top_z - base_z)) * Ellipse(width / 2 * (0.5 + 0.6 * sharpness), thickness / 2 * 0.85),
              Plane.XY.offset(top_z) * Ellipse(tip, min(tip, thickness / 2))]
-    body = one_solid(loft(faces), "ear loft") + Pos(0, 0, top_z) * scale(Sphere(1), by=(tip, min(tip, thickness / 2), tip))
-    return placed(one_solid(body, "ear"), at, tilt)
+    # The tip sits a little below the top outline and a little larger, so the two never line up exactly.
+    cap = Pos(0, 0, top_z - 0.25 * tip) * scale(Sphere(1), by=(tip * 1.08, min(tip, thickness / 2) * 1.08, tip))
+    return placed(fuse(one_solid(loft(faces), "ear loft"), cap, "ear"), at, tilt)
 
 
 def paw(width, depth, height, at, tilt=(0, 0, 0)):
@@ -95,8 +104,7 @@ def paw(width, depth, height, at, tilt=(0, 0, 0)):
 def antenna(height, stalk_radius=1.6, ball_radius=3.5, at=(0, 0, 0), tilt=(0, 0, 0), sink=3.0):
     """A stalk with a ball on top, standing on +z, rooted `sink` mm into the body."""
     stalk = Pos(0, 0, (height - sink) / 2) * Cylinder(stalk_radius, height + sink)
-    body = stalk + Pos(0, 0, height) * Sphere(ball_radius)
-    return placed(one_solid(body, "antenna"), at, tilt)
+    return placed(fuse(stalk, Pos(0, 0, height) * Sphere(ball_radius), "antenna"), at, tilt)
 
 
 def spike_row(count, base_radius, height, start, end, tilt=(0, 0, 0)):
@@ -154,7 +162,7 @@ def join(body, feature, name, min_overlap=2.0):
     except Exception:
         overlap = 0.0
     assert overlap >= min_overlap, f"{name} overlaps the body by only {overlap:.1f} mm3; sink it deeper"
-    return one_solid(body + feature, name)
+    return fuse(body, feature, name)
 
 
 def try_join(body, feature, name, added, skipped, min_overlap=2.0):

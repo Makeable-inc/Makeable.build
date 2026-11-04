@@ -31,6 +31,12 @@ class Primitives(unittest.TestCase):
                 self.assertEqual(len(shape.solids()), 1)
                 self.assertGreater(shape.volume, 10)
 
+    def test_round_tipped_ear_keeps_its_volume(self):
+        # A round tip whose outline matched the top section used to lose most of the ear in the join.
+        for sharp in (0.2, 0.3, 0.45, 0.6):
+            with self.subTest(sharp=sharp):
+                self.assertGreater(bp.ear(20, 16, 8, at=(0, 0, 0), sharpness=sharp).volume, 900)
+
     def test_bad_sizes_raise_clearly(self):
         with self.assertRaises(AssertionError):
             bp.ellipsoid(0, 5, 5)
