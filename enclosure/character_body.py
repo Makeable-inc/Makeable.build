@@ -48,8 +48,9 @@ z = 0, and ends with:
 No cavity, no window, no holes, no seam yet: those are added later inside this body.
 
 How to build it (this is what works, every time):
-- Make the main form with body_parts (oval_loft with a dome for soft loafs and heads, rounded_box for boxy robots
-  and TVs). It alone must meet the size limits you are given.
+- Make the main form with body_parts: rounded_loft (with a dome) for loafs, heads and most bodies, rounded_box for
+  boxy robots and TVs, oval_loft only for truly round forms. The main form alone must hold the parts: a rule checks
+  that the parts' box (the room they need, plus walls, from just behind the front) fits inside it.
 - Add every listed feature with body_parts (ear, paw, antenna, cone_tip, spike_row, capsule, ellipsoid), placed on the
   main form's surface with surface_z / surface_x / surface_y_front, and joined with try_join.
 - Creases where a feature meets the body are fine. Do not write your own lofts, sweeps, splines or fillets; do not
@@ -168,9 +169,38 @@ def added_names(output):
         return set()
 
 
+ROOM_SLACK = 0.5  # mm: the parts' box (required_space already includes the walls) may touch the outside this much
+
+
+def room_problem(mesh, base):
+    """The main form must hold the box the parts need, plus walls, centred across, standing on the floor, from just
+    behind the front. Checked on points spread over that box's surface."""
+    need = base.get("min_body")
+    if not need:
+        return None
+    lo, hi = mesh.bounds
+    w, d, h = need["width"] - 2 * ROOM_SLACK, need["depth"] - ROOM_SLACK, need["height"] - ROOM_SLACK
+    # The main body's front at its middle, not a paw or snout that stands out in front of it.
+    hits, _, _ = mesh.ray.intersects_location([[(lo[0] + hi[0]) / 2, lo[1] - 50, h / 2]], [[0, 1, 0]], multiple_hits=False)
+    front = float(hits[0][1]) if len(hits) else lo[1]
+    box = trimesh.creation.box(extents=(w, d, h), transform=trimesh.transformations.translation_matrix(((lo[0] + hi[0]) / 2, front + ROOM_SLACK + d / 2, h / 2 + ROOM_SLACK)))
+    points, _ = trimesh.sample.sample_surface(box, 3000, seed=2)
+    outside = ~mesh.contains(points)
+    if outside.mean() <= 0.01:
+        return None
+    bad = points[outside]
+    return (f"The body does not hold the parts' box ({w:.0f} wide, {d:.0f} deep, {h:.0f} tall mm, walls included): "
+            f"{outside.mean():.0%} of that box sticks out, around x {bad[:, 0].min():.0f} to {bad[:, 0].max():.0f}, "
+            f"y {bad[:, 1].min():.0f} to {bad[:, 1].max():.0f}, z {bad[:, 2].min():.0f} to {bad[:, 2].max():.0f}. "
+            "Make the main form roomier there (rounded_loft keeps the corners full); features do not count.")
+
+
 def problems(mesh, base, features, output=""):
     from body_stage import body_problems
     found = [p for p in body_problems(mesh, base) if "of the back's outline is flat" not in p]
+    room = room_problem(mesh, base)
+    if room:
+        found.append(room)
     share, flat = back_plate(mesh)
     if share < BACK_PLATE_SHARE or flat < BACK_PLATE_FLAT:
         found.append(f"The flat back plate covers {share:.0%} of the back outline and is {flat:.0%} flat; it needs "

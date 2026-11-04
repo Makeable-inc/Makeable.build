@@ -6,7 +6,8 @@ or raises a clear error; `try_join` never raises, so one awkward feature never s
 """
 import math
 
-from build123d import (Axis, Box, Cone, Cylinder, Ellipse, Kind, Plane, Polygon, Pos, Rot, Sphere, extrude, fillet, loft,
+from build123d import (Axis, Box, Cone, Cylinder, Ellipse, Kind, Plane, Polygon, Pos, RectangleRounded, Rot, Sphere, extrude,
+                       fillet, loft,
                        offset, scale)
 
 BIG = 2000.0
@@ -71,6 +72,24 @@ def oval_loft(sections, dome=0.0):
         z, rx, ry = sections[-1]
         cap = Pos(0, 0, z) * scale(Sphere(1), by=(rx, ry, dome))
         body = fuse(body, cap, "oval_loft dome")
+    return body
+
+
+def rounded_loft(sections, dome=0.0):
+    """A soft but roomy main form through horizontal rounded rectangles [(z, width, depth, corner_radius), ...],
+    bottom to top, centred on x = y = 0. Square-ish corners keep room inside for the parts, unlike ovals, which narrow
+    toward their corners. dome: height of a rounded cap on top (make the top two sections the same size)."""
+    assert len(sections) >= 2, "rounded_loft needs at least 2 sections"
+    zs = [s[0] for s in sections]
+    assert zs == sorted(zs) and len(set(zs)) == len(zs), "rounded_loft sections must go strictly upward in z"
+    for z, w, d, r in sections:
+        assert 0 < r < min(w, d) / 2, f"corner radius {r} must be under half of {min(w, d)}"
+    faces = [Plane.XY.offset(z) * RectangleRounded(w, d, r) for z, w, d, r in sections]
+    body = one_solid(loft(faces), "rounded_loft")
+    if dome > 0:
+        z, w, d, r = sections[-1]
+        cap = Pos(0, 0, z) * scale(Sphere(1), by=(w / 2 * 0.98, d / 2 * 0.98, dome))
+        body = fuse(body, cap, "rounded_loft dome")
     return body
 
 

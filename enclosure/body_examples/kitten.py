@@ -1,17 +1,18 @@
 """Worked example: a loaf kitten body from simple solids (body_parts). Front faces -y. Every size is a setting."""
-from body_parts import broad_flat_back, ear, flat_sole, oval_loft, paw, size, surface_y_front, surface_z, try_join
+from body_parts import broad_flat_back, ear, flat_sole, paw, rounded_loft, size, surface_y_front, surface_z, try_join
 
-WIDTH, DEPTH, HEIGHT = 112.0, 68.0, 62.0          # the main form; meet the limits you were given
-EAR = dict(width=26.0, height=19.0, thickness=10.0, sharpness=0.3)
+WIDTH, DEPTH, HEIGHT = 108.0, 62.0, 56.0          # the main form: roomy enough for the parts box, inside the front limits
+DOME = 3.0                                         # a low dome, so the front stays under its height limit with the ears
+EAR = dict(width=24.0, height=11.0, thickness=7.0, sharpness=0.35)  # short ears: they count in the front height
 EAR_X, EAR_Y, EAR_TILT = 0.30 * WIDTH, 2.0, 14     # ears near the top corners, leaning outward
 PAW = dict(width=22.0, depth=20.0, height=10.0)
 PAW_X, PAW_SINK = 0.34 * WIDTH, 6.0               # front paws at the bottom front corners, sunk 6 mm into the front
 
-rx, ry = WIDTH / 2, DEPTH / 2
-# A loaf: full at the bottom, with a soft domed top. The top two ovals are the same size, so the sides are
-# upright where the dome starts and the dome meets them without a ridge.
-body = oval_loft([(0, rx * 0.93, ry * 0.93), (HEIGHT * 0.2, rx, ry), (HEIGHT * 0.45, rx * 0.99, ry * 0.99),
-                  (HEIGHT * 0.6, rx * 0.99, ry * 0.99)], dome=HEIGHT * 0.4)
+R = 5.5                                           # corner radius seen from above: small enough to keep the parts box inside
+# A loaf: rounded-rectangle sections (roomy inside, soft outside), a little fuller at the bottom, with a domed top.
+# The top two sections are the same size, so the dome meets the upright sides without a ridge.
+body = rounded_loft([(0, WIDTH, DEPTH, R), (HEIGHT * 0.25, WIDTH, DEPTH, R),
+                     (HEIGHT * 0.75, WIDTH, DEPTH, R), (HEIGHT, WIDTH, DEPTH, R)], dome=DOME)
 
 added, skipped = [], []
 # Name each feature exactly as the feature list names it: the rule checks these names.
