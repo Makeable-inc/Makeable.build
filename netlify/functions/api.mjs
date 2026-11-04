@@ -1,3 +1,4 @@
+import { EMBER_OFFER } from "../../lib/ember-offer.mjs";
 import { loadProductionBuildPipeline } from "../../lib/production-build-pipeline.mjs";
 import { backgroundDispatchFetch } from "../../lib/aws/background-invoke.mjs";
 import { openStore } from "../../lib/storage/index.mjs";
@@ -107,7 +108,7 @@ import {
 } from "../../lib/waitlist-session.mjs";
 
 const googleVerifiers = new Map();
-const EMBER_OFFER_VERSION = "ember_usd_3499_free_shipping_oct_2026_v1";
+const EMBER_OFFER_VERSION = EMBER_OFFER.version;
 const POSTHOG_PROJECT_TOKEN = "phc_rfcnAWiEY6337gWcv54R8JHBNQ5K2iYy2Hd76ZUM6CJH";
 const POSTHOG_CAPTURE_URL = "https://us.i.posthog.com/capture/";
 const PUBLIC_PRICE_LISTING_IDS = new Set([
@@ -405,14 +406,11 @@ async function createEmberCheckout(req, env, context) {
   }
 
   const origin = new URL(req.url).origin;
-  const allowedColors = new Set(["sage", "bone", "blush"]);
-  const checkoutMarkets = {
-    US: { currency: "usd", unitAmount: "3499" },
-    SG: { currency: "sgd", unitAmount: "4499" },
-  };
-  let selectedColor = "bone";
-  let selectedMarket = "US";
-  let quantity = 1;
+  const allowedColors = new Set(Object.keys(EMBER_OFFER.colors));
+  const checkoutMarkets = EMBER_OFFER.markets;
+  let selectedColor = EMBER_OFFER.color;
+  let selectedMarket = EMBER_OFFER.market;
+  let quantity = EMBER_OFFER.quantity;
   let termsAccepted = false;
   let marketingConsent = false;
   let posthogDistinctId = "";
@@ -439,11 +437,7 @@ async function createEmberCheckout(req, env, context) {
       { "Cache-Control": "no-store" },
     );
   }
-  const colorLabels = {
-    sage: "Sage",
-    bone: "Beige",
-    blush: "Sakura",
-  };
+  const colorLabels = EMBER_OFFER.colors;
   const colorLabel = colorLabels[selectedColor];
   const market = checkoutMarkets[selectedMarket];
   const consentRecordedAt = new Date().toISOString();
@@ -456,9 +450,9 @@ async function createEmberCheckout(req, env, context) {
     "name_collection[individual][optional]": "false",
     "line_items[0][price_data][currency]": market.currency,
     "line_items[0][price_data][unit_amount]": market.unitAmount,
-    "line_items[0][price_data][product_data][name]": `Makeable Ember — ${colorLabel}`,
+    "line_items[0][price_data][product_data][name]": `${EMBER_OFFER.name} — ${colorLabel}`,
     "line_items[0][price_data][product_data][description]":
-      "Token-burner desk pet. Easy-to-assemble kit, USB-C cable included.",
+      EMBER_OFFER.description,
     "line_items[0][quantity]": String(quantity),
     "metadata[ember_color]": selectedColor,
     "metadata[market]": selectedMarket,
@@ -481,11 +475,11 @@ async function createEmberCheckout(req, env, context) {
     "payment_intent_data[metadata][consent_source]": "makeable_web_preorder",
     "payment_intent_data[metadata][offer_version]": EMBER_OFFER_VERSION,
     "shipping_options[0][shipping_rate_data][type]": "fixed_amount",
-    "shipping_options[0][shipping_rate_data][fixed_amount][amount]": "0",
+    "shipping_options[0][shipping_rate_data][fixed_amount][amount]": EMBER_OFFER.shippingAmount,
     "shipping_options[0][shipping_rate_data][fixed_amount][currency]": market.currency,
-    "shipping_options[0][shipping_rate_data][display_name]": "Free shipping",
+    "shipping_options[0][shipping_rate_data][display_name]": EMBER_OFFER.shippingName,
     "custom_text[shipping_address][message]":
-      "Pre-orders are expected to ship in October 2026.",
+      EMBER_OFFER.shippingMessage,
     success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?checkout=cancelled`,
     integration_identifier: "makeable_ember_qtmsvkwp",

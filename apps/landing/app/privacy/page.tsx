@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LegalShell } from "../legal-shell";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/privacy/" },
   title: "Privacy | Makeable",
   description: "How Makeable handles sign-in, waitlist, and product analytics data.",
 };

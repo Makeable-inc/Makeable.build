@@ -1,5 +1,7 @@
 "use client";
 
+import { ProjectLibrary } from "../project-library";
+import { appendGalleryPage, loadGalleryPage, galleryPageUrl } from "../gallery-pages";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowIcon, BuildFailurePanel, FolderSkeleton, LockedCodePanel, WorkspaceContextBar, WorkspaceTopBar, type ProjectSurface } from "../workspace-ui";
@@ -26,6 +28,8 @@ type BuildPart = {
 type BuildProject = {
   id: string;
   title: string;
+  publishState?: string;
+  createdAt?: string;
   idea?: string;
   summary: string;
   behavior?: string;
@@ -126,6 +130,9 @@ export default function BuildAppPage() {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const [accountBuilds, setAccountBuilds] = useState<BuildProject[]>([]);
+  const [moreCursor, setMoreCursor] = useState<string | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [publicBuilds, setPublicBuilds] = useState<BuildProject[]>([]);
   const [sharedProject, setSharedProject] = useState<BuildProject | null>(null);
   const [selectedBuildId, setSelectedBuildId] = useState("");
@@ -146,7 +153,7 @@ export default function BuildAppPage() {
       || publicBuilds.find((build) => build.id === selectedBuildId)
       || (sharedProject?.id === selectedBuildId ? sharedProject : null)
       || null;
-    return builds[0] || publicBuilds[0] || null;
+    return null;
   }, [builds, publicBuilds, selectedBuildId, sharedProject, hydratedBuild]);
   const activeIdentity = activeBuild ? projectDisplayIdentity(activeBuild) : null;
 
@@ -163,13 +170,13 @@ export default function BuildAppPage() {
       const { account, publicBuilds: publicLoad } = loadBuildLibrary<AuthUser, BuildProject, BuildQuota>({
         fetch: (url, init) => fetch(url, init),
         accountUrl: apiUrl("/api/account/builds"),
-        publicUrl: apiUrl("/api/builds"),
+        publicUrl: apiUrl(galleryPageUrl("")),
       });
       // The two requests settle independently: public builds show as soon as
       // they arrive, whatever happens to the account request.
       const publicDone = publicLoad.then((result) => {
         if (cancelled) return result;
-        if (result.state === "ok") setPublicBuilds(result.builds);
+        if (result.state === "ok") { setPublicBuilds(result.builds); setMoreCursor(result.nextCursor || null); }
         setLoading(false);
         return result;
       });
@@ -185,6 +192,7 @@ export default function BuildAppPage() {
           setAccountBuilds([]);
           setQuota(DEFAULT_BUILD_QUOTA);
         } else {
+          setUser(null);
           setAccountUnavailable(true);
           setLoadError("Your projects could not be loaded. Try again to reconnect to your account.");
         }
@@ -207,9 +215,11 @@ export default function BuildAppPage() {
 
   useEffect(() => {
     const restoreBuildFromUrl = () => {
-      setSurface("overview");
+      const query = new URL(window.location.href).searchParams;
+      const tab = query.get("tab");
+      setSurface(tab === "wiring" || tab === "code" ? tab : "overview");
       setWiringError("");
-      setSelectedBuildId(new URL(window.location.href).searchParams.get("build") || "");
+      setSelectedBuildId(query.get("build") || "");
     };
     setSharedProject(sharedProjectFromSession());
     restoreBuildFromUrl();
@@ -224,6 +234,7 @@ export default function BuildAppPage() {
     setSelectedBuildId(build.id);
     const url = new URL(window.location.href);
     url.searchParams.set("build", build.id);
+    url.searchParams.delete("tab");
     window.history.pushState({ makeableBuild: build.id }, "", `${url.pathname}${url.search}${url.hash}`);
   }, [selectedBuildId]);
 
@@ -254,8 +265,42 @@ export default function BuildAppPage() {
   }, [activeBuild]);
 
   const openWiring = useCallback(() => {
-    if (activeBuild && projectWiringReady(activeBuild)) setSurface("wiring");
+    if (activeBuild && projectWiringReady(activeBuild)) {
+      setSurface("wiring");
+      const url = new URL(window.location.href); url.searchParams.set("tab", "wiring");
+      window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   }, [activeBuild]);
+
+  useEffect(() => {
+    if (loading || !selectedBuildId || activeBuild) {setDetailLoading(false);return;}
+    const controller = new AbortController();
+    setDetailLoading(true);
+    let current = true;
+    const timer = window.setTimeout(() => controller.abort(), 10000);
+    void fetch(apiUrl(`/api/builds/${encodeURIComponent(selectedBuildId)}`), {signal: controller.signal, credentials: "include"})
+      .then(async r => { const data = await r.json(); if (current && !controller.signal.aborted && r.ok && data.build?.id === selectedBuildId) setHydratedBuild(data.build); })
+      .catch(() => {})
+      .finally(() => {window.clearTimeout(timer);if (current) setDetailLoading(false);});
+    return () => {window.clearTimeout(timer);current = false;controller.abort();};
+  }, [loading, selectedBuildId, activeBuild, loadAttempt]);
+
+  async function loadMore() {
+    if (!moreCursor || moreBusy) return;
+    setMoreBusy(true);
+    const result = await loadGalleryPage<BuildProject>(fetch, apiUrl(galleryPageUrl(moreCursor)));
+    if (result.ok) {setPublicBuilds(items => appendGalleryPage(items,result.builds));setMoreCursor(result.nextCursor);setLoadError("");}
+    else setLoadError("More community builds could not be loaded. Please try again.");
+    setMoreBusy(false);
+  }
+
+  function selectSurface(next: ProjectSurface) {
+    if (next === "wiring" && !projectWiringReady(activeBuild)) return;
+    setSurface(next);
+    const url = new URL(window.location.href);
+    if (next === "overview") url.searchParams.delete("tab"); else url.searchParams.set("tab",next);
+    window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   const goHome = useCallback(() => {
     router.push("/");
@@ -285,7 +330,8 @@ export default function BuildAppPage() {
     setSelectedBuildId("");
     const url = new URL(window.location.href);
     url.searchParams.delete("build");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    url.searchParams.delete("tab");
+    window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   return (
@@ -300,7 +346,7 @@ export default function BuildAppPage() {
         surface={surface}
         wiringAvailable={Boolean(activeBuild && projectWiringReady(activeBuild))}
         wiringLoading={wiringLoading}
-        onSelectSurface={(nextSurface) => nextSurface === "wiring" ? void openWiring() : setSurface(nextSurface)}
+        onSelectSurface={selectSurface}
         projects={builds.map((build) => ({ id: build.id, title: projectDisplayIdentity(build).title }))}
         selectedProjectId={activeBuild?.id}
         projectsLabel={user ? "All projects" : "Community projects"}
@@ -314,14 +360,15 @@ export default function BuildAppPage() {
       />
 
       <WorkspaceContextBar
-        title={activeIdentity?.title || (loading ? "Opening your project" : "My builds")}
+        title={activeIdentity?.title || (loading ? "Opening your project" : user ? "My builds" : "Community builds")}
         idea={activeBuild?.idea || activeBuild?.summary}
         label={loading ? "Opening" : activeBuild ? "Project" : "Library"}
         onHome={goHome}
       />
 
       <section className="mk-workspace-main" aria-labelledby="workspace-title">
-        {loading ? (
+        {selectedBuildId && <div className="project-return"><button type="button" onClick={openProjects} className="library-nav">← {user ? "My builds" : "Community builds"}</button></div>}
+        {loading || detailLoading ? (
           <FolderSkeleton />
         ) : selectedBuildId && !activeBuild ? (
           <BuildFailurePanel
@@ -333,9 +380,11 @@ export default function BuildAppPage() {
             onEdit={() => router.push("/#make")}
             onBack={openProjects}
           />
+        ) : !selectedBuildId && !publicFailed && (!accountUnavailable || publicBuilds.length > 0) ? (
+          <ProjectLibrary builds={builds} signedIn={Boolean(user)} onOpen={build => selectBuild(build as BuildProject)} moreAvailable={!user && Boolean(moreCursor)} loadingMore={moreBusy} onMore={loadMore} />
         ) : activeBuild ? (
           surface === "code"
-            ? <LockedCodePanel onBack={() => setSurface("overview")} />
+            ? <LockedCodePanel onBack={() => selectSurface("overview")} />
             : surface === "wiring" && projectWiringReady(activeBuild)
               ? <ProjectWiringGuide key={activeBuild.id} build={activeBuild} />
               : <ProjectOverview key={activeBuild.id} build={activeBuild} onOpenWiring={() => void openWiring()} wiringLoading={wiringLoading} />
@@ -348,6 +397,7 @@ export default function BuildAppPage() {
           </div>
         )}
 
+        {loadError && !publicFailed && (!accountUnavailable || publicBuilds.length > 0) && <p role="alert">{loadError}</p>}
         {wiringError && <p className="mk-wiring-load-error" role="alert">{wiringError}</p>}
       </section>
 

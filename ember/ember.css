@@ -495,3 +495,8 @@ h1, h2, h3, p { text-wrap: pretty; }
 @media (prefers-reduced-transparency: reduce) {
   .glass-card, .desk-ember figcaption, .setup-render figcaption { backdrop-filter: none; background: #191512; }
 }
+
+/* Setup guidance uses the existing Ember palette and type system. */
+.setup-guide{padding-top:100px;padding-bottom:100px;scroll-margin-top:100px}.guide-eyebrow{font-size:12px;letter-spacing:.14em;color:#e2a176}.setup-guide h2{font-size:clamp(32px,5vw,56px);line-height:1.1;margin:16px 0 24px}.guide-intro{max-width:680px;color:#bcb5b0;line-height:1.7}.guide-steps{list-style:none;padding:0;margin:48px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 48px}.guide-steps li{border-top:1px solid #ffffff26;padding-top:24px}.guide-steps li>span{color:#e2a176;font-size:13px}.guide-steps h3,.guide-help h3{font-size:22px;margin:16px 0}.guide-steps p,.guide-help p{color:#bcb5b0;line-height:1.7}.setup-guide a{color:#f5b88a;text-decoration:underline;text-underline-offset:4px}.guide-help{max-width:800px;margin-top:64px}.guide-help details{border-bottom:1px solid #ffffff26;padding:20px 0}.guide-help summary{cursor:pointer;line-height:1.5}.guide-help summary:focus-visible{outline:2px solid #f5b88a;outline-offset:5px}.guide-contact{margin-top:32px}@media(max-width:640px){.setup-guide{padding-top:64px;padding-bottom:64px}.guide-steps{grid-template-columns:1fr;gap:24px}}
+
+.setup-guide-link{color:#f5b88a;text-decoration:underline;text-underline-offset:5px;display:inline-block;padding:12px 0}

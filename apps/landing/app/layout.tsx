@@ -1,3 +1,5 @@
+import {siteOrigin,productionSite} from "./site-config";
+import "./site-support.css";
 import type { Metadata } from "next";
 import "./globals.css";
 import "./production.css";
@@ -8,7 +10,9 @@ import "./landing-sections.css";
 import PostHogProvider from "./posthog-provider";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.URL || "http://localhost:3000"),
+  metadataBase: siteOrigin,
+  alternates: {canonical: "/"},
+  robots: productionSite ? {index:true,follow:true} : {index:false,follow:false},
   title: "Makeable — Feed Ember Tokens.",
   description: "Pre-order Ember, explore starter builds, and create your own low-power ESP32 kit idea.",
   openGraph: {

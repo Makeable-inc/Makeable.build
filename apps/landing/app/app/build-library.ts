@@ -7,7 +7,7 @@ export type AccountLoad<User, Build, Quota> =
   | { state: "signed-out" }
   | { state: "unavailable" };
 
-export type PublicLoad<Build> = { state: "ok"; builds: Build[] } | { state: "failed" };
+export type PublicLoad<Build> = { state: "ok"; builds: Build[]; nextCursor?: string | null } | { state: "failed" };
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -39,7 +39,7 @@ export function loadBuildLibrary<User, Build, Quota>({
   });
   const publicBuilds = getJson(fetch, publicUrl, {}, timeoutMs).then((result): PublicLoad<Build> => {
     const builds = (result.body as { builds?: unknown } | null)?.builds;
-    return result.ok && Array.isArray(builds) ? { state: "ok", builds: builds as Build[] } : { state: "failed" };
+    return result.ok && Array.isArray(builds) ? { state: "ok", builds: builds as Build[], nextCursor: typeof (result.body as {nextCursor?: unknown})?.nextCursor === "string" ? (result.body as {nextCursor: string}).nextCursor : null } : { state: "failed" };
   });
   return { account, publicBuilds };
 }

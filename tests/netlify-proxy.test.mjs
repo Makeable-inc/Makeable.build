@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { EMBER_OFFER } from "../lib/ember-offer.mjs";
 import handler from "../netlify/functions/api.mjs";
 
 const productionOrigin = "https://makeable.build";
@@ -172,7 +173,7 @@ test("Ember checkout is handled locally and creates a Stripe Checkout session", 
   assert.equal(stripeRequest.options.body.get("shipping_options[0][shipping_rate_data][display_name]"), "Free shipping");
   assert.equal(
     stripeRequest.options.body.get("custom_text[shipping_address][message]"),
-    "Pre-orders are expected to ship in October 2026.",
+    EMBER_OFFER.shippingMessage,
   );
   assert.equal(stripeRequest.options.body.get("customer_creation"), "always");
   assert.equal(stripeRequest.options.body.get("billing_address_collection"), "required");

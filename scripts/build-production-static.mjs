@@ -65,3 +65,21 @@ for (const file of ["controls/OrbitControls.js", "loaders/GLTFLoader.js", "utils
 }
 
 await injectTrackingIntoStaticHtml(output);
+
+// Crawling policy is selected at build time, including legacy static pages.
+const production = process.env.MAKEABLE_SITE_ENV === "production";
+const origin = new URL(process.env.MAKEABLE_SITE_ORIGIN || "https://makeable.build");
+if (origin.protocol !== "https:" || origin.hostname === "localhost" || origin.pathname !== "/") throw new Error("Use a public HTTPS MAKEABLE_SITE_ORIGIN without a path.");
+await writeFile(path.join(output, "robots.txt"), production
+  ? `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /dashboard/\nDisallow: /pilot/\nSitemap: ${origin.origin}/sitemap.xml\n`
+  : "User-agent: *\nDisallow: /\n");
+const sitemap = await readFile(path.join(output, "sitemap.xml"), "utf8");
+await writeFile(path.join(output, "sitemap.xml"), sitemap.replaceAll("https://makeable.build", origin.origin));
+if (!production) {
+  for (const entry of await readdir(output, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".html")) continue;
+    const file = path.join(entry.parentPath, entry.name);
+    const html = await readFile(file, "utf8");
+    await writeFile(file, html.replace("</head>", '<meta name="robots" content="noindex, nofollow" /></head>'));
+  }
+}

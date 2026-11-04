@@ -26,8 +26,8 @@
   <header class="site-header" data-site-header>
     <div class="site-header__inner glass-bar">
       <a class="makeable-mark" href="/" aria-label="Makeable home"><img src="/assets/ember/makeable-wordmark-white.png" alt="Makeable" /></a>
-      <nav class="site-nav" aria-label="Ember navigation"><a href="#journey">How it works</a><a href="#setup">Setup</a></nav>
-      <a class="header-download" href="https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg" data-download-link aria-label="Download Ember for Mac"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download</span></a>
+      <nav class="site-nav" aria-label="Ember navigation"><a href="#journey">How it works</a><a href="#installation">Setup guide</a></nav>
+      <a class="header-download" href="/ember/download" data-download-link aria-label="Download Ember for Mac"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download</span></a>
     </div>
   </header>
 
@@ -40,7 +40,7 @@
           <h1 id="hero-title">Your AI work brings <em>Ember</em> to life.</h1>
           <p class="hero__lede">A tiny desk companion that grows with every Codex and Claude session.</p>
           <div class="hero__actions">
-            <a class="button button--primary" href="https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg" data-download-link><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download for Mac</span></a>
+            <a class="button button--primary" href="/ember/download" data-download-link><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download for Mac</span></a>
             <a class="button button--quiet" href="#journey"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 7 5-7 5Z" /></svg><span>See how it grows</span></a>
           </div>
           <p class="compatibility">Apple silicon <span>·</span> macOS 14+ <span>·</span> Private by design</p>
@@ -116,9 +116,26 @@
 
     <section class="setup" id="setup" aria-labelledby="setup-title">
       <div class="page-shell setup-card glass-card">
-        <div class="setup-copy"><h2 id="setup-title">Leave Ember on your desk.</h2><p>USB-C keeps it powered while Bluetooth syncs your Codex and Claude activity.</p><div class="setup-connections"><div class="setup-connection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10-5 4V3l5 4L7 17" /></svg><span><strong>Bluetooth</strong>Wireless token tracking</span></div><div class="setup-connection"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="5" /><path d="M8 12h8" /></svg><span><strong>USB-C</strong>Power only</span></div></div><div class="setup-update"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v6h-6" /></svg><span><strong>Updates install automatically.</strong></span></div><a class="button button--primary" href="https://github.com/Makeable-inc/Makeable.build/releases/download/ember-v2.0.0/Claude-Burner-2.0.0-arm64.dmg" data-download-link><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download for Mac</span></a><p class="compatibility">Apple silicon <span>·</span> macOS 14+ <span>·</span> Private by design</p></div>
+        <div class="setup-copy"><h2 id="setup-title">Leave Ember on your desk.</h2><p>USB-C keeps it powered while Bluetooth syncs your Codex and Claude activity.</p><p><a class="setup-guide-link" href="#installation">Read the setup guide →</a></p><div class="setup-connections"><div class="setup-connection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10-5 4V3l5 4L7 17" /></svg><span><strong>Bluetooth</strong>Wireless token tracking</span></div><div class="setup-connection"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="5" /><path d="M8 12h8" /></svg><span><strong>USB-C</strong>Power only</span></div></div><div class="setup-update"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v6h-6" /></svg><span><strong>Updates install automatically.</strong></span></div><a class="button button--primary" href="/ember/download" data-download-link><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" /></svg><span>Download for Mac</span></a><p class="compatibility">Apple silicon <span>·</span> macOS 14+ <span>·</span> Private by design</p></div>
         <figure class="setup-render"><img src="/assets/ember/ember-live-product.webp" width="951" height="651" alt="The deployed Desk Ember product centered on a warm workbench" decoding="async" /><figcaption><span class="status-dot"></span> USB-C powered · Bluetooth synced</figcaption></figure>
       </div>
+    </section>
+    <section class="setup-guide page-shell" id="installation" aria-labelledby="installation-title">
+      <p class="guide-eyebrow">GET STARTED</p><h2 id="installation-title">From download to desk.</h2>
+      <p class="guide-intro">For Apple silicon Macs running macOS 14 or later. Keep your Ember nearby and have a USB-C power source ready.</p>
+      <ol class="guide-steps">
+        <li><span>01</span><h3>Install the Mac app</h3><p><a href="/ember/download" data-download-link>Download Ember for Mac</a>, open the downloaded disk image, and copy the app to Applications. Open it from Applications. If macOS reports a security or compatibility warning, stop and contact support.</p></li>
+        <li><span>02</span><h3>Power your Ember</h3><p>Connect Ember to USB-C power. USB-C supplies power; activity sync uses Bluetooth. Keep the device close to your Mac during setup.</p></li>
+        <li><span>03</span><h3>Connect with Bluetooth</h3><p>Turn Bluetooth on in Mac System Settings. Open the Ember app and follow its connection prompts. If macOS asks for Bluetooth access, allow it for Ember in Privacy &amp; Security → Bluetooth.</p></li>
+        <li><span>04</span><h3>Check your connection</h3><p>Keep the app open while you use Codex or Claude. Confirm that the app detects your activity and your desk Ember responds. If either step fails, use the checks below.</p></li>
+      </ol>
+      <div class="guide-help"><h3>A little help getting connected.</h3>
+        <details><summary>The download or installation won’t work</summary><p>Check that your Mac uses Apple silicon and runs macOS 14 or later. Retry the download from this page. Windows, Linux, and Intel Mac support are not offered here. Send the exact warning to support instead of bypassing macOS security protections.</p></details>
+        <details><summary>Ember isn’t connecting</summary><p>Check USB-C power, move Ember near your Mac, and confirm Bluetooth is on. Check Ember’s Bluetooth permission in System Settings → Privacy &amp; Security. Quit and reopen the app, then retry its connection flow.</p></details>
+        <details><summary>Activity isn’t reaching my desk Ember</summary><p>Check whether activity appears in the Mac app first. Keep the app running and confirm the Bluetooth connection. If activity appears in the app but not on the device, restart the app and reconnect Ember.</p></details>
+        <p class="guide-contact">Still stuck? <a href="mailto:makeable.build@gmail.com">Email Makeable</a> with your macOS version, app version, and a screenshot of the error. Please don’t include API keys or private session content.</p>
+      </div>
+      <p data-download-status role="status" aria-live="polite"></p>
     </section>
   </main>
 
@@ -139,9 +156,9 @@
       <div class="site-footer__legal">
         <span>© Makeable 2026</span>
         <span aria-hidden="true">·</span>
-        <a href="https://makeable.build/terms/">Terms</a>
+        <a href="/terms/">Terms</a>
         <span aria-hidden="true">·</span>
-        <a href="https://makeable.build/privacy/">Privacy</a>
+        <a href="/privacy/">Privacy</a>
       </div>
     </div>
   </footer>

@@ -19,7 +19,8 @@
     "toolchain:install": "bash scripts/install-arduino-toolchain.sh",
     "waitlist:admin": "node scripts/waitlist-admin.mjs",
     "qc:checkout": "node scripts/checkout-qc.mjs",
-    "test:checkout": "playwright test tests/e2e/checkout.spec.mjs tests/e2e/checkout-return.spec.mjs"
+    "test:checkout": "playwright test tests/e2e/checkout.spec.mjs tests/e2e/checkout-return.spec.mjs",
+    "verify:site": "node scripts/verify-site-readiness.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.1090.0",
