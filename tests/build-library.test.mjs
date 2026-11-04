@@ -36,7 +36,7 @@ function load(answers, timeoutMs = 50) {
 
 test("a hanging account request does not hold back the public builds", async () => {
   const { account, publicBuilds } = load({ [ACCOUNT]: "hang", [PUBLIC]: PUBLIC_OK });
-  assert.deepEqual(await publicBuilds, { state: "ok", builds: [{ id: "theirs" }] });
+  assert.deepEqual(await publicBuilds, { state: "ok", builds: [{ id: "theirs" }], nextCursor: null });
   assert.deepEqual(await account, { state: "unavailable" });
 });
 

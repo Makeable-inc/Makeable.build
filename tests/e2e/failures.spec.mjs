@@ -16,12 +16,14 @@ const accountFaults = {
 for (const [fault, handler] of Object.entries(accountFaults)) {
   test(`public builds still show when the account request ${fault}`, async ({ page }) => {
     await page.route("**/api/account", handler);
+    await page.route("**/api/account/builds", handler);
     await page.goto("/");
     await expectCommunityBuildsShown(page, NEWEST_PUBLIC_BUILD.title);
 
-    // /app falls back to the newest public build, never "My builds".
+    // /app keeps the community collection available without presenting it as the user’s work.
     await page.goto("/app/");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(NEWEST_PUBLIC_BUILD.title, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Community builds", { timeout: 15_000 });
+    await expect(page.getByRole("button", {name: `Open ${NEWEST_PUBLIC_BUILD.title}`, exact: true})).toBeVisible();
   });
 }
 
@@ -75,5 +77,5 @@ test("on /app, a failing community list offers Try again and recovers", async ({
   await expect(page.getByRole("heading", { level: 1, name: "Community builds" })).toBeVisible({ timeout: 15_000 });
   failing = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: NEWEST_PUBLIC_BUILD.title })).toBeVisible();
+  await expect(page.getByRole("button", {name: `Open ${NEWEST_PUBLIC_BUILD.title}`, exact: true})).toBeVisible();
 });

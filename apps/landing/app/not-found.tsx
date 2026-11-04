@@ -1,0 +1,3 @@
+export default function NotFound() {
+  return <main className="site-recovery"><a href="/" aria-label="Makeable home"><img src="/makeable-logo-tight.webp" width="170" alt="Makeable" /></a><section><span>404 · WRONG TURN</span><h1>Let’s get you back<br />to making.</h1><p>This page may have moved, or the link may be incomplete. Your saved builds are still in your workshop.</p><div><a className="support-primary" href="/">Back to home</a><a href="/app/">Open My builds →</a></div><p className="support-small">Need a hand? <a href="mailto:makeable.build@gmail.com">Contact Makeable</a></p></section></main>;
+}

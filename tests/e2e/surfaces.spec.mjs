@@ -92,6 +92,12 @@ test("Ember: the product page opens, every picture loads and its links work", as
     }
   }
   for (const url of ownPages) {
+    if (new URL(url).pathname === "/ember/download") {
+      const redirect = await page.request.head(url, {maxRedirects: 0});
+      expect([301,302,303,307,308]).toContain(redirect.status());
+      expect(redirect.headers().location).toMatch(/^https:\/\//);
+      continue; // Never download the installer or depend on an outside host.
+    }
     expect((await page.request.get(url)).status(), url).toBeLessThan(400);
   }
   expect(unexpectedProblems(problems)).toEqual([]);

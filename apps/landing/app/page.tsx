@@ -32,6 +32,8 @@ import { projectDisplayIdentity, withProjectDisplayIdentity } from "./project-id
 import { RetailerBrand } from "./retailer-brand";
 import { ProjectWiringGuide } from "./project-wiring-guide";
 import { CheckoutReturn } from "./checkout-return";
+import { EMBER_OFFER } from "../../../lib/ember-offer.mjs";
+import { AvailabilityNotice } from "./availability-notice";
 import { LandingHowItWorks } from "./landing-how-it-works";
 import { LandingWalkthrough } from "./landing-walkthrough";
 import { projectWiringReady } from "./project-wiring-data.mjs";
@@ -688,13 +690,12 @@ export default function Home() {
   const [preorderError, setPreorderError] = useState("");
   const [communityIndex, setCommunityIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const communityGridRef = useRef<HTMLDivElement>(null);
   const featuredBuildsRailRef = useRef<HTMLDivElement>(null);
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const loginDialogRef = useRef<HTMLElement>(null);
   const preorderDialogRef = useRef<HTMLFormElement>(null);
-  const countdownRef = useRef<HTMLDivElement>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
   const pendingIdeaRef = useRef("");
   const pendingClaimJobIdRef = useRef("");
@@ -1254,10 +1255,7 @@ export default function Home() {
       authInFlightRef.current = false;
       setAuthBusy(false);
       if (loginIntentRef.current === "account") {
-        setWorkspaceOpen(true);
-        setWorkspaceMode("library");
-        setWorkspaceBuild(account?.builds?.[0] || null);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.location.assign("/app/");
       } else if (pendingClaimJobIdRef.current) {
         await claimReadyBuildJob(pendingClaimJobIdRef.current);
       } else if (currentJobRef.current?.id) {
@@ -1393,25 +1391,6 @@ export default function Home() {
     };
   }, [communityBuilds.length]);
 
-  useEffect(() => {
-    if (countdown == null) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    countdownRef.current?.focus();
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [countdown]);
-
-  useEffect(() => {
-    if (countdown == null) return undefined;
-    if (countdown <= 0) {
-      const timer = window.setTimeout(() => setCountdown(null), 350);
-      return () => window.clearTimeout(timer);
-    }
-    const timer = window.setTimeout(() => setCountdown((current) => (current == null ? null : current - 1)), 1000);
-    return () => window.clearTimeout(timer);
-  }, [countdown]);
 
   function submitBuild(event?: FormEvent) {
     event?.preventDefault();
@@ -1443,7 +1422,7 @@ export default function Home() {
       openLogin("account");
       return;
     }
-    fetchAccount(true);
+    window.location.assign("/app/");
   }
 
   function retryGallery() {
@@ -1516,8 +1495,8 @@ export default function Home() {
     setPreorderBusy(true);
     setPreorderError("");
     captureMakeableEvent("checkout started", {
-      color: "bone",
-      market: "US",
+      color: EMBER_OFFER.color,
+      market: EMBER_OFFER.market,
       quantity: 1,
       placement: "preorder_modal",
     });
@@ -1525,9 +1504,9 @@ export default function Home() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        color: "bone",
-        market: "US",
-        quantity: 1,
+        color: EMBER_OFFER.color,
+        market: EMBER_OFFER.market,
+        quantity: EMBER_OFFER.quantity,
         termsAccepted: true,
         marketingConsent: false,
         posthogDistinctId: makeableDistinctId(),
@@ -1540,8 +1519,8 @@ export default function Home() {
       })
       .catch((error) => {
         captureMakeableEvent("checkout failed", {
-          color: "bone",
-          market: "US",
+          color: EMBER_OFFER.color,
+          market: EMBER_OFFER.market,
           placement: "preorder_modal",
         });
         setPreorderError(error instanceof Error ? error.message : "Checkout is not ready in this environment.");
@@ -1558,7 +1537,7 @@ export default function Home() {
       setPreorderOpen(true);
       return;
     }
-    setCountdown(3);
+    setAvailabilityOpen(true);
     captureMakeableEvent("makeable coming soon shown", { build_id: activeHero.id });
   }
 
@@ -1677,6 +1656,7 @@ export default function Home() {
             <a href="#builds">Builds</a>
             <a href="#make">Create</a>
             <a href="#community">Community</a>
+            <a href="/ember">Software</a>
           </div>
           <div className="mk-nav-account">
             {authUser && (
@@ -1707,6 +1687,7 @@ export default function Home() {
               Create your own <ArrowIcon />
             </a>
           </div>
+          <a className="mk-mobile-software" href="/ember/">Ember software &amp; setup →</a>
         </div>
 
         <div className="mk-hero-builds" id="builds" data-builds-expanded={featuredBuildsExpanded || undefined}>
@@ -1758,7 +1739,7 @@ export default function Home() {
       <section className="mk-builder" id="make" aria-labelledby="make-title">
         <div className="mk-builder-inner">
           <h2 id="make-title">Create your own build.</h2>
-          <p>Bring any idea to life.</p>
+          <p>Describe an idea. We’ll help you explore parts and wiring.</p><p className="mk-free-builds">Experimental builder · Firmware generation is not available yet.</p>
           <form className="mk-composer" onSubmit={submitBuild}>
             <label className="mk-sr-only" htmlFor="build-idea">Describe what you want to build</label>
             <textarea
@@ -1769,9 +1750,6 @@ export default function Home() {
               placeholder="Describe what you want to build..."
               rows={3}
             />
-            <button className="mk-plus" type="button" aria-label="Add details" onClick={() => document.getElementById("build-idea")?.focus()}>
-              +
-            </button>
             <button className="mk-submit" type="submit" aria-label="Generate build">
               <ArrowIcon />
             </button>
@@ -1863,6 +1841,8 @@ export default function Home() {
         <div className="mk-footer-legal">
           <span>© Makeable 2026</span>
           <span aria-hidden="true">·</span>
+          <a href="/ember">Ember software & setup</a>
+          <span aria-hidden="true">·</span>
           <a href="/terms/">Terms</a>
           <span aria-hidden="true">·</span>
           <a href="/privacy/">Privacy</a>
@@ -1906,8 +1886,8 @@ export default function Home() {
             <button type="button" className="mk-modal-close" aria-label="Close preorder" onClick={() => setPreorderOpen(false)} disabled={preorderBusy}>x</button>
             <span>Build 001 preorder</span>
             <h2 id="preorder-title">Make Ember yours.</h2>
-            <p>Free shipping. Estimated shipping: October 2026.</p>
-            <strong>USD $34.99</strong>
+            <p>{EMBER_OFFER.shippingLabel} {EMBER_OFFER.shippingMessage}</p>
+            <strong>{EMBER_OFFER.priceLabel}</strong>
             <label className="mk-check">
               <input type="checkbox" checked={preorderTerms} onChange={(event) => setPreorderTerms(event.target.checked)} />
               <span>I agree to the <a href="/terms/" target="_blank" rel="noreferrer">Terms</a> and acknowledge the <a href="/privacy/" target="_blank" rel="noreferrer">Privacy Policy</a>.</span>
@@ -1920,15 +1900,8 @@ export default function Home() {
         </div>
       )}
 
-      {countdown != null && (
-        <div ref={countdownRef} className="mk-countdown" role="dialog" aria-modal="true" aria-labelledby="countdown-title" tabIndex={-1}>
-          <div>
-            <p>Coming soon</p>
-            <h2 id="countdown-title" aria-live="assertive">{countdown > 0 ? countdown : "Soon"}</h2>
-            <span>Full build access is not open yet.</span>
-          </div>
-        </div>
-      )}
+      {availabilityOpen && <AvailabilityNotice title={activeHero.title} onClose={() => setAvailabilityOpen(false)} />}
+
     </main>
   );
 }
