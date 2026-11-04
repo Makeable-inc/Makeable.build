@@ -1,0 +1,199 @@
+"""Tested building blocks for character bodies: simple closed solids that always build, and joins that check
+themselves. A body script imports these instead of writing risky surfacing code.
+
+Units are mm, world +z up, the front faces -y, the body stands on z = 0. Every function returns one valid solid
+or raises a clear error; `try_join` never raises, so one awkward feature never sinks the whole body.
+"""
+import math
+
+from build123d import (Axis, Box, Cone, Cylinder, Ellipse, Plane, Pos, Rot, Sphere, fillet, loft, scale)
+
+BIG = 2000.0
+
+
+def one_solid(shape, name="part"):
+    solids = shape.solids()
+    assert len(solids) == 1, f"{name} has {len(solids)} solids, expected 1"
+    solid = solids[0]
+    assert solid.is_valid, f"{name} is not a valid solid"
+    return solid
+
+
+def placed(solid, at=(0, 0, 0), tilt=(0, 0, 0)):
+    """Turn (degrees about x, then y, then z) and then move."""
+    return one_solid(Pos(*at) * (Rot(*tilt) * solid), "placed")
+
+
+# ---------- primitives: always valid closed solids ----------
+
+def ellipsoid(rx, ry, rz, at=(0, 0, 0), tilt=(0, 0, 0)):
+    """A stretched sphere: heads, cheeks, paws, bellies, eyes, noses."""
+    assert min(rx, ry, rz) > 0, "ellipsoid radii must be positive"
+    return placed(scale(Sphere(1), by=(rx, ry, rz)), at, tilt)
+
+
+def capsule(radius, length, at=(0, 0, 0), tilt=(0, 0, 0)):
+    """A rod with round ends, along z before turning: arms, legs, tails, handles, antenna stalks."""
+    assert radius > 0 and length >= 0, "capsule needs a positive radius"
+    rod = Cylinder(radius, length) + Pos(0, 0, length / 2) * Sphere(radius) + Pos(0, 0, -length / 2) * Sphere(radius)
+    return placed(one_solid(rod, "capsule"), at, tilt)
+
+
+def cone_tip(base_radius, height, tip_radius=None, at=(0, 0, 0), tilt=(0, 0, 0)):
+    """A cone with a rounded tip, base at z = 0 before turning: horns, spikes, beaks, rocket noses."""
+    tip = tip_radius if tip_radius is not None else max(0.8, base_radius * 0.18)
+    assert base_radius > tip > 0 and height > 2 * tip, "cone_tip: base must be wider than the tip and taller than it"
+    body = Pos(0, 0, height / 2) * Cone(base_radius, tip, height)
+    body = body + Pos(0, 0, height) * Sphere(tip)
+    return placed(one_solid(body, "cone_tip"), at, tilt)
+
+
+def oval_loft(sections, dome=0.0):
+    """A soft main form through horizontal ovals [(z, rx, ry), ...], bottom to top, centred on x = y = 0.
+    Use 3 to 6 sections. Keep neighbouring ovals within about 1.6x of each other so the loft never folds.
+    dome: height (mm) of a rounded cap on the top oval; 0 leaves the top flat. For a smooth join make the top two
+    ovals the same size, so the sides are upright where the dome begins (otherwise a ridge shows at the join)."""
+    assert len(sections) >= 2, "oval_loft needs at least 2 sections"
+    zs = [s[0] for s in sections]
+    assert zs == sorted(zs) and len(set(zs)) == len(zs), "oval_loft sections must go strictly upward in z"
+    faces = [Plane.XY.offset(z) * Ellipse(rx, ry) for z, rx, ry in sections]
+    body = one_solid(loft(faces), "oval_loft")
+    if dome > 0:
+        z, rx, ry = sections[-1]
+        cap = Pos(0, 0, z) * scale(Sphere(1), by=(rx, ry, dome))
+        body = one_solid(body + cap, "oval_loft dome")
+    return body
+
+
+def rounded_box(width, depth, height, radius, at=(0, 0, 0)):
+    """A box with every edge rounded (falls back to smaller radii, never crashes): boxy robots, TVs, radios."""
+    box = Box(width, depth, height)
+    return placed(safe_fillet(box, box.edges(), radius, "rounded_box"), at)
+
+
+# ---------- features built from the primitives ----------
+
+def ear(width, height, thickness, at, tilt=(0, 0, 0), sharpness=0.25, sink=3.0):
+    """A rounded triangular ear standing on +z before turning, its base `sink` mm below `at` so it roots into the body.
+    sharpness: tip width as a share of the base (0.15 pointy cat, 0.5 round bear)."""
+    tip = max(width * sharpness / 2, 1.2)
+    base_z = -sink
+    top_z = height - tip
+    assert top_z > base_z + 2, "ear is too short for its tip"
+    faces = [Plane.XY.offset(base_z) * Ellipse(width / 2, thickness / 2),
+             Plane.XY.offset(base_z + 0.55 * (top_z - base_z)) * Ellipse(width / 2 * (0.5 + 0.6 * sharpness), thickness / 2 * 0.85),
+             Plane.XY.offset(top_z) * Ellipse(tip, min(tip, thickness / 2))]
+    body = one_solid(loft(faces), "ear loft") + Pos(0, 0, top_z) * scale(Sphere(1), by=(tip, min(tip, thickness / 2), tip))
+    return placed(one_solid(body, "ear"), at, tilt)
+
+
+def paw(width, depth, height, at, tilt=(0, 0, 0)):
+    """A squashed dome. Put its centre at the floor (z = 0) and cut the sole flat so the case still stands flat."""
+    return ellipsoid(width / 2, depth / 2, height, at, tilt)
+
+
+def antenna(height, stalk_radius=1.6, ball_radius=3.5, at=(0, 0, 0), tilt=(0, 0, 0), sink=3.0):
+    """A stalk with a ball on top, standing on +z, rooted `sink` mm into the body."""
+    stalk = Pos(0, 0, (height - sink) / 2) * Cylinder(stalk_radius, height + sink)
+    body = stalk + Pos(0, 0, height) * Sphere(ball_radius)
+    return placed(one_solid(body, "antenna"), at, tilt)
+
+
+def spike_row(count, base_radius, height, start, end, tilt=(0, 0, 0)):
+    """Evenly spaced cone_tips from start to end (each an (x, y, z) on the surface): dino spikes, crowns, hair."""
+    assert count >= 1
+    parts = []
+    for i in range(count):
+        t = 0.5 if count == 1 else i / (count - 1)
+        p = tuple(a + (b - a) * t for a, b in zip(start, end))
+        parts.append(cone_tip(base_radius, height, at=(p[0], p[1], p[2] - base_radius * 0.6), tilt=tilt))
+    return parts
+
+
+# ---------- reading the body's surface, so features land on it ----------
+
+def surface_z(body, x, y):
+    """The top of the body above (x, y), or None if the body is not there."""
+    hits = body.find_intersection_points(Axis((x, y, BIG / 2), (0, 0, -1)))
+    zs = [p.Z for p, _ in hits] if hits and isinstance(hits[0], tuple) else [p.Z for p in hits]
+    return max(zs) if zs else None
+
+
+def surface_x(body, y, z, side=+1):
+    """The body's right (side=+1) or left (side=-1) side at height z, depth y."""
+    hits = body.find_intersection_points(Axis((side * BIG / 2, y, z), (-side, 0, 0)))
+    xs = [p.X for p, _ in hits] if hits and isinstance(hits[0], tuple) else [p.X for p in hits]
+    return (max(xs) if side > 0 else min(xs)) if xs else None
+
+
+def surface_y_front(body, x, z):
+    """The front of the body (smallest y) at (x, z)."""
+    hits = body.find_intersection_points(Axis((x, -BIG / 2, z), (0, 1, 0)))
+    ys = [p.Y for p, _ in hits] if hits and isinstance(hits[0], tuple) else [p.Y for p in hits]
+    return min(ys) if ys else None
+
+
+# ---------- joins and finishing ----------
+
+def safe_fillet(solid, edges, radius, name="part"):
+    """Round edges, trying smaller radii if needed. Returns the unrounded solid rather than crashing."""
+    for r in (radius, radius * 0.6, radius * 0.35, radius * 0.2):
+        try:
+            out = fillet(edges, r)
+            if out.is_valid:
+                return one_solid(out, name)
+        except Exception:
+            pass
+    return one_solid(solid, name)
+
+
+def join(body, feature, name, min_overlap=2.0):
+    """Fuse a feature that sinks into the body. Raises if it only touches (a pinched edge) or floats."""
+    try:
+        overlap = (body & feature).volume
+    except Exception:
+        overlap = 0.0
+    assert overlap >= min_overlap, f"{name} overlaps the body by only {overlap:.1f} mm3; sink it deeper"
+    return one_solid(body + feature, name)
+
+
+def try_join(body, feature, name, added, skipped, min_overlap=2.0):
+    """Like join, but a feature that fails is left out and named in `skipped` instead of crashing the body."""
+    try:
+        body = join(body, feature, name, min_overlap)
+        added.append(name)
+    except Exception as error:
+        skipped.append(f"{name}: {error}")
+    return body
+
+
+def flat_sole(body, z=0.0):
+    """Cut everything below z, so the body stands flat (paws and feet become flat-bottomed)."""
+    return one_solid(body - Pos(0, 0, z - BIG / 2) * Box(BIG, BIG, BIG), "flat sole")
+
+
+def flat_back(body, y):
+    """Cut everything behind y (the rear cover goes there)."""
+    return one_solid(body - Pos(0, y + BIG / 2, 0) * Box(BIG, BIG, BIG), "flat back")
+
+
+def bounds(body):
+    """Exact bounds from the tessellated surface ((x0, y0, z0), (x1, y1, z1)), to about 0.1 mm.
+    OpenCascade's bounding_box() can be several mm loose on curved surfaces, so never size or check with it."""
+    points = None
+    for tolerance, angle in ((0.1, 0.3), (0.2, 0.5), (0.5, 0.8)):
+        try:
+            points, _ = body.tessellate(tolerance, angle)
+            break
+        except Exception:
+            continue
+    if not points:
+        b = body.bounding_box()
+        return (b.min.X, b.min.Y, b.min.Z), (b.max.X, b.max.Y, b.max.Z)
+    xs, ys, zs = [p.X for p in points], [p.Y for p in points], [p.Z for p in points]
+    return (min(xs), min(ys), min(zs)), (max(xs), max(ys), max(zs))
+
+
+def size(body):
+    lo, hi = bounds(body)
+    return tuple(round(h - l, 1) for l, h in zip(lo, hi))
