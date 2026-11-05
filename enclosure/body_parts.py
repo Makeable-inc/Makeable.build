@@ -430,25 +430,183 @@ def spike_row(count, base_radius, height, start, end, tilt=(0, 0, 0)):
 
 # ---------- reading the body's surface, so features land on it ----------
 
+NUDGES = ((0.0, 0.0), (0.04, 0.03), (-0.05, 0.02), (0.02, -0.06))   # mm: a ray exactly through a closing point fails
+
+
+def _hits(body, origin, direction, along):
+    """Hit coordinates along one axis for a ray, nudged a hair off a point where the surface closes (a dome's top)."""
+    for du, dv in NUDGES:
+        o = [origin[0], origin[1], origin[2]]
+        free = [i for i in range(3) if i != along]
+        o[free[0]] += du
+        o[free[1]] += dv
+        try:
+            hits = body.find_intersection_points(Axis(tuple(o), direction))
+        except Exception:
+            continue
+        pts = [p for p, _ in hits] if hits and isinstance(hits[0], tuple) else list(hits)
+        return [(p.X, p.Y, p.Z)[along] for p in pts]
+    return []
+
+
 def surface_z(body, x, y):
     """The top of the body above (x, y), or None if the body is not there."""
-    hits = body.find_intersection_points(Axis((x, y, BIG / 2), (0, 0, -1)))
-    zs = [p.Z for p, _ in hits] if hits and isinstance(hits[0], tuple) else [p.Z for p in hits]
+    zs = _hits(body, (x, y, BIG / 2), (0, 0, -1), 2)
     return max(zs) if zs else None
 
 
 def surface_x(body, y, z, side=+1):
     """The body's right (side=+1) or left (side=-1) side at height z, depth y."""
-    hits = body.find_intersection_points(Axis((side * BIG / 2, y, z), (-side, 0, 0)))
-    xs = [p.X for p, _ in hits] if hits and isinstance(hits[0], tuple) else [p.X for p in hits]
+    xs = _hits(body, (side * BIG / 2, y, z), (-side, 0, 0), 0)
     return (max(xs) if side > 0 else min(xs)) if xs else None
 
 
 def surface_y_front(body, x, z):
     """The front of the body (smallest y) at (x, z)."""
-    hits = body.find_intersection_points(Axis((x, -BIG / 2, z), (0, 1, 0)))
-    ys = [p.Y for p, _ in hits] if hits and isinstance(hits[0], tuple) else [p.Y for p in hits]
+    ys = _hits(body, (x, -BIG / 2, z), (0, 1, 0), 1)
     return min(ys) if ys else None
+
+
+# ---------- features that grow out of the body ----------
+
+def surface_normal(body, point):
+    """The outward direction of the body's surface nearest `point` (a unit (x, y, z))."""
+    p = Vector(*point)
+    face = min(body.faces(), key=lambda f: f.distance_to(p))
+    n = face.normal_at(p)
+    centre = body.center()
+    if n.dot(p - centre) < 0:
+        n = -n
+    return (n.X, n.Y, n.Z)
+
+
+def _frame(direction, side):
+    """Unit vectors (along, across, thickness) for sections square to `direction`, `across` as close to `side` as it can be."""
+    d = Vector(*direction).normalized()
+    s = Vector(*side)
+    s = s - d * s.dot(d)
+    if s.length < 1e-6:
+        s = Vector(0, 1, 0) if abs(d.Y) < 0.9 else Vector(1, 0, 0)
+        s = s - d * s.dot(d)
+    s = s.normalized()
+    return d, s, d.cross(s).normalized()
+
+
+def _height_under(body, origin, d, offset_vec):
+    """How far along d the body's surface is at origin + offset_vec (negative: below origin), or None if not there."""
+    for nudge in (Vector(0, 0, 0), Vector(0.04, 0.03, 0.02), Vector(-0.05, 0.02, -0.03)):
+        start = origin + offset_vec + d * 60 + nudge
+        try:
+            hits = body.find_intersection_points(Axis(start, -d))
+        except Exception:
+            continue
+        pts = [p for p, _ in hits] if hits and isinstance(hits[0], tuple) else list(hits)
+        return max((q - origin).dot(d) for q in pts) if pts else None
+    return None
+
+
+def grow(body, name, at, profile, added, skipped, direction=None, side=(1, 0, 0), roundness=2.2, flare=1.7, tip=True):
+    """A feature grown out of the body as one smooth piece: ears, horns, fins, tails, legs, snouts, antennas, spikes.
+    It starts as a wide base sunk under the surface, flares up through it, then follows `profile` out to its tip, so it
+    reads as part of the body (no seam, no fillet needed). Joins it like try_join and returns the body.
+    at: a point on the surface (from surface_z, surface_x or surface_y_front).
+    profile: [(distance out, half width, half thickness), ...] from the root to the tip, distances rising; a fourth
+      number leans that section sideways (mm along `side`). Example ear: [(0, 10, 5), (8, 7, 4), (15, 2, 1.5)]. The
+      base adds about half the first section's smaller size below the profile, where it flares into the body.
+    direction: which way it grows (default: straight out of the surface at `at`). side: the direction its width runs
+      (default x, across the front). roundness: the cross-section (2 oval, 3 soft rounded box). flare: how much wider
+      than the first profile section the root is, so it blends into the body (1 = no blend). tip: close in a round tip.
+    A change to what was asked (a lower flare, faceted) is printed as a "grow note"."""
+    try:
+        if len(profile) < 2:
+            raise ValueError(f"{name}: give the profile at least 2 sections, from the root to the tip")
+        ts = [float(p[0]) for p in profile]
+        if any(b <= a for a, b in zip(ts, ts[1:])):
+            raise ValueError(f"{name}: the profile's distances must rise from the root to the tip (got {ts})")
+        if min(min(p[1], p[2]) for p in profile) <= 0:
+            raise ValueError(f"{name}: every half width and half thickness must be above 0 mm")
+        origin = Vector(*at)
+        d, s, t = _frame(direction or surface_normal(body, at), side)
+        w0, h0 = profile[0][1], profile[0][2]
+
+        def depth_under(scale_):
+            """The lowest the surface falls (along d) under a ring scale_ times the root section, minus a margin."""
+            heights = []
+            for k in range(12):
+                ang = 2 * math.pi * k / 12
+                h = _height_under(body, origin, d, s * (w0 * scale_ * math.cos(ang)) + t * (h0 * scale_ * math.sin(ang)))
+                heights.append(h if h is not None else -2 * max(w0, h0))
+            return min(heights)
+
+        def section(dist, a, b, lean=0.0):
+            centre = origin + d * dist + s * lean
+            return Face(_superellipse(max(a, 0.3), max(b, 0.3), roundness, Plane(origin=centre, x_dir=s, z_dir=d)))
+
+        prof = [(p[0], p[1], p[2], p[3] if len(p) > 3 else 0.0) for p in profile]
+
+        def within(piece, faces, margin=1.5):
+            """True if the loft stays inside the box around its own sections: beyond that it swung."""
+            lo_e, hi_e = [1e9] * 3, [-1e9] * 3
+            for f in faces:
+                bb = f.bounding_box()
+                lo_e = [min(x, y) for x, y in zip(lo_e, (bb.min.X, bb.min.Y, bb.min.Z))]
+                hi_e = [max(x, y) for x, y in zip(hi_e, (bb.max.X, bb.max.Y, bb.max.Z))]
+            lo, hi = bounds(piece)
+            return all(l >= e - margin for l, e in zip(lo, lo_e)) and all(h <= e + margin for h, e in zip(hi, hi_e))
+
+        def build(flare_, smooth):
+            # three short pieces, each through only a few sections (a smooth loft through many wiggles):
+            # the flaring base, the profile, and a round tip
+            rise = 0.5 * min(w0, h0) if flare_ > 1.01 else 0.0
+            shifted = [(t_ + rise, a_, b_, l_) for t_, a_, b_, l_ in prof]
+            parts = []
+            if flare_ > 1.01:
+                mid = 1 + (flare_ - 1) * 0.35
+                root_t = min(depth_under(flare_), 0.0) - 2.0
+                mid_t = max(min(depth_under(mid), 0.0) - 0.4, root_t + 0.5)
+                base_faces = [section(root_t, w0 * flare_, h0 * flare_), section(mid_t, w0 * mid, h0 * mid), section(*shifted[0])]
+            else:
+                base_faces = [section(min(depth_under(1.0), 0.0) - 1.5, w0, h0), section(*shifted[0])]
+            base = one_solid(loft(base_faces, ruled=not smooth), name)
+            if not within(base, base_faces):
+                raise ValueError("the base swung outside its sections")
+            parts.append(base)
+            # the profile starts 1 mm inside the base, so the two overlap and fuse into one solid
+            first = shifted[0]
+            body_faces = [section(first[0] - 1.0, first[1], first[2], first[3])] + [section(*r) for r in shifted[1:]]
+            stem = one_solid(loft(body_faces, ruled=not smooth or len(body_faces) == 2), name)
+            if not within(stem, body_faces):
+                raise ValueError("the profile swung outside its sections")
+            parts.append(stem)
+            if tip:
+                t_, a_, b_, l_ = shifted[-1]
+                reach = min(a_, b_) * 0.85
+                # centred 0.5 mm inside the last section, so it overlaps the profile and fuses into one solid
+                frame = Plane(origin=origin + d * (t_ - 0.5) + s * l_, x_dir=s, z_dir=d)
+                parts.append(one_solid(frame.location * scale(Sphere(1), by=(max(a_, 0.3), max(b_, 0.3), max(reach, 0.3))), name))
+            piece = parts[0]
+            for part in parts[1:]:
+                piece = fuse(piece, part, name)
+            return piece
+
+        piece, used = None, None
+        for flare_, smooth in ((flare, True), (1 + (flare - 1) * 0.6, True), (1.0, True), (flare, False), (1.0, False)):
+            try:
+                piece, used = build(flare_, smooth), (flare_, smooth)
+                break
+            except Exception:
+                continue
+        if piece is None:
+            raise ValueError(f"{name}: no smooth form through this profile; change the sizes more gradually")
+        if used[0] < flare - 1e-6:
+            note("grow", f"{name}: the base blends less than asked (flare {used[0]:.2f} instead of {flare:g}): the surface "
+                         "curves too much under it; move it to a flatter spot for a softer blend")
+        if not used[1]:
+            note("grow", f"{name}: built with straight facets: change the profile's sizes more gradually for a smooth one")
+    except ValueError as error:
+        skipped.append(f"{name}: {error}")
+        return body
+    return try_join(body, piece, name, added, skipped)
 
 
 # ---------- joins and finishing ----------

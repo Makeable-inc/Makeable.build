@@ -31,8 +31,10 @@ screen limits, the main form's proportion), `room` (the parts' box fits inside),
    Start the rounding above the parts' room (superblob's `shoulder`, soft_box's `max_round`), as round as it allows.
    `build`, then `check("room")` and `check("size")`, then `render()`.
 2. **Proportions.** Compare the render with the concept's silhouette. Fix the main form before adding anything.
-3. **Features, one at a time.** Add one feature with its building block (ear, paw, antenna, ellipsoid, capsule),
-   placed with `surface_z` / `surface_x` / `surface_y_front`, joined with `try_join` under its exact listed name.
+3. **Features, one at a time.** Grow each feature out of the body with `grow(body, name, at, profile, added, skipped)`
+   under its exact listed name: `at` from `surface_z` / `surface_x` / `surface_y_front`, `profile` its sizes from the
+   root to the tip. Its base flares into the body, so it reads as part of it, not stuck on. Use `ear`, `paw`, `ellipsoid`
+   or `capsule` with `try_join` only for a shape a profile cannot describe (separate toe beans, a ball on a stalk).
    `build`, `check("features")`, `render()`. Ask `look()` if you are not sure it reads. Then the next feature.
 4. **Back and sole.** `flat_sole`, then `broad_flat_back(body, share=0.65)`. `build`, `check("back")`,
    `check("build")`.

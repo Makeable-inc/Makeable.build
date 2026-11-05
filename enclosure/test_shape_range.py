@@ -94,5 +94,55 @@ class SpineRange(unittest.TestCase):
         self.assertLess(max(steps), 1.0, heights)
 
 
+class GrowRange(unittest.TestCase):
+    """Features grown out of the body: on the top, the sides and the front of curved and boxy bodies, with random
+    profiles, each is one solid joined to the body, or skipped with a reason; never a crash or a loose piece."""
+
+    def test_random_features_on_many_bodies(self):
+        rng = random.Random(5)
+        bodies = [bp.superblob(100, 60, 58, roundness=4, top=2.6, shoulder=0.45),
+                  bp.superblob(90, 70, 50, roundness=2.2, top=2.0),
+                  bp.soft_box(110, 60, 55, radius=8)]
+        for i in range(18):
+            body = bodies[i % 3]
+            lo, hi = bp.bounds(body)
+            where = ("top", "side", "front")[i % 3 if i < 9 else rng.randint(0, 2)]
+            if where == "top":
+                x = rng.uniform(lo[0] * 0.6, hi[0] * 0.6)
+                at, direction, side = (x, 0, bp.surface_z(body, x, 0)), None, (1, 0, 0)
+            elif where == "side":
+                z = rng.uniform(15, hi[2] - 15)
+                at, direction, side = (bp.surface_x(body, 0, z, side=1), 0, z), (1, 0, rng.uniform(-0.3, 0.6)), (0, 0, 1)
+            else:
+                z = rng.uniform(15, hi[2] - 15)
+                at, direction, side = (0, bp.surface_y_front(body, 0, z), z), (0, -1, 0), (1, 0, 0)
+            n = rng.randint(2, 4)
+            w, h = rng.uniform(4, 14), rng.uniform(3, 10)
+            profile = [(k * rng.uniform(4, 9), w * (1 - 0.6 * k / n), h * (1 - 0.6 * k / n), rng.uniform(-3, 3) * (k > 0))
+                       for k in range(n)]
+            profile = [(sum(q[0] for q in profile[:j + 1]),) + q[1:] for j, q in enumerate(profile)]
+            added, skipped = [], []
+            with self.subTest(i=i, where=where, profile=profile), contextlib.redirect_stdout(io.StringIO()):
+                out = bp.grow(body, "f", at, profile, added, skipped, direction=direction, side=side)
+                self.assertEqual(len(out.solids()), 1)
+                self.assertTrue(out.is_valid)
+                self.assertTrue(added or skipped, "either added or skipped with a reason")
+                if added:
+                    self.assertGreater(out.volume, body.volume, "the feature adds volume")
+                    glo, ghi = bp.bounds(out)
+                    reach = profile[-1][0] + max(w, h) * 2 + 10
+                    self.assertTrue(all(g >= l - reach for g, l in zip(glo, lo)) and all(g <= h_ + reach for g, h_ in zip(ghi, hi)),
+                                    "the feature stays near its profile")
+            self.assertTrue(added, f"skipped: {skipped}") if i < 9 else None
+
+    def test_a_bad_profile_is_skipped_with_a_reason(self):
+        body = bp.superblob(100, 60, 58, roundness=4, top=2.6, shoulder=0.45)
+        added, skipped = [], []
+        out = bp.grow(body, "horn", (0, 0, bp.surface_z(body, 0, 0)), [(5, 4, 4), (2, 2, 2)], added, skipped)
+        self.assertEqual(added, [])
+        self.assertIn("rise", skipped[0])
+        self.assertAlmostEqual(out.volume, body.volume, delta=1)
+
+
 if __name__ == "__main__":
     unittest.main()

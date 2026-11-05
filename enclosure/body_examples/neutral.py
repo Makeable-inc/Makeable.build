@@ -1,8 +1,7 @@
 """Worked example: the method, not a character. A soft main form sized from the parts' room, then features grown
 out of it one kind at a time, then the flat back. Copy the method; take every size from your own brief.
 Front faces -y. Every size is a setting."""
-from body_parts import (broad_flat_back, ear, feature_report, flat_sole, size, spine_body, superblob, surface_x, surface_z,
-                        try_join)
+from body_parts import broad_flat_back, feature_report, flat_sole, grow, size, superblob, surface_x, surface_z
 
 ROOM = dict(width=100.0, depth=42.0, height=50.0)  # the parts' room from the brief (walls included): copy its numbers
 WIDTH, DEPTH, HEIGHT = 108.0, 60.0, 66.0           # the main form: inside the front limits, with height to spare over
@@ -20,18 +19,18 @@ body = superblob(WIDTH, DEPTH, HEIGHT, roundness=4.0, top=2.5, shoulder=SHOULDER
 print("core:", list(size(body)))                   # the main form's size, before any feature (the proportion rule)
 
 added, skipped = [], []
-# 2. Features, one kind per build, each named exactly as the brief's feature list names it.
-#    Read the surface where a feature goes; sink its root in so it grows out of the body rather than sitting on it.
+# 2. Features, one kind per build, each named exactly as the brief's feature list names it. grow() reads the surface
+#    around `at` and flares the base into the body; the profile is (distance out, half width, half thickness[, lean])
+#    from the root to the tip.
 for side, name in ((-1, "left horn"), (1, "right horn")):
     x = side * 0.28 * WIDTH
-    z = surface_z(body, x, 0.0)
-    horn = ear(width=20.0, height=14.0, thickness=12.0, sharpness=0.6, at=(x, 0.0, z), tilt=(0, side * 12, 0), sink=6.0)
-    body = try_join(body, horn, name, added, skipped)
+    body = grow(body, name, (x, 0.0, surface_z(body, x, 0.0)),
+                [(0, 9.0, 6.0), (7, 6.0, 4.5, side * 1.5), (14, 2.5, 2.0, side * 3.0)], added, skipped)
 
-# A tail from spine_body: a short tapered form rooted in the side (keep features off the side where the USB opens).
-x_side = surface_x(body, 6.0, 22.0, side=+1)
-tail = spine_body([(x_side - 8, 20), (x_side + 6, 22), (x_side + 16, 30)], [(9, 8), (6, 6), (3, 3)])
-body = try_join(body, tail, "tail", added, skipped)
+# A tail on the right side (keep features off the side where the USB opens), growing out and up, then curling.
+z = 24.0
+body = grow(body, "tail", (surface_x(body, 6.0, z, side=+1), 6.0, z),
+            [(0, 7.0, 6.0), (10, 5.0, 4.5), (20, 3.0, 3.0, 6.0)], added, skipped, direction=(1, 0, 0.5), side=(0, 0, 1))
 
 # 3. The sole and the back plate last: the cover is cut flat from the back, the rim around it stays soft.
 body, back_y = broad_flat_back(flat_sole(body), share=0.65)
