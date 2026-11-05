@@ -49,5 +49,26 @@ class BackPlate(unittest.TestCase):
         self.assertGreaterEqual(share, body_rules.BACK_PLATE_SHARE)
 
 
+class SpaceReport(unittest.TestCase):
+    LIMITS = {"max_width": 138, "max_height": 37, "tight_width": 110, "tight_height": 30}
+
+    def report(self, room):
+        from unittest import mock
+        import review_facts
+        with mock.patch("review_facts.screen_limits", lambda _b: self.LIMITS):
+            return review_facts.space_report({"min_body": room, "max_depth": 80})
+
+    def test_only_face_shapes_the_parts_fit_are_offered(self):
+        text = self.report({"width": 104, "depth": 40, "height": 36})
+        self.assertNotIn("wide and low", text, "a 36 mm room cannot fit a face at most 30 mm tall")
+        self.assertIn("narrow and tall face: up to 6.0 mm more width and 1.0 mm more height", text)
+        self.assertIn("Tight", text)
+
+    def test_a_roomy_design_is_not_flagged(self):
+        text = self.report({"width": 80, "depth": 40, "height": 20})
+        self.assertIn("wide and low face: up to 58.0 mm more width and 10.0 mm more height", text)
+        self.assertNotIn("Tight", text)
+
+
 if __name__ == "__main__":
     unittest.main()

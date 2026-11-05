@@ -111,3 +111,42 @@ def filter_fixes(fixes, base, size=None):
             continue
         kept.append(fix)
     return kept, dropped
+
+
+TIGHT = 6.0   # mm: less spare than this on an axis and a rounded form cannot round much there
+
+
+def space_report(base):
+    """Before any drawing: how much room the main form has beyond the parts' room on each axis, in mm, from the face
+    limits and the depth limit. A report explains the room; it does not make any. None if the limits are unknown."""
+    room = base.get("min_body") or {}
+    try:
+        limit = screen_limits(base)
+    except Exception:
+        return None
+    if not room or not base.get("max_depth"):
+        return None
+    w, d, h = room["width"], room["depth"], room["height"]
+    deep = base["max_depth"] - d
+    # The face may be wide and low (up to max_width wide, at most tight_height tall) or narrow and tall (at most
+    # tight_width wide, up to max_height tall). Only shapes the parts' room fits into are real options.
+    options = []
+    if h <= limit["tight_height"] and w <= limit["max_width"]:
+        options.append(("wide and low", limit["max_width"] - w, limit["tight_height"] - h))
+    if w <= limit["tight_width"] and h <= limit["max_height"]:
+        options.append(("narrow and tall", limit["tight_width"] - w, limit["max_height"] - h))
+    lines = [f"Space for the main form beyond the parts' room ({w:.0f} wide, {d:.0f} deep, {h:.0f} tall mm, walls included):"]
+    if not options:
+        lines.append("- none: the parts' room is already bigger than the face limits allow.")
+    for name, more_w, more_h in options:
+        lines.append(f"- {name} face: up to {more_w:.1f} mm more width and {more_h:.1f} mm more height")
+    lines += [f"- depth: up to {deep:.1f} mm more (limit {base['max_depth']} mm; the back is cut flat)",
+              "- Features (ears, horns, tails, fins, feet) do not count in the face, so they may reach past these."]
+    best_w = max((o[1] for o in options), default=0.0)
+    best_h = max((o[2] for o in options), default=0.0)
+    tight = [name for name, value in (("height", best_h), ("width", best_w), ("depth", deep)) if value < TIGHT]
+    if tight:
+        lines.append(f"- Tight: under {TIGHT:.0f} mm spare in {' and '.join(tight)}. The main form can barely round there "
+                     "without cutting into the parts' room: round only within the spare, and carry the character with "
+                     "features and the outline seen from the front instead.")
+    return "\n".join(lines)
