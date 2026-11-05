@@ -134,6 +134,23 @@ class SoftForms(unittest.TestCase):
                 self.assertAlmostEqual(got, want, delta=0.2, msg=f"top={top}")
             self.assertLess(self.round_trip(blob), 0.3)
 
+    def test_a_low_shoulder_holds_a_box_shaped_room(self):
+        from build123d import Box, Pos
+        blob = bp.superblob(108, 60, 64, roundness=4, top=2.5, shoulder=0.4)
+        self.assertEqual(len(blob.solids()), 1)
+        self.assertTrue(blob.is_valid)
+        for got, want in zip(bp.size(blob), (108.0, 60.0, 64.0)):
+            self.assertAlmostEqual(got, want, delta=0.3)
+        self.assertLess(self.round_trip(blob), 0.3)
+        room = Pos(0, 0, 25) * Box(96, 50, 50)
+        self.assertLess((room - blob).volume, 0.01 * room.volume, "the room sticks out of the body")
+
+    def test_a_short_tail_with_three_points_is_a_clean_mesh(self):
+        tail = bp.spine_body([(40, 20), (54, 22), (64, 30)], [(9, 8), (6, 6), (3, 3)])
+        self.assertEqual(len(tail.solids()), 1)
+        lo, hi = bp.bounds(tail)
+        self.assertLess(hi[0] - lo[0], 60, "a broken mesh blows the bounds up")
+
     def test_spine_body_flows_into_a_tapered_tail_and_is_step_safe(self):
         body = bp.spine_body([(-60, 22), (-30, 24), (0, 24), (30, 22), (55, 22), (70, 32)],
                              [(26, 22), (28, 24), (28, 24), (24, 21), (12, 10), (4, 4)])

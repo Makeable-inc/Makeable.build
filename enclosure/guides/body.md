@@ -26,7 +26,9 @@ screen limits, the main form's proportion), `room` (the parts' box fits inside),
 ## The order that works
 
 1. **Main form first.** Size it from the brief's numbers: the front limits, then a few mm over the parts' room.
-   Use `soft_box` and size its rounding with `max_round` from the spare room, as round as the parts allow.
+   Pick the block by the concept's silhouette: `superblob` for a rounded body (an egg, a pebble, a frog), `spine_body`
+   for a long body that flows into a tail, neck or nose (a whale, a seal), `soft_box` for a boxy one (a TV, a robot).
+   Start the rounding above the parts' room (superblob's `shoulder`, soft_box's `max_round`), as round as it allows.
    `build`, then `check("room")` and `check("size")`, then `render()`.
 2. **Proportions.** Compare the render with the concept's silhouette. Fix the main form before adding anything.
 3. **Features, one at a time.** Add one feature with its building block (ear, paw, antenna, ellipsoid, capsule),

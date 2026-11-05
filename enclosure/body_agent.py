@@ -331,9 +331,9 @@ def brief(base):
     lines.append("The back, opposite the front, becomes a printed cover that must lie flat on a print bed: cut it with "
                  "broad_flat_back(body, share=0.65); the cover is that plate and stays completely flat.")
     features = "\n".join(f"- {f['name']}: {f.get('kind', '')}, {f['where']}" for f in base.get("features") or []) or "- (none listed)"
-    example = (HERE / "body_examples" / "kitten.py").read_text(encoding="utf-8")
+    example = (HERE / "body_examples" / "neutral.py").read_text(encoding="utf-8")
     return "\n\n".join(["\n".join(lines), "Features the body must have, each one clearly there:\n" + features,
-                        "A worked example of the building blocks in use (a different product; copy the method, not its sizes):\n```python\n" + example + "\n```"])
+                        "A worked example of the method (not a character: copy the order and the way sizes come from the room, not its shapes or sizes):\n```python\n" + example + "\n```"])
 
 
 def design_body(base, picture, folder, resume=False):

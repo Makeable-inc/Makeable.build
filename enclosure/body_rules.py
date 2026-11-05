@@ -33,17 +33,25 @@ def printed(output, label):
         return None
 
 
-def face_size(mesh):
-    """Width and height of the face: the body cut just behind the main form's front (read at its middle, so a paw
-    or snout in front does not count). Ears, antennas, arms and legs away from that slice are ornaments."""
+def face_slice(mesh):
+    """The points of the body cut just behind the main form's front (read at its middle, so a paw or snout in front
+    does not count), or None. Ears, antennas, arms, legs and tails away from that slice are ornaments."""
     lo, hi = mesh.bounds
     mid = [(lo[0] + hi[0]) / 2, lo[1] - 50, (lo[2] + hi[2]) / 2]
     hits, _, _ = mesh.ray.intersects_location([mid], [[0, 1, 0]], multiple_hits=False)
     front = float(hits[0][1]) if len(hits) else lo[1]
     cut = mesh.section(plane_origin=[0, front + FACE_DEPTH, 0], plane_normal=[0, 1, 0])
     if cut is None or len(cut.vertices) < 3:
+        return None
+    return np.asarray(cut.vertices)
+
+
+def face_size(mesh):
+    """Width and height of the face (see face_slice): the main form's front, ornaments not counted."""
+    v = face_slice(mesh)
+    if v is None:
+        lo, hi = mesh.bounds
         return hi[0] - lo[0], hi[2] - lo[2]
-    v = np.asarray(cut.vertices)
     return float(v[:, 0].max() - v[:, 0].min()), float(v[:, 2].max() - v[:, 2].min())
 
 
@@ -65,17 +73,22 @@ def back_plate(mesh):
 
 def room_rule(mesh, base):
     """The main form holds the box the parts need, centred across, on the floor, from just behind the front (read at
-    its rearmost point over the box's height, so a front that curves back at the top or bottom still counts)."""
+    its rearmost point over the box's front, so a front that curves back at the top, bottom or sides still counts)."""
     need = base.get("min_body")
     if not need:
         return rule("room", "room", True, None)
     lo, hi = mesh.bounds
     w, d, h = need["width"] - 2 * ROOM_SLACK, need["depth"] - ROOM_SLACK, need["height"] - ROOM_SLACK
-    x = (lo[0] + hi[0]) / 2
-    rays = [[x, lo[1] - 50, z] for z in np.linspace(ROOM_SLACK + 1, ROOM_SLACK + h - 1, 9)]
+    face = face_slice(mesh)
+    # centred on the main form's face, so a tail or arm on one side does not pull the box off centre
+    x = float(face[:, 0].min() + face[:, 0].max()) / 2 if face is not None else (lo[0] + hi[0]) / 2
+    # the front read at its rearmost point over the box's whole front (its height and its width), so a front that
+    # curves back at the top, the bottom or the sides still counts
+    rays = [[px, lo[1] - 50, z] for px in np.linspace(x - w / 2 + 1, x + w / 2 - 1, 7)
+            for z in np.linspace(ROOM_SLACK + 1, ROOM_SLACK + h - 1, 9)]
     hits, _, _ = mesh.ray.intersects_location(rays, [[0, 1, 0]] * len(rays), multiple_hits=False)
     front = float(hits[:, 1].max()) if len(hits) == len(rays) else lo[1]
-    box = trimesh.creation.box(extents=(w, d, h), transform=trimesh.transformations.translation_matrix(((lo[0] + hi[0]) / 2, front + ROOM_SLACK + d / 2, h / 2 + ROOM_SLACK)))
+    box = trimesh.creation.box(extents=(w, d, h), transform=trimesh.transformations.translation_matrix((x, front + ROOM_SLACK + d / 2, h / 2 + ROOM_SLACK)))
     points, _ = trimesh.sample.sample_surface(box, 3000, seed=2)
     outside = ~mesh.contains(points)
     share = float(outside.mean())

@@ -150,20 +150,32 @@ def _superellipse(a, b, n, plane, count=48):
         return Wire.make_polygon(pts, close=True)
 
 
-def superblob(width, depth, height, roundness=3.0, top=2.5, at=(0, 0, 0), sections=14):
+def superblob(width, depth, height, roundness=3.0, top=2.5, shoulder=1.0, at=(0, 0, 0), sections=14):
     """A soft main form between a box and an egg, standing on a flat sole at z = 0, exactly width x depth x height.
-    roundness: the outline seen from above (2 = oval, 3 = soft rounded box, 5 = nearly a box).
-    top: how the sides curve into the top (2 = a full dome, 3 = a soft cushion, 5 = upright sides, flat top).
-    Fuller at the bottom than an egg: the sole keeps the full outline, so it stands flat and holds the parts."""
+    roundness: the outline seen from above (2 = oval, 3 = soft rounded box, 4-5 = boxy; the corners of a box-shaped
+    parts room need about 4 to fit).
+    top: how the sides curve into the top (2 = a full dome, 3 = a soft cushion, 5 = nearly flat on top).
+    shoulder: the share of the height that rounds over into the top (1 = the whole height, an egg or dome; 0.3 =
+    upright sides with a soft top band, which holds a box-shaped parts room). Rounding cuts into the room inside:
+    keep the room's top below the band, or leave enough height over it."""
+    assert 0.1 <= shoulder <= 1.0, "shoulder is a share of the height, from 0.1 to 1"
     def build(reach):
+        start = reach * (1 - shoulder)
         faces = []
         for i in range(sections):
             # slices closer together near the top, where the outline turns fastest, so the smooth loft does not swing
             f = math.sin(i / sections * math.pi / 2)
             shrink = (1 - f ** top) ** (1 / top)
-            faces.append(Face(_superellipse(width / 2 * shrink, depth / 2 * shrink, roundness, Plane.XY.offset(reach * f))))
+            faces.append(Face(_superellipse(width / 2 * shrink, depth / 2 * shrink, roundness, Plane.XY.offset(start + (reach - start) * f))))
         faces.append(Vertex(0, 0, reach))   # closes the top in a point, so it has no flat nub
-        return one_solid(loft(faces, ruled=False), "superblob")
+        band = one_solid(loft(faces, ruled=False), "superblob")
+        if start <= 0.5:
+            return band
+        # the upright sides: the band's own bottom face pushed straight down to the sole. Lofting them with the band
+        # makes the smooth loft bulge outward, and a separately drawn outline overlapping the band fuses invalid.
+        bottom = band.faces().sort_by(Axis.Z)[0]
+        sides = Solid.extrude(bottom, Vector(0, 0, -start))
+        return fuse(band, one_solid(sides, "superblob sides"), "superblob")
     body = build(height)
     top_z = bounds(body)[1][2]
     if abs(top_z - height) > 0.05:
@@ -173,6 +185,9 @@ def superblob(width, depth, height, roundness=3.0, top=2.5, at=(0, 0, 0), sectio
     return placed(step_safe(body), at)
 
 
+MIN_SPINE_POINTS = 6
+
+
 def spine_body(spine, sizes, roundness=2.2, round_ends=True, at=(0, 0, 0)):
     """One smooth form along a spine: a body that flows into a tail, a neck or a nose with no seam.
     spine: points (x, z) from one end to the other, along the length (x), in the front's plane.
@@ -180,8 +195,13 @@ def spine_body(spine, sizes, roundness=2.2, round_ends=True, at=(0, 0, 0)):
     roundness: the cross-section shape (2 = oval, 3 = soft rounded box). round_ends: close each end in a soft dome
     (a small end closes in a point, so a tail or nose tapers to a tip). Cut the sole flat afterwards (flat_sole)."""
     assert len(spine) == len(sizes) >= 3, "spine_body needs at least 3 spine points, each with a size"
+    # Fill in points between the given ones: a loft through only a few sections, closing in a point, can tessellate
+    # into a broken mesh, so the spine always has at least MIN_SPINE_POINTS sections.
+    spine, sizes = [tuple(p) for p in spine], [tuple(z) for z in sizes]
+    while len(spine) < MIN_SPINE_POINTS:
+        spine = [v for a_, b_ in zip(spine, spine[1:]) for v in (a_, tuple((p + q) / 2 for p, q in zip(a_, b_)))] + [spine[-1]]
+        sizes = [v for a_, b_ in zip(sizes, sizes[1:]) for v in (a_, tuple((p + q) / 2 for p, q in zip(a_, b_)))] + [sizes[-1]]
     pts = [Vector(x, 0, z) for x, z in spine]
-    sizes = list(sizes)
 
     def tangent(i):
         return (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
@@ -397,13 +417,36 @@ def section_area(body, y, thickness=0.2):
         return 0.0
 
 
-def broad_flat_back(body, share=0.8, step=1.0, max_cut=25.0):
-    """Cut the back flat, moving the cut forward until the flat plate is at least `share` of the body's biggest
-    cross-section, so the rear cover is broad, prints flat and has room for screws. Returns (body, y of the cut)."""
+def _hull_area(points):
+    """Area (mm2) of the convex outline of (x, z) points."""
+    from scipy.spatial import ConvexHull
+    try:
+        return float(ConvexHull(points).volume) if len(points) >= 3 else 0.0
+    except Exception:
+        return 0.0
+
+
+def _back_outline(body):
+    """Points (x, z) of the body seen from the back: its whole outline, features included."""
+    points, _ = body.tessellate(0.2, 0.5)
+    return [(p.X, p.Z) for p in points]
+
+
+def broad_flat_back(body, share=0.65, step=1.0, max_cut=25.0):
+    """Cut the back flat, moving the cut forward until the flat plate covers at least `share` of the body's outline
+    seen from the back (ears, tails and fins count, as in the back-plate rule), so the rear cover is broad, prints flat
+    and has room for screws. Returns (body, y of the cut)."""
     lo, hi = bounds(body)
-    biggest = max(section_area(body, lo[1] + f * (hi[1] - lo[1])) for f in (0.3, 0.45, 0.6, 0.75))
+    outline = _hull_area(_back_outline(body))
+
+    def plate(y):
+        try:
+            slab = body & Pos(0, y, 0) * Box(BIG, 0.2, BIG)
+            return _hull_area(_back_outline(slab))
+        except Exception:
+            return 0.0
     y = hi[1] - step
-    while y > hi[1] - max_cut and section_area(body, y) < share * biggest:
+    while y > hi[1] - max_cut and plate(y) < share * outline:
         y -= step
     return flat_back(body, y), y
 
