@@ -68,6 +68,17 @@ class Workshop:
         reviewed = self.picture and self.base.get("style") == "character"
         return self.best is not None and (not reviewed or self.best["score"] >= LOOK_TARGET)
 
+    def state(self):
+        """What resume needs beyond the saved script: the counters and the best result."""
+        best = dict(self.best, folder=str(self.best["folder"])) if self.best else None
+        return {"submits": self.submits, "best": {k: v for k, v in (best or {}).items() if k != "code"} or None,
+                "last_fixes": self.last_fixes}
+
+    def restore(self, saved):
+        self.submits, self.last_fixes = saved.get("submits", 0), saved.get("last_fixes", [])
+        best = saved.get("best")
+        self.best = dict(best, folder=Path(best["folder"])) if best else None
+
     def finish_run(self):
         # Written after the code runs, so the script cannot replace the rules it is checked against.
         (self.work / "base_design.json").write_text(json.dumps(self.base, indent=1), encoding="utf-8")
@@ -211,7 +222,7 @@ class Workshop:
         return f"Unknown tool {name}.", None
 
 
-def design_case(brief, folder, base, body_stl, picture, part_ids, system):
+def design_case(brief, folder, base, body_stl, picture, part_ids, system, resume=False):
     """Runs the agent. Returns a summary, with the best passing case copied to <folder>/best."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
@@ -219,7 +230,7 @@ def design_case(brief, folder, base, body_stl, picture, part_ids, system):
     # The one-shot system prompt asks for a single script reply; here the script goes through run() instead.
     system = system.replace("Reply with only the script, in one ```python block. ", "Pass the complete script to the run tool each time. ")
     instructions = system + "\n\n" + harness.guide("case")
-    outcome, steps, tokens, seconds = harness.run(shop, instructions, brief, folder, picture, MAX_STEPS, MAX_SUBMITS, "case")
+    outcome, steps, tokens, seconds = harness.run(shop, instructions, brief, folder, picture, MAX_STEPS, MAX_SUBMITS, "case", resume)
     if shop.best:
         target = folder / "best"
         if target.exists():

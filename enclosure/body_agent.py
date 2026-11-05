@@ -83,6 +83,17 @@ class BodyShop:
     def code(self):
         return self.script.text
 
+    def state(self):
+        """What resume needs beyond the saved script: the counters and the best result."""
+        best = dict(self.best, folder=str(self.best["folder"])) if self.best else None
+        return {"submits": self.submits, "best": {k: v for k, v in (best or {}).items() if k != "code"} or None,
+                "last_fixes": self.last_fixes}
+
+    def restore(self, saved):
+        self.submits, self.last_fixes = saved.get("submits", 0), saved.get("last_fixes", [])
+        best = saved.get("best")
+        self.best = dict(best, folder=Path(best["folder"])) if best else None
+
     def build(self, code=None):
         if code:
             self.script.write(code)
@@ -217,14 +228,14 @@ def brief(base):
                         "A worked example of the building blocks in use (a different product; copy the method, not its sizes):\n```python\n" + example + "\n```"])
 
 
-def design_body(base, picture, folder):
+def design_body(base, picture, folder, resume=False):
     """Runs the body agent. Returns (code, stl path, summary) like body_stage.design_body; the best passing body
     is copied to <folder> (BODY.stl, BODY.step, body.py, summary.json)."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     shop = BodyShop(folder, base, picture)
     instructions = SYSTEM + "\n\n" + harness.guide("body")
-    outcome, steps, tokens, seconds = harness.run(shop, instructions, brief(base), folder, picture, MAX_STEPS, MAX_SUBMITS, "body")
+    outcome, steps, tokens, seconds = harness.run(shop, instructions, brief(base), folder, picture, MAX_STEPS, MAX_SUBMITS, "body", resume)
     summary = {"outcome": outcome, "steps": steps, "submits": shop.submits, "best_score": shop.best["score"] if shop.best else None,
                "features": shop.features, "style": "character", "tokens": tokens, "seconds": seconds}
     (folder / "summary.json").write_text(json.dumps(summary, indent=1, default=str), encoding="utf-8")

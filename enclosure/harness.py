@@ -10,7 +10,11 @@ Keeping the context in check:
 - a long tool result is stored whole in <folder>/results/rN.txt and the agent gets a short version with a
   reference it can fetch with recall("rN");
 - past COMPACT_AT input tokens on one call, the agent writes a handoff summary and the loop starts a fresh response
-  chain from the summary, the current file, the latest results and the concept picture (off until measured)."""
+  chain from the summary, the current file, the latest results and the concept picture.
+
+Resuming: after every step <folder>/state.json holds the counters, the best result, the latest results and the
+last handoff summary (the script itself is already saved). run(..., resume=True) continues from it on a fresh chain.
+A shop that keeps state provides state() -> dict and restore(dict)."""
 import base64
 import json
 import os
@@ -87,12 +91,34 @@ class Results:
         return path.read_text(encoding="utf-8") if path.exists() else f"No stored result named {ref!r}."
 
 
-def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submits=4, label="agent"):
-    """Runs the agent until the shop's best is good enough or a budget ends. Returns (outcome, steps, tokens, seconds)."""
+def save_state(folder, shop, **counters):
+    """Everything needed to continue after a crash, written after every step."""
+    state = {**counters, "shop": shop.state() if hasattr(shop, "state") else {}}
+    path = Path(folder) / "state.json"
+    path.with_suffix(".tmp").write_text(json.dumps(state, indent=1, default=str), encoding="utf-8")
+    path.with_suffix(".tmp").replace(path)
+
+
+def load_state(folder):
+    path = Path(folder) / "state.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submits=4, label="agent", resume=False):
+    """Runs the agent until the shop's best is good enough or a budget ends. Returns (outcome, steps, tokens, seconds).
+    resume=True continues a stopped run from its state.json."""
     folder = Path(folder)
     started, steps, tokens, calls_made, chains = time.time(), 0, 0, 0, 1
     tools = [*shop.tools, RECALL]
     store = Results(folder)
+    summary, latest, nudges = None, [], 0
+    earlier = load_state(folder) if resume else None
+    if earlier:
+        steps, tokens, calls_made, nudges = earlier["steps"], earlier["tokens"], earlier["model_calls"], earlier["nudges"]
+        chains, summary, latest = earlier["chains"] + 1, earlier.get("summary"), earlier.get("latest", [])
+        if hasattr(shop, "restore"):
+            shop.restore(earlier["shop"])
+        log(folder, step=steps, resumed=True, chain=chains)
 
     def ask(body, previous=None):
         nonlocal tokens, calls_made
@@ -109,8 +135,20 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
             content.append(image_part(picture))
         return {"instructions": instructions, "input": [{"role": "user", "content": content}]}
 
-    data = ask(opening())
-    nudges = 0
+    if earlier:
+        code = getattr(shop, "code", None)
+        best = shop.best
+        facts = (f"You are resuming a run that stopped after step {steps}. Submits used: {shop.submits} of {max_submits}. "
+                 + (f"Best passing result so far: {best['score']}/10 (kept). " if best else "Nothing has passed yet. ")
+                 + "The saved script is below; run it first, then carry on.")
+        extra = [{"type": "input_text", "text": facts}]
+        if summary:
+            extra.append({"type": "input_text", "text": "Your last handoff summary:\n" + summary})
+        extra += [{"type": "input_text", "text": "The current file:\n```python\n" + (code or "(none yet)") + "\n```"},
+                  {"type": "input_text", "text": "The latest tool results:\n" + "\n\n".join(latest)[-4000:]}]
+        data = ask(opening(extra))
+    else:
+        data = ask(opening())
     while True:
         calls = [item for item in data["output"] if item["type"] == "function_call"]
         said = "".join(c.get("text", "") for item in data["output"] if item["type"] == "message" for c in item["content"])
@@ -151,6 +189,8 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
             latest.append(f"{item['name']}: {sent}")
             if picture_out:
                 pictures.append(picture_out)
+        save_state(folder, shop, steps=steps, tokens=tokens, model_calls=calls_made, nudges=nudges, chains=chains,
+                   summary=summary, latest=latest, label=label)
         follow = list(results)
         if pictures:
             parts = [{"type": "input_text", "text": "The concept, then yours:"}]
@@ -176,6 +216,8 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
             # Hand off: the agent summarises, then a fresh chain starts from the summary, the file and the latest results.
             closing = ask({"input": follow + [{"role": "user", "content": [{"type": "input_text", "text": HANDOFF}]}], "tool_choice": "none"}, previous=data["id"])
             summary = "".join(c.get("text", "") for item in closing["output"] if item["type"] == "message" for c in item["content"])[:SUMMARY_LIMIT]
+            save_state(folder, shop, steps=steps, tokens=tokens, model_calls=calls_made, nudges=nudges, chains=chains + 1,
+                       summary=summary, latest=latest, label=label)
             chains += 1
             log(folder, step=steps, compacted=True, chain=chains, summary=summary)
             code = getattr(shop, "code", None)

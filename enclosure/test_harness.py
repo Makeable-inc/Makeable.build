@@ -94,5 +94,46 @@ class CostCount(unittest.TestCase):
         self.assertEqual(agent.job_tokens(), 2_400)
 
 
+
+class Resume(unittest.TestCase):
+    def test_a_crashed_run_continues_from_its_saved_step(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        folder = Path(tmp.name)
+
+        class Keeping(Shop):
+            def state(self):
+                return {"submits": self.submits, "best": self.best}
+
+            def restore(self, saved):
+                self.submits, self.best = saved["submits"], saved["best"]
+
+        first = iter([reply(("check", {"group": "fit"})), reply(("render", {}))])
+
+        def crashing(_tools, body, previous=None):
+            try:
+                return next(first)
+            except StopIteration:
+                raise RuntimeError("the laptop went to sleep")
+        with mock.patch.object(harness, "call", crashing), self.assertRaises(RuntimeError):
+            harness.run(Keeping(), "instructions", "brief", folder, None, 20, 4, "test")
+        saved = json.loads((folder / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["steps"], 2)
+
+        sent, second = [], iter([reply(("submit", {}))])
+
+        def fake(_tools, body, previous=None):
+            sent.append((body, previous))
+            return next(second)
+        with mock.patch.object(harness, "call", fake):
+            outcome = harness.run(Keeping(), "instructions", "brief", folder, None, 20, 4, "test", resume=True)
+        opening = " ".join(c["text"] for c in sent[0][0]["input"][0]["content"] if c["type"] == "input_text")
+        self.assertIn("resuming a run that stopped after step 2", opening)
+        self.assertIn("the current file", opening)
+        self.assertIsNone(sent[0][1])
+        self.assertEqual(outcome[1], 3, "the step count carries on from the saved one")
+        self.assertEqual(outcome[0], "pass")
+
+
 if __name__ == "__main__":
     unittest.main()
