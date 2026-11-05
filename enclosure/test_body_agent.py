@@ -55,5 +55,54 @@ class StepRule(unittest.TestCase):
             self.assertFalse(body_rules.step_rule(f"{tmp}/small.step", wide)["ok"])
 
 
+
+class Gates(unittest.TestCase):
+    """The staged look reviews and the latest-file rule, with a fake reviewer."""
+
+    def setUp(self):
+        from unittest import mock
+        from PIL import Image
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        folder = Path(tmp.name)
+        picture = folder / "concept.png"
+        Image.new("RGB", (16, 16), "white").save(picture)
+        base = {**BASE, "parts": "esp32-s3-devkit-n16r8,ssd1309-242-oled,ttp223-touch"}
+        self.shop = body_agent.BodyShop(folder, base, picture)
+        self.asked = []
+        limits = {"max_width": 140, "max_height": 58, "tight_width": 110, "tight_height": 55, "screen_width": 55, "screen_height": 28}
+        for target in (mock.patch("body_stage.screen_limits", lambda _b: limits), mock.patch("review_facts.screen_limits", lambda _b: limits),
+                       mock.patch.object(body_agent, "ask", self.fake_ask), mock.patch.object(body_agent.BodyShop, "view", lambda s: picture)):
+            target.start()
+            self.addCleanup(target.stop)
+        self.score = 5
+
+    def fake_ask(self, prompt, _board):
+        self.asked.append(prompt)
+        return {"score": self.score, "fix": ["Increase body height by 40% to match the concept", "Make the ears broader at the root"]}, 10
+
+    def test_the_character_gate_blocks_submit_then_records_a_skip(self):
+        self.shop.build(EXAMPLE + EXPORT)
+        self.assertTrue(any("Does it read as the concept" in p for p in self.asked), "the character review ran on build")
+        self.assertIn("touch button", self.asked[-1])
+        blocked = self.shop.submit()
+        self.assertIn("under 7", blocked)
+        self.assertEqual(self.shop.submits, 0)
+        self.shop.build()
+        self.assertEqual(len(self.shop.skipped_gates), 1)
+        self.assertNotIn("under 7", self.shop.submit()[:40])
+
+    def test_a_fix_the_limits_cannot_allow_is_dropped(self):
+        self.shop.build(EXAMPLE + EXPORT)
+        self.assertNotIn("Increase body height", " ".join(self.shop.last_fixes))
+        self.assertIn("Make the ears broader at the root", self.shop.last_fixes)
+
+    def test_a_changed_script_must_be_built_before_submit(self):
+        self.score = 8
+        self.shop.build(EXAMPLE + EXPORT)
+        self.shop.script.edit("WIDTH, DEPTH, HEIGHT = 110.0, 64.0, 58.0", "WIDTH, DEPTH, HEIGHT = 108.0, 64.0, 58.0")
+        self.assertIn("build() it first", self.shop.submit())
+
+
 if __name__ == "__main__":
     unittest.main()

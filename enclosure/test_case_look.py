@@ -46,5 +46,15 @@ class Review(unittest.TestCase):
         self.assertIn("round the bezel", verdict["fix"])
 
 
+    def test_the_prompt_names_the_real_parts(self):
+        seen = []
+        with mock.patch.object(case_look, "ask", lambda prompt, _i: (seen.append(prompt) or {"score": 7, "features": {}, "fix": ["Give the knob a paw cap"]}, 10)):
+            look = case_look.review(self.attempt, self.picture, {"features": FEATURES, "parts": "esp32-s3-devkit-n16r8,ttp223-touch", "max_depth": 80,
+                                                                 "width_to_height": [1.5, 2.6]}, 8)
+        self.assertIn("the touch button", seen[0])
+        self.assertNotIn("knob and board", seen[0])
+        self.assertEqual(look["fix"], [], "a knob fix on a touch design is dropped")
+
+
 if __name__ == "__main__":
     unittest.main()

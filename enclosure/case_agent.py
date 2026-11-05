@@ -59,7 +59,7 @@ class Workshop:
         shutil.copy(HERE / "case_parts.py", self.work / "case_parts.py")
         write_data(part_ids, self.work)
         self.script = script_file.ScriptFile(self.folder / "script.py")
-        self.ran, self.report = False, None
+        self.ran, self.report, self.ran_code = False, None, None   # ran_code: the script text the last run used
         self.best, self.submits, self.look = None, 0, None
         self.tools, self.last_fixes, self.target = TOOLS, [], LOOK_TARGET
 
@@ -95,6 +95,7 @@ class Workshop:
         if code is None:
             return "There is no script yet. Write it with write(code)."
         self.ran, message = run_design(code, self.work)
+        self.ran_code = code if self.ran else None
         self.report = None
         if not self.ran:
             return message[-OUTPUT_LIMIT:]
@@ -108,9 +109,15 @@ class Workshop:
             self.report = checks.check_design(self.work, "case")
         return self.report
 
+    def stale(self):
+        """The saved script changed since the last run, so the last results are not for it."""
+        return self.script.text != self.ran_code
+
     def check(self, group):
         if not self.ran:
             return "Nothing has run yet, or the last run failed. Call run() with a script that works."
+        if self.stale():
+            return "The saved script changed since the last run, so there is nothing current to check. run() it first."
         report = self.checked()
         names = None if group == "all" else GROUPS[group]
         fields = ("check", "part", "measured", "limit", "where", "fix")
@@ -162,6 +169,8 @@ class Workshop:
     def submit(self):
         if not self.ran:
             return "Nothing has run yet."
+        if self.stale():
+            return "The saved script changed since the last run, so this case has not been checked. run() it first."
         self.submits += 1
         report = self.checked()
         look = None

@@ -37,6 +37,16 @@ screen limits, the main form's proportion), `room` (the parts' box fits inside),
 5. **Submit.** If it fails, fix what it names. If it passes under the look target, improve the weakest feature or the
    silhouette and submit again. The best pass is kept.
 
+## The look reviews that come with a build
+
+`build()` adds two reviews by itself, so you do not need to ask for them:
+- **Proportions**, once the main form fits (room and size pass) and before features: advice on length, height and
+  softness. Act on it before adding features if it says the form is off.
+- **Character**, once every listed feature is on: does it read as the concept? Under 7/10, `submit` is refused
+  until a later build reaches 7 (two tries, then it moves on and the skip is recorded).
+The reviewers know the real parts and limits; a fix they give always fits them. `submit` also refuses a script that
+changed since its last build: build it first.
+
 ## What good looks like
 
 - The silhouette and proportions match the concept; the screen's face is the front.

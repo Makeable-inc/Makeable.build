@@ -17,7 +17,8 @@ included. The fixed checks decide; your job is to make them pass and make the ca
 | `render()` | after the parts and openings are in, and after each look change | a picture of your case next to the concept |
 | `submit()` | when `check("all")` would pass, or to keep a better-looking version | all checks plus the look review |
 
-`check("all")` with nothing failing submits for you.
+`check("all")` with nothing failing submits for you. `check` and `submit` refuse a script that changed since its
+last run: run it first.
 
 ## The order that works
 

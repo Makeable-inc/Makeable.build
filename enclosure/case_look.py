@@ -9,26 +9,28 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 import agent
+import review_facts
 from look_check import data_url
 
 DROP_LIMIT = 2   # a look score this far under the body's is a problem to fix, not noise (the reviewer is about +-1)
 
 PROMPT = """You check how a finished 3D-printed case looks. Image 1 is the concept picture. Image 2 is the chosen body
 (the outside the case must keep). Image 3 is the finished case from four angles (front, straight on, side, back), with
-the screen, knob and board in place. Ignore colours.
+__PARTS__ in place. Ignore colours.
 Design principles a good case follows:
 - The silhouette and proportions match the concept; the case keeps the body's outside exactly.
 - One consistent softness: every outer edge rounded alike; no sharp edges next to soft ones.
 - The screen sits in an even, deliberate bezel; openings are sized and rounded to suit the form.
 - Features (ears, arms, feet, antennas) are in proportion and grow out of the body, not stuck on.
 - No screws, seams, bosses or patches showing on the front or the top.
-- Details suit the character (for example a knob cap shaped for it), and nothing looks unfinished.
+- Details suit the character (a control shaped for it: a cap for a knob, a styled dimple for a touch button), and
+  nothing looks unfinished.
 Score anchors: 2 = a plain box; 3 = a box with stickers on; 5 = recognisable as the concept but crude;
 7 = a good toy a shop would sell; 9 = a polished product with every principle met.
 Judge the finished case against the concept and the body:
 - Is each required feature still there and recognisable? A feature cut off, left loose or hidden counts as missing.
 - What did the case add or change that spoils the look (a lump, a screw boss or seam showing on the front, a window,
-  knob or opening that clashes with the character, the body's softness lost)?
+  control or opening that clashes with the character, the body's softness lost)?
 Reply with only JSON:
 {"features": {"<feature name>": "present" | "weak" | "missing"}, "score": <0-10, 10 = reads clearly as the concept>,
  "fix": ["<up to 4 concrete changes to the case script, most important first, with where on the case>"]}
@@ -85,10 +87,19 @@ def review(attempt, picture, base, body_score=None):
     features = base.get("features") or []
     names = "\n".join(f"- {f['name']} ({f.get('where', '')})" for f in features) or "- (none listed)"
     board = sheet(picture, body_view(attempt), attempt / "preview.png", attempt / "look_sheet.png")
-    found, tokens = ask(PROMPT + names, board)
+    # The real parts and limits, so the advice fits the hardware: a touch design has no knob, a full face cannot grow.
+    size = None
+    try:
+        from checks import load_stl
+        size = review_facts.body_size(load_stl(attempt / "BODY.stl"))
+    except Exception:
+        pass
+    prompt = PROMPT.replace("__PARTS__", review_facts.parts_phrase(base)) + names + "\n\n" + review_facts.facts(base, size)
+    found, tokens = ask(prompt, board)
     score = found.get("score") if isinstance(found.get("score"), (int, float)) else None
     marks = found.get("features") if isinstance(found.get("features"), dict) else {}
     fixes = [str(f) for f in found.get("fix", []) if isinstance(f, str)][:4] if isinstance(found.get("fix"), list) else []
+    fixes, dropped = review_facts.filter_fixes(fixes, base, size)
     problems = []
     def mark(name):
         # The reviewer may repeat the place after the name, as in "left arm (left side)".
@@ -101,7 +112,7 @@ def review(attempt, picture, base, body_score=None):
         problems.append(f"The finished case lost these features of the body: {', '.join(gone)}. Keep every feature joined to the Shell and visible.")
     if score is not None and body_score is not None and score <= body_score - DROP_LIMIT:
         problems.append(f"The finished case looks clearly worse than the chosen body ({score}/10 against {body_score}/10).")
-    result = {"score": score, "features": marks, "fix": fixes, "problems": problems, "tokens": tokens}
+    result = {"score": score, "features": marks, "fix": fixes, "dropped_fixes": dropped, "problems": problems, "tokens": tokens}
     (attempt / "look.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
     return result
 

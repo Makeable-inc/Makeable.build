@@ -9,6 +9,7 @@ from pathlib import Path
 import body_parts
 import body_rules
 import harness
+import review_facts
 import script_file
 from case_look import ask, sheet
 from checks import load_stl
@@ -18,6 +19,8 @@ HERE = Path(__file__).resolve().parent
 MAX_STEPS = 60
 MAX_SUBMITS = 6
 LOOK_TARGET = 8
+CHARACTER_TARGET = 7   # the character review, once the key features are on, must reach this before submit
+GATE_TRIES = 2         # character reviews under the target before the gate is skipped (and the skip recorded)
 OUTPUT_LIMIT = 2500
 
 SYSTEM = """You are a product designer who models characterful desk gadgets in code with build123d and the tested
@@ -42,6 +45,17 @@ Reply with only JSON: {"features": {"<feature name>": "present" | "weak" | "miss
 "fix": ["<up to 4 concrete changes in mm or proportions, most important first>"]}
 Required features:
 """
+
+PROPORTION = RUBRIC + """
+Image 1 is the concept, image 2 is the main form only: the features (ears, spikes, tail, eyes...) are not on yet, so
+do not judge whether it reads as the character. Judge only the proportions and silhouette against the concept:
+length, height, how soft or boxy it is, where it is fuller or slimmer. Reply with only JSON:
+{"proportions": "<at most 2 sentences>", "fix": ["<up to 2 concrete changes in mm or proportions>"]}"""
+
+CHARACTER = RUBRIC + """
+Image 1 is the concept, image 2 is the body with its key features on (no screen or knob yet). Ignore colours.
+Does it read as the concept? Reply with only JSON: {"score": <0-10>, "fix": ["<up to 3 concrete changes, most
+important first>"]}"""
 
 QUESTION = RUBRIC + """
 Image 1 is the concept, image 2 is the body so far. Answer this one question in at most 3 sentences, ending with
@@ -75,6 +89,10 @@ class BodyShop:
         self.script = script_file.ScriptFile(self.folder / "script.py")
         self.ran, self.mesh, self.output = False, None, ""
         self.best, self.submits, self.tools, self.last_fixes, self.target = None, 0, TOOLS, [], LOOK_TARGET
+        self.built = None            # the script text of the last build that worked: only that can be submitted
+        self.proportion_done = False
+        self.character = {"score": None, "tries": 0, "done": False}
+        self.skipped_gates = []
 
     def done(self):
         return self.best is not None and self.best["score"] >= LOOK_TARGET
@@ -110,9 +128,58 @@ class BodyShop:
         if not (self.work / "BODY.stl").exists() or not (self.work / "BODY.step").exists():
             return "It ran but did not export BODY.stl and BODY.step. End with export_stl and export_step as the instructions say."
         self.ran, self.mesh = True, load_stl(self.work / "BODY.stl")
+        self.built = code
         self.script.snapshot()
         self.output = (self.work / "output.txt").read_text(encoding="utf-8", errors="replace")
-        return ("Ran.\n" + self.output[-1500:]).strip()
+        return ("Ran.\n" + self.output[-1500:]).strip() + self.staged_review()
+
+    def facts(self):
+        try:
+            return review_facts.facts(self.base, review_facts.body_size(self.mesh))
+        except Exception:
+            return review_facts.facts(self.base)
+
+    def fixes_that_fit(self, fixes):
+        try:
+            size = review_facts.body_size(self.mesh)
+        except Exception:
+            size = None
+        kept, _ = review_facts.filter_fixes([str(f) for f in fixes if f], self.base, size)
+        return kept
+
+    def staged_review(self):
+        """The two look checks that come before submit: proportions once the main form fits (advice), and the character
+        once every key feature is on (a gate: under CHARACTER_TARGET, fix before submit, at most GATE_TRIES times)."""
+        if not self.picture:
+            return ""
+        notes = []
+        added = set(body_rules.printed(self.output, "added") or [])
+        features_on = bool(self.features) and all(f["name"] in added for f in self.features)
+        if not self.proportion_done and not features_on and not [r for r in self.rules(("room", "size")) if not r["ok"]]:
+            self.proportion_done = True
+            board = sheet(self.picture, self.view(), self.view(), self.work / "look_sheet.png")
+            found, _ = ask(PROPORTION + "\n\n" + self.facts(), board)
+            fixes = self.fixes_that_fit(found.get("fix", []) if isinstance(found.get("fix"), list) else [])
+            notes.append(f"Proportion review (advice; features not judged yet): {found.get('proportions', '')} "
+                         + (f"Fixes: {'; '.join(fixes)}" if fixes else ""))
+        if features_on and not self.character["done"]:
+            board = sheet(self.picture, self.view(), self.view(), self.work / "look_sheet.png")
+            found, _ = ask(CHARACTER + "\n\n" + self.facts(), board)
+            score = found.get("score") if isinstance(found.get("score"), (int, float)) else 0
+            fixes = self.fixes_that_fit(found.get("fix", []) if isinstance(found.get("fix"), list) else [])
+            self.character["score"], self.character["tries"] = score, self.character["tries"] + 1
+            self.last_fixes = fixes or self.last_fixes
+            if score >= CHARACTER_TARGET:
+                self.character["done"] = True
+                notes.append(f"Character review: {score}/10, it reads. Finish the back and sole, then submit.")
+            elif self.character["tries"] >= GATE_TRIES:
+                self.character["done"] = True
+                self.skipped_gates.append(f"character review under {CHARACTER_TARGET} after {GATE_TRIES} tries (last {score}/10)")
+                notes.append(f"Character review: {score}/10 after {GATE_TRIES} tries; moving on (recorded). You may submit.")
+            else:
+                notes.append(f"Character review: {score}/10, under {CHARACTER_TARGET}. Fix this before submitting "
+                             f"(try {self.character['tries']} of {GATE_TRIES}): {'; '.join(fixes) or 'make it read as the concept'}")
+        return ("\n\n" + "\n".join(notes)) if notes else ""
 
     def rules(self, groups=body_rules.GROUPS):
         return body_rules.check(self.mesh, self.base, self.features, self.output, self.work / "BODY.step", groups)
@@ -153,7 +220,7 @@ class BodyShop:
         if not self.ran or not self.picture:
             return "Nothing to look at yet."
         board = sheet(self.picture, self.view(), self.view(), self.work / "look_sheet.png")
-        found, _ = ask(QUESTION + question + '\nReply with only JSON: {"answer": "<your answer>"}', board)
+        found, _ = ask(QUESTION + question + "\n\n" + self.facts() + '\nReply with only JSON: {"answer": "<your answer>"}', board)
         return str(found.get("answer") or found)[:1200]
 
     def docs(self, name):
@@ -166,6 +233,13 @@ class BodyShop:
     def submit(self):
         if not self.ran:
             return "Nothing has been built yet."
+        if self.script.text != self.built:
+            return "The saved script changed since the last build, so this body has not been checked. build() it first."
+        if self.picture and self.features and not self.character["done"]:
+            added = set(body_rules.printed(self.output, "added") or [])
+            if all(f["name"] in added for f in self.features):
+                return (f"The character review is {self.character['score']}/10, under {CHARACTER_TARGET}. Make its fixes and build() "
+                        f"again first (try {self.character['tries']} of {GATE_TRIES}).")
         self.submits += 1
         found = self.rules()
         failed = [{k: r[k] for k in ("rule", "measured", "fix")} for r in found if not r["ok"]]
@@ -173,9 +247,9 @@ class BodyShop:
         review, score, fixes = {}, 0, []
         if self.picture:
             board = sheet(self.picture, self.view(), self.view(), self.work / "look_sheet.png")
-            review, _ = ask(REVIEW + names, board)
+            review, _ = ask(REVIEW + names + "\n\n" + self.facts(), board)
             score = review.get("score") if isinstance(review.get("score"), (int, float)) else 0
-            fixes = review.get("fix", []) if isinstance(review.get("fix"), list) else []
+            fixes = self.fixes_that_fit(review.get("fix", []) if isinstance(review.get("fix"), list) else [])
         passed = not failed
         self.last_fixes = fixes or [f["fix"] for f in failed if f.get("fix")]
         snapshot = self.folder / f"submit-{self.submits}"
