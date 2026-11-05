@@ -8,7 +8,7 @@ import math
 
 from build123d import (Axis, Box, Cone, Cylinder, Ellipse, Kind, Circle, Plane, Polygon, Pos, Rectangle, RectangleRounded, Rot, Sphere, extrude,
                        fillet, loft,
-                       offset, scale, Solid)
+                       offset, scale, Solid, Spline, Vector, Vertex, Wire, Face)
 
 BIG = 2000.0
 CORE = {}     # the main form's size before the first feature joins (mm), for the width / height rule
@@ -133,6 +133,75 @@ def soft_box(width, depth, height, radius, corner=None, bottom=2.0, flat_back=Tr
     soft = offset(core, amount=radius, kind=Kind.ARC)
     soft = soft & Pos(0, 0, height / 2) * Box(width + 10, depth, height)
     return placed(one_solid(soft, "soft_box"), at)
+
+
+def _superellipse(a, b, n, plane, count=48):
+    """A closed superellipse |u/a|^n + |v/b|^n = 1 on a plane: n=2 an ellipse, n=4 a soft rounded box."""
+    pts = []
+    for i in range(count):
+        t = 2 * math.pi * i / count
+        c, s = math.cos(t), math.sin(t)
+        u = a * math.copysign(abs(c) ** (2 / n), c)
+        v = b * math.copysign(abs(s) ** (2 / n), s)
+        pts.append(plane.from_local_coords((u, v)))
+    try:
+        return Wire([Spline(*pts, periodic=True)])
+    except Exception:
+        return Wire.make_polygon(pts, close=True)
+
+
+def superblob(width, depth, height, roundness=3.0, top=2.5, at=(0, 0, 0), sections=14):
+    """A soft main form between a box and an egg, standing on a flat sole at z = 0, exactly width x depth x height.
+    roundness: the outline seen from above (2 = oval, 3 = soft rounded box, 5 = nearly a box).
+    top: how the sides curve into the top (2 = a full dome, 3 = a soft cushion, 5 = upright sides, flat top).
+    Fuller at the bottom than an egg: the sole keeps the full outline, so it stands flat and holds the parts."""
+    faces = []
+    for i in range(sections):
+        f = i / sections
+        shrink = (1 - f ** top) ** (1 / top)
+        faces.append(Face(_superellipse(width / 2 * shrink, depth / 2 * shrink, roundness, Plane.XY.offset(height * f))))
+    faces.append(Vertex(0, 0, height))   # closes the top in a point, so it has no flat nub
+    body = one_solid(loft(faces, ruled=False), "superblob")
+    top_z = bounds(body)[1][2]
+    if abs(top_z - height) > 0.05:
+        # a smooth loft bulges a little past its last section: bring it back to the exact height
+        body = one_solid(scale(body, by=(1, 1, height / top_z)), "superblob")
+    return placed(step_safe(body), at)
+
+
+def spine_body(spine, sizes, roundness=2.2, round_ends=True, at=(0, 0, 0)):
+    """One smooth form along a spine: a body that flows into a tail, a neck or a nose with no seam.
+    spine: points (x, z) from one end to the other, along the length (x), in the front's plane.
+    sizes: (half depth along y, half height) of the cross-section at each spine point; make the ends small to taper.
+    roundness: the cross-section shape (2 = oval, 3 = soft rounded box). round_ends: close each end in a soft dome
+    (a small end closes in a point, so a tail or nose tapers to a tip). Cut the sole flat afterwards (flat_sole)."""
+    assert len(spine) == len(sizes) >= 3, "spine_body needs at least 3 spine points, each with a size"
+    pts = [Vector(x, 0, z) for x, z in spine]
+    sizes = list(sizes)
+
+    def tangent(i):
+        return (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+
+    def section(p, normal, half_d, half_h):
+        # across the spine, with its local x along y (depth) and local y up the body
+        return Face(_superellipse(max(half_d, 0.3), max(half_h, 0.3), roundness, Plane(origin=p, x_dir=(0, 1, 0), z_dir=normal)))
+
+    def cap(i, outward):
+        """Sections beyond end i that shrink like a quarter circle, ending in a point."""
+        half_d, half_h = sizes[i]
+        reach = min(half_d, half_h) * 0.9
+        out = []
+        for k in (1, 2, 3):
+            a = k / 4 * math.pi / 2
+            out.append(section(pts[i] + outward * (reach * math.sin(a)), tangent(i), half_d * math.cos(a), half_h * math.cos(a)))
+        return out, pts[i] + outward * reach
+
+    faces = [section(p, tangent(i), *sizes[i]) for i, p in enumerate(pts)]
+    if round_ends:
+        head, tip0 = cap(0, -tangent(0))
+        tail, tip1 = cap(len(pts) - 1, tangent(len(pts) - 1))
+        faces = [Vertex(*tip0)] + head[::-1] + faces + tail + [Vertex(*tip1)]
+    return placed(step_safe(one_solid(loft(faces, ruled=False), "spine_body")), at)
 
 
 def max_round(slack_a, slack_b):

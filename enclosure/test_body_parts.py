@@ -116,5 +116,32 @@ class StepRoundTrip(unittest.TestCase):
                     self.assertAlmostEqual(a, b, delta=0.2, msg=f"arm at {at}")
 
 
+class SoftForms(unittest.TestCase):
+    """The soft main forms: exact size, sealed, and the same after a STEP round trip (the case stage loads the STEP)."""
+
+    def round_trip(self, solid):
+        import tempfile
+        from build123d import export_step, import_step
+        with tempfile.TemporaryDirectory() as tmp:
+            export_step(solid, f"{tmp}/s.step")
+            before, after = bp.bounds(solid), bp.bounds(import_step(f"{tmp}/s.step"))
+        return max(abs(a - b) for a, b in zip(before[0] + before[1], after[0] + after[1]))
+
+    def test_superblob_is_its_exact_size_and_step_safe(self):
+        for top in (2, 3, 5):
+            blob = bp.superblob(110, 64, 58, roundness=3, top=top)
+            for got, want in zip(bp.size(blob), (110.0, 64.0, 58.0)):
+                self.assertAlmostEqual(got, want, delta=0.2, msg=f"top={top}")
+            self.assertLess(self.round_trip(blob), 0.3)
+
+    def test_spine_body_flows_into_a_tapered_tail_and_is_step_safe(self):
+        body = bp.spine_body([(-60, 22), (-30, 24), (0, 24), (30, 22), (55, 22), (70, 32)],
+                             [(26, 22), (28, 24), (28, 24), (24, 21), (12, 10), (4, 4)])
+        self.assertEqual(len(body.solids()), 1)
+        self.assertLess(self.round_trip(body), 0.3)
+        lo, hi = bp.bounds(body)
+        self.assertGreater(hi[0], 70, "the tail tip reaches past the last spine point")
+
+
 if __name__ == "__main__":
     unittest.main()
