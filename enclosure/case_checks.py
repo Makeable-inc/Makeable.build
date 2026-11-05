@@ -299,6 +299,29 @@ def check_window_view(name, card, transform, union, others, axis, side):
                   fix="Looking straight at the window you can see into the case beside the glass, often at the corners. Match the window's corners to the glass's rounded corners, or bring the rim closer.")
 
 
+FACE_DEPTH = 3.0  # mm behind the screen face: the case front is measured on a slice there
+
+
+def face_size(union, screen, transform, axis, side, others):
+    """The size of the case front the screen sits in: the case cut by a plane just behind the screen face. Ears,
+    antennas, arms and legs that stand out of the body away from that plane are ornaments and do not count; if
+    the slice fails, the whole case counts."""
+    rotation, offset = transform[:3, :3], transform[:3, 3]
+    local = (union.vertices - offset) @ rotation
+    whole = local[:, others].max(axis=0) - local[:, others].min(axis=0)
+    point = (np.array(screen["min"]) + np.array(screen["max"])) / 2
+    point[axis] = screen["max" if side else "min"][axis] - (FACE_DEPTH if side else -FACE_DEPTH)
+    normal = rotation @ AXES[axis]
+    try:
+        cut = union.section(plane_origin=apply(transform, point[None])[0], plane_normal=normal)
+    except Exception:
+        cut = None
+    if cut is None or len(cut.vertices) < 3:
+        return whole
+    flat = (np.asarray(cut.vertices) - offset) @ rotation
+    return flat[:, others].max(axis=0) - flat[:, others].min(axis=0)
+
+
 def check_screen(name, card, transform, union):
     results = []
     screen, glass = card["features"]["screen"], card["features"]["glass"]
@@ -341,12 +364,11 @@ def check_screen(name, card, transform, union):
 
     results.append(check_window_view(name, card, transform, union, others, axis, side))
 
-    local = (union.vertices - offset) @ rotation
-    case_size =local[:, others].max(axis=0) - local[:, others].min(axis=0)
+    case_size = face_size(union, screen, transform, axis, side, others)
     shares = (high - low)[others] / case_size
     best, other = float(shares.max()), float(shares.min())
     results.append(result("screen_share", name, best >= MIN_SCREEN_SHARE_WIDEST and other >= MIN_SCREEN_SHARE_OTHER, measured=[round(best, 2), round(other, 2)], limit=f"screen is at least {MIN_SCREEN_SHARE_WIDEST} of the case front one way and {MIN_SCREEN_SHARE_OTHER} the other",
-                          where=f"case front {np.round(case_size, 1).tolist()} mm, screen {np.round((high - low)[others], 1).tolist()} mm", fix="The screen looks small in the case. Trim the case front so the screen is its main feature."))
+                          where=f"case front (at the screen, ornaments not counted) {np.round(case_size, 1).tolist()} mm, screen {np.round((high - low)[others], 1).tolist()} mm", fix="The screen looks small in the case. Trim the case front so the screen is its main feature."))
 
     elevation = float(np.degrees(np.arcsin(np.clip(normal[2], -1, 1))))
     results.append(result("screen_faces_viewer", name, -5 <= elevation <= MAX_SCREEN_TILT_UP, measured=round(elevation, 1), limit=f"screen faces between -5 and {MAX_SCREEN_TILT_UP} degrees above horizontal when the case sits on a desk",
@@ -433,6 +455,41 @@ def check_outer_parts(meshes, front, body):
     return results
 
 
+KEEP_PITCH = 1.0        # mm between sight lines when comparing the case's outline with the body's
+MAX_LOST_OUTLINE = 30.0  # mm2: at most this much of the body's outline may be missing from the case, seen from any side
+
+
+def check_keeps_body(meshes, body):
+    """The printed case keeps the frozen body's outside: seen from the front, the top and the side, every part of the
+    body's outline (an arm, an ear, a foot) is still there. Openings do not change the outline, a lost piece does."""
+    if body is None:
+        return []
+    case = trimesh.util.concatenate([m for n, m in meshes.items() if n.startswith("PRINT_")])
+    lo, hi = body.bounds
+    results = []
+    for axis, label in ((1, "front"), (2, "top"), (0, "side")):
+        others = [i for i in range(3) if i != axis]
+        us = np.arange(lo[others[0]] + KEEP_PITCH / 2, hi[others[0]], KEEP_PITCH)
+        vs = np.arange(lo[others[1]] + KEEP_PITCH / 2, hi[others[1]], KEEP_PITCH)
+        grid = np.array([(u, v) for u in us for v in vs])
+        origins = np.zeros((len(grid), 3))
+        origins[:, others[0]], origins[:, others[1]], origins[:, axis] = grid[:, 0], grid[:, 1], lo[axis] - 10
+        direction = np.zeros(3)
+        direction[axis] = 1
+        rays = np.tile(direction, (len(grid), 1))
+        in_body = body.ray.intersects_any(origins, rays)
+        in_case = case.ray.intersects_any(origins, rays)
+        lost = in_body & ~in_case
+        area = float(lost.sum() * KEEP_PITCH ** 2)
+        where = rounded(origins[lost][len(origins[lost]) // 2]) if lost.any() else None
+        results.append(result("keeps_body", label, area <= MAX_LOST_OUTLINE, measured=round(area, 1),
+                              limit=f"at most {MAX_LOST_OUTLINE} mm2 of the body's outline missing, seen from the {label}", where=where,
+                              fix=f"Seen from the {label}, {area:.0f} mm2 of the body's outline is gone from the printed case, near {where}: "
+                                  "a feature (an arm, ear, foot or antenna) was cut off or left as a loose piece. Keep every piece of "
+                                  "the body joined to the Shell: move openings and cuts off the features, or join the feature back."))
+    return results
+
+
 def check_case(design, meshes, purchased, cards, transforms):
     case = design.get("case")
     if not isinstance(case, dict):
@@ -445,7 +502,9 @@ def check_case(design, meshes, purchased, cards, transforms):
     results = check_plastic_pairs(meshes)
     results.extend(check_flat_on_bed(meshes))
     body_path = design.get("body_stl")
-    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), load_stl(body_path) if body_path else None))
+    body = load_stl(body_path) if body_path else None
+    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), body))
+    results.extend(check_keeps_body(meshes, body))
     union = merged(meshes.values())
     part_points = {}
     for name, transform in transforms.items():
