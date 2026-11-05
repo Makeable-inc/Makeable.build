@@ -21,6 +21,7 @@ MAX_SUBMITS = 6
 LOOK_TARGET = 8
 CHARACTER_TARGET = 7   # the character review, once the key features are on, must reach this before submit
 GATE_TRIES = 2         # character reviews under the target before the gate is skipped (and the skip recorded)
+SIDE_WORDS = {"left", "right", "top", "bottom", "front", "back", "upper", "lower", "middle", "side"}
 OUTPUT_LIMIT = 2500
 
 SYSTEM = """You are a product designer who models characterful desk gadgets in code with build123d and the tested
@@ -93,6 +94,7 @@ class BodyShop:
         self.proportion_done = False
         self.character = {"score": None, "tries": 0, "done": False}
         self.skipped_gates = []
+        self.features_built = set()  # features already on an accepted build, so the next may add one new kind
 
     def done(self):
         return self.best is not None and self.best["score"] >= LOOK_TARGET
@@ -105,10 +107,15 @@ class BodyShop:
         """What resume needs beyond the saved script: the counters and the best result."""
         best = dict(self.best, folder=str(self.best["folder"])) if self.best else None
         return {"submits": self.submits, "best": {k: v for k, v in (best or {}).items() if k != "code"} or None,
-                "last_fixes": self.last_fixes}
+                "last_fixes": self.last_fixes, "proportion_done": self.proportion_done, "character": self.character,
+                "skipped_gates": self.skipped_gates, "features_built": sorted(self.features_built)}
 
     def restore(self, saved):
         self.submits, self.last_fixes = saved.get("submits", 0), saved.get("last_fixes", [])
+        self.proportion_done = saved.get("proportion_done", False)
+        self.character = saved.get("character", self.character)
+        self.skipped_gates = saved.get("skipped_gates", [])
+        self.features_built = set(saved.get("features_built", []))
         best = saved.get("best")
         self.best = dict(best, folder=Path(best["folder"])) if best else None
 
@@ -127,11 +134,38 @@ class BodyShop:
             return message[-OUTPUT_LIMIT:]
         if not (self.work / "BODY.stl").exists() or not (self.work / "BODY.step").exists():
             return "It ran but did not export BODY.stl and BODY.step. End with export_stl and export_step as the instructions say."
-        self.ran, self.mesh = True, load_stl(self.work / "BODY.stl")
+        output = (self.work / "output.txt").read_text(encoding="utf-8", errors="replace")
+        refused = self.out_of_order(output)
+        if refused:
+            # Not accepted: the body that ran skipped a step, so it cannot be checked, reviewed or submitted.
+            return refused
+        self.ran, self.mesh, self.output = True, load_stl(self.work / "BODY.stl"), output
         self.built = code
+        self.features_built |= set(body_rules.printed(output, "added") or [])
         self.script.snapshot()
-        self.output = (self.work / "output.txt").read_text(encoding="utf-8", errors="replace")
         return ("Ran.\n" + self.output[-1500:]).strip() + self.staged_review()
+
+    def out_of_order(self, output):
+        """The build order is enforced, not only advised: the main form alone first, so its proportions are reviewed
+        before any feature; then one kind of feature per build, so each can be checked and seen on its own."""
+        if not (self.picture and self.features):
+            return None
+        added = set(body_rules.printed(output, "added") or [])
+        if not self.proportion_done and added:
+            return ("Not accepted: this build adds features (" + ", ".join(sorted(added)) + ") before the main form's "
+                    "proportions were reviewed. Build the main form alone first (no try_join), with room and size "
+                    "passing, so it can be reviewed; then add the features.")
+        def kind_of(feature):
+            # "left ear" and "right ear" are one kind, as are "spike 1" and "spike 2"
+            words = [w for w in feature["name"].lower().split() if w not in SIDE_WORDS and not w.isdigit()]
+            return feature.get("kind") or " ".join(words) or feature["name"]
+        kind = {f["name"]: kind_of(f) for f in self.features}
+        new = added - self.features_built
+        kinds = sorted({kind.get(name, name) for name in new})
+        if len(kinds) > 1:
+            return ("Not accepted: this build adds more than one kind of feature at once (" + ", ".join(kinds) + "). "
+                    "Add one kind per build (all the spikes together is fine), so each is checked and seen on its own.")
+        return None
 
     def facts(self):
         try:

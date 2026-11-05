@@ -12,6 +12,11 @@ from checks import load_stl
 HERE = Path(__file__).resolve().parent
 EXAMPLE = (HERE / "body_examples" / "kitten.py").read_text(encoding="utf-8")
 EXPORT = '\nfrom build123d import export_stl, export_step\nexport_stl(body, "BODY.stl", tolerance=0.01)\nexport_step(body, "BODY.step")\n'
+EARS_AT = EXAMPLE.index('for side, name in ((-1, "left ear")')
+PAWS_AT = EXAMPLE.index('for side, name in ((-1, "left paw")')
+BACK_AT = EXAMPLE.index("# The back is cut flat")
+MAIN_ONLY = EXAMPLE[:EARS_AT] + EXAMPLE[BACK_AT:]           # the main form alone
+WITH_EARS = EXAMPLE[:PAWS_AT] + EXAMPLE[BACK_AT:]           # then one kind of feature
 KITTEN = [{"name": n, "where": w} for n, w in (("left ear", "top left"), ("right ear", "top right"),
                                                ("left paw", "bottom left front"), ("right paw", "bottom right front"))]
 BASE = {"features": KITTEN, "max_depth": 80, "width_to_height": [1.5, 2.6], "min_body": {"width": 101, "depth": 42, "height": 53},
@@ -81,8 +86,25 @@ class Gates(unittest.TestCase):
         self.asked.append(prompt)
         return {"score": self.score, "fix": ["Increase body height by 40% to match the concept", "Make the ears broader at the root"]}, 10
 
+    def build_in_order(self):
+        """Main form, then ears, then paws: the order the agent must follow."""
+        for script in (MAIN_ONLY, WITH_EARS, EXAMPLE):
+            result = self.shop.build(script + EXPORT)
+            self.assertTrue(result.startswith("Ran."), result[:300])
+
+    def test_features_before_the_main_form_review_are_refused(self):
+        result = self.shop.build(EXAMPLE + EXPORT)
+        self.assertIn("Not accepted", result)
+        self.assertIn("main form alone first", result)
+        self.assertIn("Nothing has been built", self.shop.submit())
+
+    def test_two_kinds_of_feature_in_one_build_are_refused(self):
+        self.shop.build(MAIN_ONLY + EXPORT)
+        result = self.shop.build(EXAMPLE + EXPORT)
+        self.assertIn("more than one kind of feature", result)
+
     def test_the_character_gate_blocks_submit_then_records_a_skip(self):
-        self.shop.build(EXAMPLE + EXPORT)
+        self.build_in_order()
         self.assertTrue(any("Does it read as the concept" in p for p in self.asked), "the character review ran on build")
         self.assertIn("touch button", self.asked[-1])
         blocked = self.shop.submit()
@@ -93,13 +115,13 @@ class Gates(unittest.TestCase):
         self.assertNotIn("under 7", self.shop.submit()[:40])
 
     def test_a_fix_the_limits_cannot_allow_is_dropped(self):
-        self.shop.build(EXAMPLE + EXPORT)
+        self.build_in_order()
         self.assertNotIn("Increase body height", " ".join(self.shop.last_fixes))
         self.assertIn("Make the ears broader at the root", self.shop.last_fixes)
 
     def test_a_changed_script_must_be_built_before_submit(self):
         self.score = 8
-        self.shop.build(EXAMPLE + EXPORT)
+        self.build_in_order()
         self.shop.script.edit("WIDTH, DEPTH, HEIGHT = 110.0, 64.0, 58.0", "WIDTH, DEPTH, HEIGHT = 108.0, 64.0, 58.0")
         self.assertIn("build() it first", self.shop.submit())
 
