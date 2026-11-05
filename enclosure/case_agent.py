@@ -62,6 +62,7 @@ class Workshop:
         self.ran, self.report, self.ran_code = False, None, None   # ran_code: the script text the last run used
         self.best, self.submits, self.look = None, 0, None
         self.tools, self.last_fixes, self.target = TOOLS, [], LOOK_TARGET
+        self.troubles = []   # what kept the case from fitting this body, for the body stage if the case fails
 
     def done(self):
         """The best passing case is good enough to stop: the look target is met, or the look is not reviewed."""
@@ -72,10 +73,11 @@ class Workshop:
         """What resume needs beyond the saved script: the counters and the best result."""
         best = dict(self.best, folder=str(self.best["folder"])) if self.best else None
         return {"submits": self.submits, "best": {k: v for k, v in (best or {}).items() if k != "code"} or None,
-                "last_fixes": self.last_fixes}
+                "last_fixes": self.last_fixes, "troubles": self.troubles}
 
     def restore(self, saved):
         self.submits, self.last_fixes = saved.get("submits", 0), saved.get("last_fixes", [])
+        self.troubles = saved.get("troubles", [])
         best = saved.get("best")
         self.best = dict(best, folder=Path(best["folder"])) if best else None
 
@@ -98,11 +100,28 @@ class Workshop:
         self.ran_code = code if self.ran else None
         self.report = None
         if not self.ran:
+            self.note_trouble(message)
             return message[-OUTPUT_LIMIT:]
         self.finish_run()
         self.script.snapshot()
         output = (self.work / "output.txt").read_text(encoding="utf-8", errors="replace")
         return ("Ran.\n" + output[-1200:]) if output.strip() else "Ran."
+
+    BODY_WORDS = ("stick out", "sticks out", "outside the body", "body", "no room", "would run", "outline", "wall")
+
+    def note_trouble(self, text):
+        """Keep the last few distinct reasons the case did not fit, preferring ones that name the body."""
+        lines = [l.strip() for l in str(text).splitlines() if l.strip()]
+        line = next((l for l in reversed(lines) if l.startswith(("AssertionError", "ValueError"))), lines[-1] if lines else "")
+        line = line.replace("AssertionError: ", "")[:300]
+        if line and line not in self.troubles:
+            self.troubles = (self.troubles + [line])[-8:]
+
+    def body_feedback(self):
+        """Why this body could not take a working case, in the case stage's own words, or None."""
+        named = [t for t in self.troubles if any(w in t.lower() for w in self.BODY_WORDS)] or self.troubles
+        return ("The case could not be built inside this body. The last problems it hit:\n"
+                + "\n".join(f"- {t}" for t in named[-5:])) if named else None
 
     def checked(self):
         if self.report is None:
@@ -122,6 +141,8 @@ class Workshop:
         names = None if group == "all" else GROUPS[group]
         fields = ("check", "part", "measured", "limit", "where", "fix")
         failed = [{k: r.get(k) for k in fields} for r in report["failed"] if names is None or r["check"] in names]
+        for r in failed:
+            self.note_trouble(f"{r['check']} ({r.get('part')}): {r.get('fix') or r.get('measured')}")
         warned = [{k: r.get(k) for k in fields} for r in report.get("warnings", []) if names is None or r["check"] in names][:6]
         counted = sum(1 for r in report["results"] if names is None or r["check"] in names)
         if group == "all" and not report["failed"]:
@@ -183,6 +204,8 @@ class Workshop:
             except Exception as error:
                 print(f"no look review: {error}", flush=True)
         problems = [{k: r.get(k) for k in ("check", "part", "measured", "limit", "where", "fix")} for r in report["failed"]]
+        for r in problems:
+            self.note_trouble(f"{r['check']} ({r.get('part')}): {r.get('fix') or r.get('measured')}")
         if look and look["problems"]:
             problems.append({"check": "look_review", "fix": " ".join(look["problems"])})
         passed = report["passed"] and not (look and look["problems"])
@@ -254,6 +277,7 @@ def design_case(brief, folder, base, body_stl, picture, part_ids, system, resume
             print(f"no viewer: {error}", flush=True)
     summary = {"result": label, "outcome": outcome, "steps": steps, "submits": shop.submits,
                "look_score": shop.best["score"] if shop.best else None, "best": str(folder / "best") if shop.best else None,
-               "skipped_gates": getattr(shop, "skipped_gates", []), "tokens": tokens, "seconds": seconds}
+               "skipped_gates": getattr(shop, "skipped_gates", []), "tokens": tokens, "seconds": seconds,
+               "body_feedback": None if shop.best or not hasattr(shop, "body_feedback") else shop.body_feedback()}
     (folder / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
     return summary

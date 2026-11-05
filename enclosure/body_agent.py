@@ -335,7 +335,13 @@ def brief(base):
     space = space_report(base)
     if space:
         lines.append(space)
-    example = (HERE / "body_examples" / "neutral.py").read_text(encoding="utf-8")
+    if base.get("case_feedback"):
+        # A body that passed every body rule but could not take a working case: the case stage's reasons, so this
+        # body leaves the room the case needs there (fuller walls, a flatter inside) even if it rounds less.
+        lines.append("An earlier body passed every body rule, but the case stage could not fit a working case inside "
+                     "it. " + base["case_feedback"] + "\nMake this body leave the case room it needs where those problems "
+                     "are: a fuller main form there, even if it rounds less.")
+    example =(HERE / "body_examples" / "neutral.py").read_text(encoding="utf-8")
     return "\n\n".join(["\n".join(lines), "Features the body must have, each one clearly there:\n" + features,
                         "A worked example of the method (not a character: copy the order and the way sizes come from the room, not its shapes or sizes):\n```python\n" + example + "\n```"])
 
