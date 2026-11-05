@@ -99,38 +99,102 @@ DIAGNOSE = ("Diagnose before switching: read the error, check your assumptions, 
 CAD_WORDS = ("loft", "shell", "fillet", "brep", "stdfail", "standard_", "not a valid solid", "boolean", "offset")
 
 
-def failure_view(text):
-    """A crash as the agent's next decision should see it: what failed, where in its file, what to try. None if the
-    result is not a crash. Rule failures already name the measured value, the limit and the fix."""
+HELPER_FILES = ("body_parts.py", "case_parts.py")   # the shared building blocks the agents call
+REFUSALS = ("Not accepted", "Nothing has", "Nothing to", "The saved script changed", "There is no script",
+            "It ran but did not export", "Import of", "Unknown tool", "Inspection limit")
+TOOL_FAILURE_LIMIT = 2   # the same shared-tool failure twice (one focused retry) stops the run as blocked by tool
+
+
+def crash_cause(text):
+    """What a crash was: its exception, the shared helper it failed in and the operation inside it, and whose fault it
+    is ("tool": a shared building block broke; "script": the agent's own code, or a helper refusing its values).
+    None if the text is not a crash."""
     if not text.startswith("The code crashed"):
         return None
     lines = [l for l in text.splitlines() if l.strip()]
     error = next((l.strip() for l in reversed(lines) if re.match(r"^\s*[A-Za-z_.]*(Error|Exception)\b", l)), lines[-1].strip())
+    kind = error.split(":", 1)[0].strip()
+    frames = re.findall(r'File "([^"]+)", line (\d+), in (\S+)', text)
+    names = [(Path(f.replace("\\", "/")).name, int(n), fn) for f, n, fn in frames]
     at = None
     for i, l in enumerate(lines):
         found = re.search(r'File ".*design\.py", line (\d+)', l)
         if found:
             at = f"line {found.group(1)}: " + (lines[i + 1].strip() if i + 1 < len(lines) else "")
-    if any(w in text.lower() for w in CAD_WORDS) and not error.startswith(("AssertionError", "ValueError")):
-        tries = ["Build that part with a body_parts block (superblob, spine_body, soft_box, ear, paw, ...): they accept "
+    helpers = [fn for name, _, fn in names if name in HELPER_FILES]
+    deepest = names[-1] if names else None
+    helper = helpers[0] if helpers else None
+    operation = deepest[2] if deepest else None
+    # a helper that raises AssertionError / ValueError itself is refusing the values it was given: the script's to fix
+    refused = deepest is not None and deepest[0] in HELPER_FILES and kind in ("AssertionError", "ValueError")
+    source = "tool" if helper and not refused else "script"
+    return {"type": kind, "error": error[:400], "helper": helper, "operation": operation, "source": source, "at": at}
+
+
+def failure_view(text):
+    """A crash as the agent's next decision should see it: what failed, where in its file, whose fault it is and what
+    to try, marked {"ok": false, "kind": "crash"}. None if the result is not a crash."""
+    cause = crash_cause(text)
+    if cause is None:
+        return None
+    error = cause["error"]
+    if cause["source"] == "tool":
+        tries = [f"{cause['helper']} failed inside {cause['operation']} ({cause['type']}): this is a fault in the shared "
+                 "building block, not in your script, so editing the calling line will not repair it.",
+                 "Get the same result another way: a different block, or different settings or features for this one.",
+                 f"If the same failure comes back once more, the run stops as blocked by this tool."]
+    elif any(w in text.lower() for w in CAD_WORDS) and not error.startswith(("AssertionError", "ValueError")):
+        tries = ["Build that part with a body_parts block (superblob, spine_body, soft_box, grow, ...): they accept "
                  "any settings and print a note when they had to change something.",
                  "If it is your own loft or fillet: change the sections more gradually or use a smaller radius."]
     elif error.startswith(("AssertionError", "ValueError")):
         tries = ["The message names what to change, often by how many mm: change that value."]
     else:
         tries = ["Fix the line named above; check its inputs with measure() if you are not sure."]
-    return json.dumps({"ok": False, "error": error[:400], "at": at, "try": tries + [DIAGNOSE], "trace": text[-900:]})
+    return json.dumps({"ok": False, "kind": "crash", "source": cause["source"], "error": error, "helper": cause["helper"],
+                       "operation": cause["operation"], "at": cause["at"], "try": tries + [DIAGNOSE], "trace": text[-900:]})
+
+
+def marked(text):
+    """Every failed result carries the same mark, {"ok": false, "kind": ...}, so the agent (and the log) can tell a
+    failure from a result at a glance: crashes, failed rules or checks, and refusals. Other results are unchanged."""
+    view = failure_view(text)
+    if view:
+        return view
+    if text.startswith(REFUSALS):
+        kind = "limit" if text.startswith("Inspection limit") else "refused"
+        return json.dumps({"ok": False, "kind": kind, "source": "script", "message": text})
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return text
+    if isinstance(data, dict) and data.get("failed") and not data.get("passed") and "ok" not in data:
+        return json.dumps({"ok": False, "kind": "rule", **data}, default=str)
+    return text
 
 
 def failed(text):
-    """True for a crash or a check/submit that names failures."""
-    if text.startswith("The code crashed") or text.startswith('{"ok": false'):
+    """True for any marked failure, a crash, or a check/submit that names failures."""
+    if text.startswith("The code crashed"):
         return True
     try:
         data = json.loads(text)
     except (ValueError, TypeError):
         return False
-    return isinstance(data, dict) and bool(data.get("failed")) and not data.get("passed")
+    return isinstance(data, dict) and (data.get("ok") is False or (bool(data.get("failed")) and not data.get("passed")))
+
+
+def save_tool_bug(folder, cause, code, text):
+    """The exact script that broke a shared helper, kept as a regression case for that helper."""
+    bugs = Path(folder) / "tool_bugs"
+    bugs.mkdir(parents=True, exist_ok=True)
+    n = len(list(bugs.glob(f"{cause['helper']}-*.py"))) + 1
+    path = bugs / f"{cause['helper']}-{n}.py"
+    head = "\n".join(f"# {l}" for l in [f"{cause['helper']} failed inside {cause['operation']}: {cause['error']}",
+                                         "Regression case: this script must build once the helper is fixed."])
+    path.write_text(head + "\n" + (code or "") + "\n", encoding="utf-8")
+    (bugs / f"{cause['helper']}-{n}.trace.txt").write_text(text, encoding="utf-8")
+    return path
 
 
 def result_label(best, target, reviewed=True):
@@ -165,6 +229,7 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
     store = Results(folder)
     summary, latest, nudges = None, [], 0
     inspections, seen = 0, {}
+    tool_failures, blocked = {}, None
     earlier = load_state(folder) if resume else None
     if earlier:
         steps, tokens, calls_made, nudges = earlier["steps"], earlier["tokens"], earlier["model_calls"], earlier["nudges"]
@@ -253,9 +318,17 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
                                    "failure": text[-1500:]})
             elif not looking and failed(text):
                 seen[key] = (steps, text)
-            view = failure_view(text)
-            if view:
-                text = view
+            cause = crash_cause(text) if not looking else None
+            raw = text
+            text = marked(text)
+            if cause and cause["source"] == "tool":
+                key = (cause["type"], cause["helper"], cause["operation"])
+                tool_failures[key] = tool_failures.get(key, 0) + 1
+                if tool_failures[key] >= TOOL_FAILURE_LIMIT and not blocked:
+                    bug = save_tool_bug(folder, cause, getattr(shop, "code", None), raw)
+                    blocked = (f"blocked by tool: {cause['helper']} failed inside {cause['operation']} "
+                               f"({cause['type']}) {tool_failures[key]} times; regression case {bug.name}")
+                    print(f"TOOL BUG {blocked}", flush=True)
             # a failure is sent whole: the next decision needs the reason, not a reference to it
             sent = text if item["name"] == "recall" or failed(text) else store.short(text)
             log(folder, step=steps, inspections=inspections, tool=item["name"], arguments=arguments, result=text[:3000],
@@ -276,7 +349,10 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
             follow.append({"role": "user", "content": parts})
         best = shop.best
         outcome = None
-        if best and shop.done():
+        if blocked:
+            # a shared tool is broken: stop rather than spend the rest of the run around it; the best pass is kept
+            outcome = blocked
+        elif best and shop.done():
             outcome = best["status"] or "passed"
         elif shop.submits >= max_submits:
             outcome = best["status"] if best else "stopped: used all submits"

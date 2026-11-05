@@ -54,6 +54,7 @@ A failed build, run, check or submit comes back with what failed, where in your 
 switching: read the error, check your assumptions (`measure` what you are unsure of), and make a focused fix to what it
 names. Do not rerun the same code unchanged: the harness flags it and it changes nothing. Do not drop a workable
 approach after one failure either: change the value the message names, often by the mm it gives.
+Every failure is marked `"ok": false` with its kind (crash, rule, refused, limit) and its `source`. `"source": "tool"` means a shared building block broke, not your script: get the result another way (a different block or settings); the same tool failure twice stops the run.
 A building block that had to change what you asked prints a "note" in the build output (for example "built a flatter
 top: needs 3 mm more height"). Read the notes: they mean the shape is not what you asked for.
 

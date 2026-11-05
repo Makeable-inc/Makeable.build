@@ -51,6 +51,56 @@ class Crashing(Shop):
         return super().execute(name, arguments)
 
 
+# The dino body's crash in runs/tuning-6a-v2 (it happened 9 times): a shared helper failed, not the agent's script.
+TOOL_CRASH = ("The code crashed:\nTraceback (most recent call last):\n"
+              '  File "C:\\work\\design.py", line 25, in <module>\n    body, back_y = broad_flat_back(body, share=0.65)\n'
+              '  File "C:\\work\\body_parts.py", line 714, in broad_flat_back\n    outline = _hull_area(_back_outline(body))\n'
+              '  File "C:\\work\\body_parts.py", line 705, in _back_outline\n    points, _ = body.tessellate(0.2, 0.5)\n'
+              '  File "C:\\venv\\build123d\\topology\\shape_core.py", line 2346, in tessellate\n'
+              "    poly.Node(i).Transformed(trsf) for i in range(1, poly.NbNodes() + 1)\n"
+              "AttributeError: 'NoneType' object has no attribute 'NbNodes'")
+# A helper refusing the values it was given: the script's to fix.
+REFUSED = ("The code crashed:\nTraceback (most recent call last):\n"
+           '  File "C:\\work\\design.py", line 12, in <module>\n    post = stop(part, -45, 53, cover_y)\n'
+           '  File "C:\\work\\case_parts.py", line 230, in stop\n    assert inside(body, x, y, z), msg\n'
+           "AssertionError: A stop at x=-45, z=53 would stick out of the body.")
+
+
+class ToolBroken(Shop):
+    def __init__(self):
+        super().__init__()
+        self.edits = 0
+
+    def execute(self, name, arguments):
+        if name == "edit":
+            self.edits += 1
+            self.code = f"print({self.edits})"
+            return "Changed line 3.", None
+        if name == "build":
+            return TOOL_CRASH, None
+        return super().execute(name, arguments)
+
+
+class Causes(unittest.TestCase):
+    def test_a_crash_inside_a_shared_helper_is_the_tool_s_fault(self):
+        cause = harness.crash_cause(TOOL_CRASH)
+        self.assertEqual((cause["source"], cause["helper"], cause["operation"], cause["type"]),
+                         ("tool", "broad_flat_back", "tessellate", "AttributeError"))
+        shown = json.loads(harness.marked(TOOL_CRASH))
+        self.assertEqual((shown["ok"], shown["kind"], shown["source"]), (False, "crash", "tool"))
+        self.assertIn("editing the calling line will not repair it", shown["try"][0])
+
+    def test_a_helper_refusing_its_values_is_the_script_s_to_fix(self):
+        cause = harness.crash_cause(REFUSED)
+        self.assertEqual((cause["source"], cause["helper"]), ("script", "stop"))
+
+    def test_every_failure_is_marked_and_results_are_not(self):
+        self.assertEqual(json.loads(harness.marked("Not accepted: features first."))["kind"], "refused")
+        self.assertEqual(json.loads(harness.marked('{"group": "fit", "failed": [{"check": "gap"}]}'))["kind"], "rule")
+        self.assertEqual(harness.marked('{"group": "fit", "failed": []}'), '{"group": "fit", "failed": []}')
+        self.assertEqual(harness.marked("Ran."), "Ran.")
+
+
 class Harness(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -95,6 +145,16 @@ class Harness(unittest.TestCase):
         self.assertIn("line 6", shown["at"])
         self.assertTrue(any("body_parts block" in t for t in shown["try"]))
         self.assertNotIn("recall(", sent[1][0]["input"][0]["output"], "a failure is never shortened")
+
+    def test_the_same_tool_failure_after_one_retry_stops_the_run_and_keeps_the_script(self):
+        replies = [reply(("build", {})), reply(("edit", {"old": "a", "new": "b"})), reply(("build", {})),
+                   reply(("edit", {"old": "b", "new": "c"})), reply(("build", {})), reply(("submit", {}))]
+        outcome, sent, steps = self.run_shop(ToolBroken(), replies)
+        self.assertTrue(outcome[0].startswith("blocked by tool: broad_flat_back failed inside tessellate"), outcome[0])
+        self.assertEqual(len([s for s in steps if s.get("tool") == "build"]), 2, "no third try")
+        bugs = list((self.folder / "tool_bugs").glob("broad_flat_back-*.py"))
+        self.assertEqual(len(bugs), 1)
+        self.assertIn("print(1)", bugs[0].read_text(encoding="utf-8"), "the exact script that broke it")
 
     def test_the_same_failure_twice_is_flagged_and_not_counted(self):
         outcome, sent, steps = self.run_shop(Crashing(), [reply(("build", {})), reply(("build", {})), reply(("submit", {}))])
