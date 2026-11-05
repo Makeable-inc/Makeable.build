@@ -49,6 +49,17 @@ class BackPlate(unittest.TestCase):
         self.assertGreaterEqual(share, body_rules.BACK_PLATE_SHARE)
 
 
+class FlatBackNeverCrashes(unittest.TestCase):
+    def test_a_body_whose_mesh_fails_still_gets_its_flat_back(self):
+        # the dino body in runs/tuning-6a-v2 crashed here 9 times: tessellate() on the whole solid returned no mesh
+        from unittest import mock
+        from build123d import Solid
+        body = bp.flat_sole(bp.superblob(108, 60, 66, roundness=4, top=2.5, shoulder=1 - 51 / 66))
+        with mock.patch.object(Solid, "tessellate", side_effect=AttributeError("'NoneType' object has no attribute 'NbNodes'")):
+            cut, y = bp.broad_flat_back(body, share=0.65)
+        self.assertLess(y, bp.bounds(body)[1][1])
+
+
 class SpaceReport(unittest.TestCase):
     LIMITS = {"max_width": 138, "max_height": 37, "tight_width": 110, "tight_height": 30}
 

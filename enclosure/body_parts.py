@@ -701,9 +701,24 @@ def _hull_area(points):
 
 
 def _back_outline(body):
-    """Points (x, z) of the body seen from the back: its whole outline, features included."""
-    points, _ = body.tessellate(0.2, 0.5)
-    return [(p.X, p.Z) for p in points]
+    """Points (x, z) of the body seen from the back: its whole outline, features included. Never fails: a body the
+    mesher cannot cover in one go is read at coarser settings, then face by face (a face that will not mesh gives
+    its corners)."""
+    for tolerance, angle in ((0.2, 0.5), (0.5, 0.8), (1.0, 1.0)):
+        try:
+            points, _ = body.tessellate(tolerance, angle)
+            if points:
+                return [(p.X, p.Z) for p in points]
+        except Exception:
+            continue
+    points = []
+    for face in body.faces():
+        try:
+            found, _ = face.tessellate(0.5, 0.8)
+            points += [(p.X, p.Z) for p in found]
+        except Exception:
+            points += [(v.X, v.Z) for v in face.vertices()]
+    return points
 
 
 def broad_flat_back(body, share=0.65, step=1.0, max_cut=25.0):
