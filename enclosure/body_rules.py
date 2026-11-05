@@ -155,8 +155,14 @@ def check(mesh, base, features, output, step_path=None, groups=GROUPS):
                             f"{BACK_PLATE_SHARE:.0%} and {BACK_PLATE_FLAT:.0%}, so the rear cover prints flat. Use soft_box (its back "
                             "stays flat) and broad_flat_back(body, share=0.65).", [round(share, 2), round(flat, 2)]))
     if "features" in groups:
-        added = set(printed(output, "added") or [])
+        joined = [str(n) for n in printed(output, "added") or []]
+        added = set(joined)
         sizes = printed(output, "features") or {}
+        twice = sorted({n for n in joined if joined.count(n) > 1})
+        # each listed feature is one piece with its own name: two pieces under one name would let a missing one pass
+        results.append(rule("feature_names", "features", not twice,
+                            f"These names were used for more than one piece: {', '.join(twice)}. Give every piece its own "
+                            "name, exactly as the brief lists it (for example 'spike 1', 'spike 2', 'spike 3').", twice or None))
         need = max(VISIBLE_MIN, VISIBLE_SHARE * mesh.volume)
         for f in features:
             name = f["name"]

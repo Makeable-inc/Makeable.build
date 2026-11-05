@@ -10,11 +10,12 @@ WIDTH, DEPTH, HEIGHT = 108.0, 60.0, 66.0           # the main form: inside the f
 
 # 1. The main form. superblob for a rounded body. roundness: the outline from above (2 oval .. 5 boxy; about 4 holds a
 #    box-shaped room). top: how the top curves (2 dome .. 5 flat). shoulder: the share of the height that rounds over;
-#    start the rounding just above the room, so the room stays inside: shoulder = 1 - (room height + 1) / HEIGHT.
+#    start the rounding just above the room, so the room stays inside: shoulder = (HEIGHT - room height - 1) / HEIGHT, at least 0.
+#    With no spare height over the room it is 0: straight sides, and the build prints a note saying so.
 #    For a long body that flows into a tail, neck or nose, use spine_body instead, for example:
 #    body = flat_sole(spine_body([(-55, 26), (-20, 28), (20, 27), (50, 24), (68, 34)],
 #                                [(30, 26), (30, 28), (29, 27), (16, 14), (5, 5)]))
-SHOULDER = 1 - (ROOM["height"] + 1) / HEIGHT
+SHOULDER = max(0.0, (HEIGHT - ROOM["height"] - 1) / HEIGHT)
 body = superblob(WIDTH, DEPTH, HEIGHT, roundness=4.0, top=2.5, shoulder=SHOULDER)
 print("core:", list(size(body)))                   # the main form's size, before any feature (the proportion rule)
 

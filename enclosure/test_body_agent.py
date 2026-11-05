@@ -45,6 +45,14 @@ class Shop(unittest.TestCase):
         found = body_rules.check(self.shop.mesh, BASE, KITTEN + [{"name": "tail", "where": "back"}], self.shop.output, groups=("features",))
         self.assertEqual([r["rule"] for r in found if not r["ok"]], ["feature:tail"])
 
+    def test_two_pieces_under_one_name_fail(self):
+        output = "added: ['spike 1', 'spike 2', 'spike 1', 'spike 2']\nfeatures: {}\n"
+        spikes = [{"name": f"spike {i}", "where": "top"} for i in (1, 2)]
+        found = body_rules.check(self.shop.mesh, BASE, spikes, output, groups=("features",))
+        names = [r for r in found if r["rule"] == "feature_names"][0]
+        self.assertFalse(names["ok"])
+        self.assertIn("spike 1", names["fix"])
+
     def test_docs_and_measure_work_on_the_built_body(self):
         self.assertIn("soft_box(", self.shop.docs("soft_box"))
         self.assertRegex(self.shop.measure("print(round(surface_z(body, 0, 0), 1))"), r"\d")

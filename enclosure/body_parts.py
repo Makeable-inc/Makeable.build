@@ -69,7 +69,7 @@ def capsule(radius, length, at=(0, 0, 0), tilt=(0, 0, 0)):
 
 
 def cone_tip(base_radius, height, tip_radius=None, at=(0, 0, 0), tilt=(0, 0, 0)):
-    """A cone with a rounded tip, base at z = 0 before turning: horns, spikes, beaks, rocket noses."""
+    """A cone with a rounded tip, base at z = 0 before turning: horns, spikes, beaks, pointed noses."""
     tip = tip_radius if tip_radius is not None else max(0.8, base_radius * 0.18)
     assert base_radius > tip > 0 and height > 2 * tip, "cone_tip: base must be wider than the tip and taller than it"
     body = fuse(Pos(0, 0, height / 2) * Cone(base_radius, tip, height), Pos(0, 0, height - 0.2 * tip) * Sphere(tip * 1.05), "cone_tip")
@@ -150,39 +150,115 @@ def _superellipse(a, b, n, plane, count=48):
         return Wire.make_polygon(pts, close=True)
 
 
+MIN_BAND = 2.0     # mm: a rounded top band lower than this is built as straight sides (there is no room to round)
+
+
+def note(block, text):
+    """Tell the agent, in the build output, that a block built something other than asked, and why."""
+    print(f"{block} note: {text}")
+
+
+def _blob_band(a, b, n, top, start, reach, count, smooth, polygon):
+    """The rounded top band of a superblob, from z = start to z = reach (raises if this way of lofting fails)."""
+    outline = _polygon_superellipse if polygon else _superellipse
+    faces = []
+    for i in range(count):
+        # slices closer together near the top, where the outline turns fastest, so the smooth loft does not swing
+        f = math.sin(i / count * math.pi / 2)
+        shrink = (1 - f ** top) ** (1 / top)
+        faces.append(Face(outline(a * shrink, b * shrink, n, Plane.XY.offset(start + (reach - start) * f))))
+    if top >= 3.5:
+        # a flat top closes with a small flat cap: closing it in a point leaves a dent and a spike
+        last = (1 - math.sin((count - 1) / count * math.pi / 2) ** top) ** (1 / top) * 0.6
+        faces.append(Face(outline(a * last, b * last, n, Plane.XY.offset(reach))))
+    else:
+        faces.append(Vertex(0, 0, reach))   # a dome closes in a point, so it has no flat nub
+    return one_solid(loft(faces, ruled=not smooth), "superblob")
+
+
+def _polygon_superellipse(a, b, n, plane, count=64):
+    pts = []
+    for i in range(count):
+        t = 2 * math.pi * i / count
+        c, s = math.cos(t), math.sin(t)
+        pts.append(plane.from_local_coords((a * math.copysign(abs(c) ** (2 / n), c), b * math.copysign(abs(s) ** (2 / n), s))))
+    return Wire.make_polygon(pts, close=True)
+
+
 def superblob(width, depth, height, roundness=3.0, top=2.5, shoulder=1.0, at=(0, 0, 0), sections=14):
     """A soft main form between a box and an egg, standing on a flat sole at z = 0, exactly width x depth x height.
-    roundness: the outline seen from above (2 = oval, 3 = soft rounded box, 4-5 = boxy; the corners of a box-shaped
-    parts room need about 4 to fit).
-    top: how the sides curve into the top (2 = a full dome, 3 = a soft cushion, 5 = nearly flat on top).
+    roundness: the outline seen from above (2 = oval, 3 = soft rounded box, 4-6 = boxy; a box-shaped parts room
+    needs about 4 to fit its corners).
+    top: how the sides curve into the top (2 = a full dome, 3 = a soft cushion, 5 = flat on top).
     shoulder: the share of the height that rounds over into the top (1 = the whole height, an egg or dome; 0.3 =
-    upright sides with a soft top band, which holds a box-shaped parts room). Rounding cuts into the room inside:
-    keep the room's top below the band, or leave enough height over it."""
-    assert 0.1 <= shoulder <= 1.0, "shoulder is a share of the height, from 0.1 to 1"
-    def build(reach):
+    upright sides with a soft top band, which holds a box-shaped parts room). Rounding cuts into the room inside, so
+    start it above the room: shoulder = (HEIGHT - room height - 1) / HEIGHT, at least 0.
+    Every setting works. Values outside the range are brought into it, and a band too low to round is built as
+    straight sides; each such change is printed as a "superblob note" saying what was built and why."""
+    for name, value in (("width", width), ("depth", depth), ("height", height)):
+        if not value or value <= 0:
+            raise ValueError(f"superblob {name} is {value} mm: give a size above 0 mm (the brief's room plus the walls)")
+    asked = dict(roundness=roundness, top=top, shoulder=shoulder)
+    roundness, top, shoulder = min(max(roundness, 2.0), 8.0), min(max(top, 2.0), 8.0), min(max(shoulder, 0.0), 1.0)
+    for name, value in (("roundness", roundness), ("top", top), ("shoulder", shoulder)):
+        if abs(value - asked[name]) > 1e-9:
+            note("superblob", f"{name} {asked[name]} is outside its range, built with {value}")
+    band = shoulder * height
+    if band < MIN_BAND:
+        note("superblob", f"a rounded top needs at least {MIN_BAND} mm of band height; shoulder {shoulder:g} gives "
+                          f"{band:.1f} mm, so the sides go straight up and the top is flat. For a rounded top, raise "
+                          f"shoulder to {MIN_BAND / height:.2f} or more (it needs that much spare height over the room).")
+        sides = extrude(Face(_superellipse(width / 2, depth / 2, roundness, Plane.XY)), amount=height)
+        return placed(step_safe(one_solid(sides, "superblob")), at)
+
+    def build(a, b, reach, way):
+        count, smooth, polygon, top_used = way
         start = reach * (1 - shoulder)
-        faces = []
-        for i in range(sections):
-            # slices closer together near the top, where the outline turns fastest, so the smooth loft does not swing
-            f = math.sin(i / sections * math.pi / 2)
-            shrink = (1 - f ** top) ** (1 / top)
-            faces.append(Face(_superellipse(width / 2 * shrink, depth / 2 * shrink, roundness, Plane.XY.offset(start + (reach - start) * f))))
-        faces.append(Vertex(0, 0, reach))   # closes the top in a point, so it has no flat nub
-        band = one_solid(loft(faces, ruled=False), "superblob")
-        if start <= 0.5:
-            return band
-        # the upright sides: the band's own bottom face pushed straight down to the sole. Lofting them with the band
-        # makes the smooth loft bulge outward, and a separately drawn outline overlapping the band fuses invalid.
-        bottom = band.faces().sort_by(Axis.Z)[0]
-        sides = Solid.extrude(bottom, Vector(0, 0, -start))
-        return fuse(band, one_solid(sides, "superblob sides"), "superblob")
-    body = build(height)
-    top_z = bounds(body)[1][2]
-    if abs(top_z - height) > 0.05:
-        # a smooth loft bulges a little past its top point: rebuild once with the sections lowered by that much
-        # (scaling the solid instead crashes OpenCascade on these lofts)
-        body = build(height * height / top_z)
-    return placed(step_safe(body), at)
+        piece = _blob_band(a, b, roundness, top_used, start, reach, count, smooth, polygon)
+        if start > 0.5:
+            # the upright sides: the band's own bottom face pushed straight down to the sole. Lofting them with the
+            # band makes the smooth loft bulge outward, and a separately drawn outline overlapping it fuses invalid.
+            bottom = piece.faces().sort_by(Axis.Z)[0]
+            piece = fuse(piece, one_solid(Solid.extrude(bottom, Vector(0, 0, -start)), "superblob sides"), "superblob")
+        return piece
+
+    def sized(way):
+        """The shape built one way, exactly the asked size, or None if that way fails."""
+        a, b, reach = width / 2, depth / 2, height
+        for _ in range(4):
+            # a smooth loft bulges a little past its sections: rebuild with them pulled in by that much
+            # (scaling the solid instead crashes OpenCascade on these lofts)
+            try:
+                body = step_safe(build(a, b, reach, way))   # measured as it will be saved
+            except Exception:
+                return None
+            lo, hi = bounds(body)
+            got = (hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
+            if all(abs(g - w) <= 0.25 for g, w in zip(got, (width, depth, height))):
+                return body
+            if any(g > 1.15 * w for g, w in zip(got, (width, depth, height))):
+                return None   # the loft swung far outside its sections: this way of lofting is unstable here
+            a, b, reach = a * width / got[0], b * depth / got[1], reach * height / got[2]
+        return None
+
+    # ways to build it, best first: smooth; fewer slices; a faceted outline; a slightly less flat top; ruled (faceted)
+    ways = [(sections, True, False, top), (10, True, False, top), (sections, True, True, top),
+            (sections, True, False, min(top, 4.0)), (sections, False, True, top)]
+    body = None
+    for way in ways:
+        body = sized(way)
+        if body is not None:
+            if way[3] != top:
+                note("superblob", f"top {top:g} could not be lofted on this band, built with top {way[3]:g} (a little rounder)")
+            elif not way[1]:
+                note("superblob", "built with straight facets between slices: the smooth loft was unstable at these settings")
+            break
+    if body is None:
+        note("superblob", f"these settings could not be rounded ({width:g} x {depth:g} x {height:g} mm, roundness {roundness:g}, "
+                          f"top {top:g}, shoulder {shoulder:g}); built with straight sides and a flat top instead. "
+                          "Try a lower top or a larger shoulder.")
+        body = step_safe(one_solid(extrude(Face(_superellipse(width / 2, depth / 2, roundness, Plane.XY)), amount=height), "superblob"))
+    return placed(body, at)
 
 
 MIN_SPINE_POINTS = 6
@@ -201,31 +277,71 @@ def spine_body(spine, sizes, roundness=2.2, round_ends=True, at=(0, 0, 0)):
     while len(spine) < MIN_SPINE_POINTS:
         spine = [v for a_, b_ in zip(spine, spine[1:]) for v in (a_, tuple((p + q) / 2 for p, q in zip(a_, b_)))] + [spine[-1]]
         sizes = [v for a_, b_ in zip(sizes, sizes[1:]) for v in (a_, tuple((p + q) / 2 for p, q in zip(a_, b_)))] + [sizes[-1]]
-    pts = [Vector(x, 0, z) for x, z in spine]
+    reach_out = max(max(d, h) for d, h in sizes)
+    span = (min(x for x, _ in spine) - reach_out - 1, max(x for x, _ in spine) + reach_out + 1)
+    tall = (min(z for _, z in spine) - reach_out - 1, max(z for _, z in spine) + reach_out + 1)
 
-    def tangent(i):
-        return (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+    def denser(points, wide):
+        """Twice as many sections, each new one halfway between its neighbours."""
+        pts_ = [v for a_, b_ in zip(points, points[1:]) for v in (a_, tuple((p + q) / 2 for p, q in zip(a_, b_)))] + [points[-1]]
+        wide_ = [v for a_, b_ in zip(wide, wide[1:]) for v in (a_, tuple((p + q) / 2 for p, q in zip(a_, b_)))] + [wide[-1]]
+        return pts_, wide_
 
-    def section(p, normal, half_d, half_h):
-        # across the spine, with its local x along y (depth) and local y up the body
-        return Face(_superellipse(max(half_d, 0.3), max(half_h, 0.3), roundness, Plane(origin=p, x_dir=(0, 1, 0), z_dir=normal)))
+    def eased(wide):
+        """Sizes averaged with their neighbours (the ends kept), so a sudden jump does not make the loft swing."""
+        return [wide[0]] + [tuple((p + 2 * q + r) / 4 for p, q, r in zip(*wide[i - 1:i + 2])) for i in range(1, len(wide) - 1)] + [wide[-1]]
 
-    def cap(i, outward):
-        """Sections beyond end i that shrink like a quarter circle, ending in a point."""
-        half_d, half_h = sizes[i]
-        reach = min(half_d, half_h) * 0.9
-        out = []
-        for k in (1, 2, 3):
-            a = k / 4 * math.pi / 2
-            out.append(section(pts[i] + outward * (reach * math.sin(a)), tangent(i), half_d * math.cos(a), half_h * math.cos(a)))
-        return out, pts[i] + outward * reach
+    def build(points, wide, smooth):
+        pts = [Vector(x, 0, z) for x, z in points]
 
-    faces = [section(p, tangent(i), *sizes[i]) for i, p in enumerate(pts)]
-    if round_ends:
-        head, tip0 = cap(0, -tangent(0))
-        tail, tip1 = cap(len(pts) - 1, tangent(len(pts) - 1))
-        faces = [Vertex(*tip0)] + head[::-1] + faces + tail + [Vertex(*tip1)]
-    return placed(step_safe(one_solid(loft(faces, ruled=False), "spine_body")), at)
+        def tangent(i):
+            return (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+
+        def section(p, normal, half_d, half_h):
+            # across the spine, with its local x along y (depth) and local y up the body
+            return Face(_superellipse(max(half_d, 0.3), max(half_h, 0.3), roundness, Plane(origin=p, x_dir=(0, 1, 0), z_dir=normal)))
+
+        def cap(i, outward):
+            """Sections beyond end i that shrink like a quarter circle, ending in a point."""
+            half_d, half_h = wide[i]
+            reach = min(half_d, half_h) * 0.9
+            out = []
+            for k in (1, 2, 3):
+                a = k / 4 * math.pi / 2
+                out.append(section(pts[i] + outward * (reach * math.sin(a)), tangent(i), half_d * math.cos(a), half_h * math.cos(a)))
+            return out, pts[i] + outward * reach
+
+        faces = [section(p, tangent(i), *wide[i]) for i, p in enumerate(pts)]
+        if round_ends:
+            head, tip0 = cap(0, -tangent(0))
+            tail, tip1 = cap(len(pts) - 1, tangent(len(pts) - 1))
+            faces = [Vertex(*tip0)] + head[::-1] + faces + tail + [Vertex(*tip1)]
+        body = step_safe(one_solid(loft(faces, ruled=not smooth), "spine_body"))
+        lo, hi = bounds(body)
+        if lo[0] < span[0] or hi[0] > span[1] or lo[2] < tall[0] or hi[2] > tall[1]:
+            raise ValueError("the loft swung outside its sections")
+        return body
+
+    # ways to build it, best first: as given; more sections; sizes eased; faceted (ruled) as the last resort
+    dense = denser(spine, sizes)
+    ways = [("as given", spine, sizes, True), ("more sections", *dense, True),
+            ("sizes eased", dense[0], eased(dense[1]), True), ("faceted", *dense, False)]
+    for name, points, wide, smooth in ways:
+        try:
+            body = build(points, wide, smooth)
+        except Exception:
+            continue
+        if name == "sizes eased":
+            note("spine_body", "the sizes jump too much between neighbouring points for a smooth form, so they were "
+                               "evened out a little; change the sizes more gradually to keep them exact")
+        elif name == "faceted":
+            note("spine_body", "built with straight facets between sections: the smooth form was unstable; change the "
+                               "sizes more gradually or turn the spine less sharply")
+        return placed(body, at)
+    raise ValueError("spine_body could not make this form: the sizes or the spine's turns change too sharply between "
+                     f"points (sizes up to {reach_out:.0f} mm on points as close as "
+                     f"{min(abs(q[0] - p[0]) + abs(q[1] - p[1]) for p, q in zip(spine, spine[1:])):.0f} mm). Space the "
+                     "points further apart or change the sizes more gradually.")
 
 
 def max_round(slack_a, slack_b):

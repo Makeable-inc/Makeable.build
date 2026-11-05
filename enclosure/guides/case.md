@@ -48,6 +48,20 @@ Write the script once with `write`, then change it with `edit`: replace only the
 exactly from `show`. An edit that matches 0 or 2+ places changes nothing and says so; include more lines around it.
 Every run that works is kept as a snapshot, so a broken edit never loses a version that ran.
 
+## When something fails
+
+A failed build, run, check or submit comes back with what failed, where in your file, and what to try. Diagnose before
+switching: read the error, check your assumptions (`measure` what you are unsure of), and make a focused fix to what it
+names. Do not rerun the same code unchanged: the harness flags it and it changes nothing. Do not drop a workable
+approach after one failure either: change the value the message names, often by the mm it gives.
+A building block that had to change what you asked prints a "note" in the build output (for example "built a flatter
+top: needs 3 mm more height"). Read the notes: they mean the shape is not what you asked for.
+
+## Budget
+
+Builds, runs, edits, checks and submits count as steps. Looking (`docs`, `show`, `render`, `recall`) is free up to
+its own limit of 40 calls, then counts as steps too.
+
 ## Do not
 
 - Do not rewrite the whole script when one group fails: `edit` only what the failed checks name.

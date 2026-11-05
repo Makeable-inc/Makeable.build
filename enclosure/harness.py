@@ -17,6 +17,7 @@ last handoff summary (the script itself is already saved). run(..., resume=True)
 A shop that keeps state provides state() -> dict and restore(dict)."""
 import base64
 import json
+import re
 import os
 import time
 import urllib.request
@@ -91,6 +92,47 @@ class Results:
         return path.read_text(encoding="utf-8") if path.exists() else f"No stored result named {ref!r}."
 
 
+INSPECT_TOOLS = {"docs", "show", "render", "recall"}   # looking, not building: not counted in max_steps
+MAX_INSPECTIONS = 40                                    # their own limit, so a run cannot go on forever looking
+DIAGNOSE = ("Diagnose before switching: read the error, check your assumptions, and make a focused fix to what it names. "
+            "Do not rerun the same code unchanged, and do not drop a workable approach after one failure.")
+CAD_WORDS = ("loft", "shell", "fillet", "brep", "stdfail", "standard_", "not a valid solid", "boolean", "offset")
+
+
+def failure_view(text):
+    """A crash as the agent's next decision should see it: what failed, where in its file, what to try. None if the
+    result is not a crash. Rule failures already name the measured value, the limit and the fix."""
+    if not text.startswith("The code crashed"):
+        return None
+    lines = [l for l in text.splitlines() if l.strip()]
+    error = next((l.strip() for l in reversed(lines) if re.match(r"^\s*[A-Za-z_.]*(Error|Exception)\b", l)), lines[-1].strip())
+    at = None
+    for i, l in enumerate(lines):
+        found = re.search(r'File ".*design\.py", line (\d+)', l)
+        if found:
+            at = f"line {found.group(1)}: " + (lines[i + 1].strip() if i + 1 < len(lines) else "")
+    if any(w in text.lower() for w in CAD_WORDS) and not error.startswith(("AssertionError", "ValueError")):
+        tries = ["Build that part with a body_parts block (superblob, spine_body, soft_box, ear, paw, ...): they accept "
+                 "any settings and print a note when they had to change something.",
+                 "If it is your own loft or fillet: change the sections more gradually or use a smaller radius."]
+    elif error.startswith(("AssertionError", "ValueError")):
+        tries = ["The message names what to change, often by how many mm: change that value."]
+    else:
+        tries = ["Fix the line named above; check its inputs with measure() if you are not sure."]
+    return json.dumps({"ok": False, "error": error[:400], "at": at, "try": tries + [DIAGNOSE], "trace": text[-900:]})
+
+
+def failed(text):
+    """True for a crash or a check/submit that names failures."""
+    if text.startswith("The code crashed") or text.startswith('{"ok": false'):
+        return True
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return False
+    return isinstance(data, dict) and bool(data.get("failed")) and not data.get("passed")
+
+
 def result_label(best, target, reviewed=True):
     """The honest result: done only when every rule passes and the look reaches the target; a working result under
     the target is a draft for inspection, never a finished enclosure."""
@@ -122,9 +164,11 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
     tools = [*shop.tools, RECALL]
     store = Results(folder)
     summary, latest, nudges = None, [], 0
+    inspections, seen = 0, {}
     earlier = load_state(folder) if resume else None
     if earlier:
         steps, tokens, calls_made, nudges = earlier["steps"], earlier["tokens"], earlier["model_calls"], earlier["nudges"]
+        inspections = earlier.get("inspections", 0)
         chains, summary, latest = earlier["chains"] + 1, earlier.get("summary"), earlier.get("latest", [])
         if hasattr(shop, "restore"):
             shop.restore(earlier["shop"])
@@ -185,22 +229,44 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
             break
         results, pictures, latest = [], [], []
         for item in calls:
-            steps += 1
             arguments = json.loads(item.get("arguments") or "{}")
             began = time.time()
-            if item["name"] == "recall":
+            free = item["name"] in INSPECT_TOOLS and inspections < MAX_INSPECTIONS   # a look that costs no build step
+            looking = item["name"] in INSPECT_TOOLS
+            key = (item["name"], json.dumps(arguments, sort_keys=True), getattr(shop, "code", None))
+            if looking and not free:
+                text, picture_out = (f"Inspection limit reached ({MAX_INSPECTIONS} docs/show/render/recall calls). "
+                                     "Build, edit, check or submit instead."), None
+            elif item["name"] == "recall":
                 text, picture_out = store.recall(arguments.get("ref", "")), None
             else:
                 text, picture_out = shop.execute(item["name"], arguments)
-            sent = text if item["name"] == "recall" else store.short(text)
-            log(folder, step=steps, tool=item["name"], arguments=arguments, result=text[:3000], sent_chars=len(sent), seconds=round(time.time() - began, 1))
+            repeat = not looking and failed(text) and seen.get(key, (None, None))[1] == text
+            if free:
+                inspections += 1
+            elif not repeat:
+                steps += 1   # a build, check or submit, or a look past the inspection limit
+            if repeat:
+                # the same call on the same file gave the same failure: say so, and do not count it as a try
+                text = json.dumps({"ok": False, "error": f"Same call, same file, same failure as step {seen[key][0]}.",
+                                   "try": ["Change the file or the arguments first: the failure below will not change by itself.", DIAGNOSE],
+                                   "failure": text[-1500:]})
+            elif not looking and failed(text):
+                seen[key] = (steps, text)
+            view = failure_view(text)
+            if view:
+                text = view
+            # a failure is sent whole: the next decision needs the reason, not a reference to it
+            sent = text if item["name"] == "recall" or failed(text) else store.short(text)
+            log(folder, step=steps, inspections=inspections, tool=item["name"], arguments=arguments, result=text[:3000],
+                sent_chars=len(sent), repeat=repeat or None, seconds=round(time.time() - began, 1))
             print(f"{label} step {steps}: {item['name']} {text[:160]!r}", flush=True)
             results.append({"type": "function_call_output", "call_id": item["call_id"], "output": sent})
             latest.append(f"{item['name']}: {sent}")
             if picture_out:
                 pictures.append(picture_out)
         save_state(folder, shop, steps=steps, tokens=tokens, model_calls=calls_made, nudges=nudges, chains=chains,
-                   summary=summary, latest=latest, label=label)
+                   summary=summary, latest=latest, label=label, inspections=inspections)
         follow = list(results)
         if pictures:
             parts = [{"type": "input_text", "text": "The concept, then yours:"}]
