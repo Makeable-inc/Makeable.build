@@ -13,8 +13,8 @@ import harness
 from sandbox import run_design
 
 HERE = Path(__file__).resolve().parent
-MAX_STEPS = 40          # tool calls in one run
-MAX_SUBMITS = 4         # full-check submits
+MAX_STEPS = 60          # tool calls in one run
+MAX_SUBMITS = 6         # full-check submits
 LOOK_TARGET = 8         # a passing case under this look score gets polish submits, while they last
 OUTPUT_LIMIT = 2500     # characters of a tool result sent back: every result is resent on each later step
 
@@ -58,7 +58,7 @@ class Workshop:
         write_data(part_ids, self.work)
         self.code, self.ran, self.report = None, False, None
         self.best, self.submits, self.look = None, 0, None
-        self.tools = TOOLS
+        self.tools, self.last_fixes, self.target = TOOLS, [], LOOK_TARGET
 
     def done(self):
         """The best passing case is good enough to stop: the look target is met, or the look is not reviewed."""
@@ -155,6 +155,7 @@ class Workshop:
             problems.append({"check": "look_review", "fix": " ".join(look["problems"])})
         passed = report["passed"] and not (look and look["problems"])
         score = (look or {}).get("score") or 0
+        self.last_fixes = (look or {}).get("fix", []) or [p.get("fix") for p in problems if p.get("fix")]
         snapshot = self.folder / f"submit-{self.submits}"
         if snapshot.exists():
             shutil.rmtree(snapshot)

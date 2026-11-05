@@ -13,6 +13,7 @@ from pathlib import Path
 import agent
 
 GUIDES = Path(__file__).resolve().parent / "guides"
+MAX_NUDGES = 2   # times the agent is sent back when it stops short of the goal with budget left
 
 
 def guide(name):
@@ -48,6 +49,7 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
     if picture:
         content.append(image_part(picture))
     data = call(shop.tools, {"instructions": instructions, "input": [{"role": "user", "content": content}]})
+    nudges = 0
     while True:
         tokens += data.get("usage", {}).get("total_tokens", 0)
         calls = [item for item in data["output"] if item["type"] == "function_call"]
@@ -55,7 +57,23 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
         if said:
             log(folder, step=steps, said=said[:2000])
         if not calls:
-            outcome = "stopped: the agent stopped calling tools"
+            # Stopping short of the goal while budget is left: send it back once or twice with what to do next.
+            left = shop.submits < max_submits and steps < max_steps
+            if left and nudges < MAX_NUDGES and not (shop.best and shop.done()):
+                nudges += 1
+                fixes = getattr(shop, "last_fixes", []) or []
+                if shop.best:
+                    text = (f"Your best passing result scores {shop.best['score']}/10 and the target is {getattr(shop, 'target', 8)}. "
+                            "Keep going: make the reviewer's most important change, check it, and submit again. "
+                            "The best pass is kept, so trying cannot make the result worse.")
+                else:
+                    text = "Nothing has passed yet. Keep going: fix what the last check or submit named, then submit."
+                if fixes:
+                    text += "\nThe reviewer's fixes, most important first:\n" + "\n".join(f"- {f}" for f in fixes[:3])
+                log(folder, step=steps, nudge=text)
+                data = call(shop.tools, {"input": [{"role": "user", "content": [{"type": "input_text", "text": text}]}]}, previous=data["id"])
+                continue
+            outcome = (shop.best["status"] if shop.best else "stopped: the agent stopped calling tools")
             break
         results, pictures = [], []
         for item in calls:

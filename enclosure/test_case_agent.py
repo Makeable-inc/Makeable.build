@@ -22,6 +22,7 @@ class FakeShop:
 
     def __init__(self, scores, folder):
         self.scores, self.submits, self.best, self.calls, self.tools = list(scores), 0, None, [], []
+        self.last_fixes, self.target = ["round the bezel"], case_agent.LOOK_TARGET
         self.folder = Path(folder)
 
     def done(self):
@@ -68,15 +69,32 @@ class Loop(unittest.TestCase):
         self.assertEqual([s["tool"] for s in steps if "tool" in s], ["run", "check", "submit", "run", "submit", "submit"])
 
     def test_it_stops_when_the_agent_stops_calling_tools(self):
-        summary, _ = self.run_agent([reply(("run", {"code": "a"})), reply(said="done")], [])
+        # Sent back MAX_NUDGES times, then the stop is final.
+        replies = [reply(("run", {"code": "a"}))] + [reply(said="done")] * (harness.MAX_NUDGES + 1)
+        summary, _ = self.run_agent(replies, [])
         self.assertIn("stopped calling tools", summary["outcome"])
         self.assertIsNone(summary["best"])
 
     def test_the_submit_budget_ends_the_run_with_the_best_kept(self):
         replies = [reply(("submit", {}))] * case_agent.MAX_SUBMITS
-        summary, _ = self.run_agent(replies, [5, 6, 4, 5])
+        summary, _ = self.run_agent(replies, [5, 6, 4, 5, 4, 5][:case_agent.MAX_SUBMITS])
         self.assertEqual(summary["submits"], case_agent.MAX_SUBMITS)
         self.assertEqual(summary["look_score"], 6)
+
+    def test_stopping_under_the_target_sends_it_back_with_the_fixes(self):
+        sent = []
+        replies = iter([reply(("submit", {})), reply(said="good enough"), reply(("submit", {}))])
+
+        def fake_call(_tools, body, previous=None):
+            sent.append(body)
+            return next(replies)
+        shop = FakeShop([6, 8], self.folder)
+        with mock.patch.object(harness, "call", fake_call), mock.patch.object(case_agent, "Workshop", lambda *a, **k: shop):
+            summary = case_agent.design_case("brief", self.folder, {"style": "character"}, "BODY.stl", self.picture, [], "system")
+        self.assertEqual(summary["look_score"], 8)
+        nudge = sent[2]["input"][0]["content"][0]["text"]
+        self.assertIn("6/10", nudge)
+        self.assertIn("round the bezel", nudge)
 
 
 if __name__ == "__main__":

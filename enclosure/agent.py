@@ -35,7 +35,7 @@ MAX_CODE_FAILURES = 6
 NO_PROGRESS_TRIES = 2
 # One token limit for the whole job: every stage, every look check and the automatic retry. Passing jobs used
 # 25k to 90k on AWS, the hardest pass 195k; the one that reached 392k failed anyway.
-JOB_TOKEN_LIMIT = 250_000
+JOB_TOKEN_LIMIT = int(os.environ.get("ENCLOSURE_JOB_TOKEN_LIMIT", 250_000))  # 0 = no limit (local test runs only)
 _job = {"tokens": 0}
 
 
@@ -54,7 +54,7 @@ def job_tokens():
 
 
 def job_out_of_tokens():
-    return _job["tokens"] >= JOB_TOKEN_LIMIT
+    return JOB_TOKEN_LIMIT > 0 and _job["tokens"] >= JOB_TOKEN_LIMIT
 
 
 def token_limit_reason():

@@ -14,8 +14,8 @@ from checks import load_stl
 from sandbox import run_design
 
 HERE = Path(__file__).resolve().parent
-MAX_STEPS = 40
-MAX_SUBMITS = 4
+MAX_STEPS = 60
+MAX_SUBMITS = 6
 LOOK_TARGET = 8
 OUTPUT_LIMIT = 2500
 
@@ -71,7 +71,7 @@ class BodyShop:
         self.work = self.folder / "work"
         self.work.mkdir(parents=True, exist_ok=True)
         self.code, self.ran, self.mesh, self.output = None, False, None, ""
-        self.best, self.submits, self.tools = None, 0, TOOLS
+        self.best, self.submits, self.tools, self.last_fixes, self.target = None, 0, TOOLS, [], LOOK_TARGET
 
     def done(self):
         return self.best is not None and self.best["score"] >= LOOK_TARGET
@@ -154,6 +154,7 @@ class BodyShop:
             score = review.get("score") if isinstance(review.get("score"), (int, float)) else 0
             fixes = review.get("fix", []) if isinstance(review.get("fix"), list) else []
         passed = not failed
+        self.last_fixes = fixes or [f["fix"] for f in failed if f.get("fix")]
         snapshot = self.folder / f"submit-{self.submits}"
         shutil.rmtree(snapshot, ignore_errors=True)
         shutil.copytree(self.work, snapshot)
