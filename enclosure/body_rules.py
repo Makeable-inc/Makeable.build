@@ -126,8 +126,9 @@ def check(mesh, base, features, output, step_path=None, groups=GROUPS):
                             f"The face (the main form's front, ornaments not counted) is {width:.1f} x {height:.1f} mm. It must be at most "
                             f"{limit['max_width']:.1f} wide and {limit['max_height']:.1f} tall, and either at most {limit['tight_width']:.1f} "
                             f"wide or at most {limit['tight_height']:.1f} tall.", [round(width, 1), round(height, 1)]))
-        core = printed(output, "core")
-        if core and base.get("width_to_height"):
+        # The main form's size from the script's "core:" line; without it, the whole body counts (stricter, never skipped).
+        core = printed(output, "core") or [float(v) for v in size]
+        if base.get("width_to_height"):
             low, high = base["width_to_height"]
             ratio = core[0] / core[2]
             results.append(rule("proportion", "size", low <= ratio <= high,
