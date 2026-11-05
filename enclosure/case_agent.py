@@ -231,12 +231,20 @@ def design_case(brief, folder, base, body_stl, picture, part_ids, system, resume
     system = system.replace("Reply with only the script, in one ```python block. ", "Pass the complete script to the run tool each time. ")
     instructions = system + "\n\n" + harness.guide("case")
     outcome, steps, tokens, seconds = harness.run(shop, instructions, brief, folder, picture, MAX_STEPS, MAX_SUBMITS, "case", resume)
+    reviewed = bool(picture and base.get("style") == "character")
+    label = harness.result_label(shop.best, LOOK_TARGET, reviewed)
     if shop.best:
         target = folder / "best"
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(shop.best["folder"], target)
-    summary = {"outcome": outcome, "steps": steps, "submits": shop.submits, "look_score": shop.best["score"] if shop.best else None,
-               "best": str(folder / "best") if shop.best else None, "tokens": tokens, "seconds": seconds}
+        try:
+            from viewer import build
+            build(target, outcome=label[0].upper() + label[1:])
+        except Exception as error:
+            print(f"no viewer: {error}", flush=True)
+    summary = {"result": label, "outcome": outcome, "steps": steps, "submits": shop.submits,
+               "look_score": shop.best["score"] if shop.best else None, "best": str(folder / "best") if shop.best else None,
+               "skipped_gates": getattr(shop, "skipped_gates", []), "tokens": tokens, "seconds": seconds}
     (folder / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
     return summary

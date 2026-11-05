@@ -91,6 +91,16 @@ class Results:
         return path.read_text(encoding="utf-8") if path.exists() else f"No stored result named {ref!r}."
 
 
+def result_label(best, target, reviewed=True):
+    """The honest result: done only when every rule passes and the look reaches the target; a working result under
+    the target is a draft for inspection, never a finished enclosure."""
+    if not best:
+        return "failed"
+    if reviewed and (best.get("score") or 0) < target:
+        return f"draft: fits, look goal not met ({best.get('score') or 0}/10)"
+    return "done"
+
+
 def save_state(folder, shop, **counters):
     """Everything needed to continue after a crash, written after every step."""
     state = {**counters, "shop": shop.state() if hasattr(shop, "state") else {}}

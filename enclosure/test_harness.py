@@ -135,5 +135,14 @@ class Resume(unittest.TestCase):
         self.assertEqual(outcome[0], "pass")
 
 
+
+class Labels(unittest.TestCase):
+    def test_only_a_pass_at_the_target_is_done(self):
+        self.assertEqual(harness.result_label({"score": 8}, 8), "done")
+        self.assertEqual(harness.result_label({"score": 6}, 8), "draft: fits, look goal not met (6/10)")
+        self.assertEqual(harness.result_label(None, 8), "failed")
+        self.assertEqual(harness.result_label({"score": 0}, 8, reviewed=False), "done", "a plain design has no look goal")
+
+
 if __name__ == "__main__":
     unittest.main()

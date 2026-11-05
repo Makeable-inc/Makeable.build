@@ -236,8 +236,9 @@ def design_body(base, picture, folder, resume=False):
     shop = BodyShop(folder, base, picture)
     instructions = SYSTEM + "\n\n" + harness.guide("body")
     outcome, steps, tokens, seconds = harness.run(shop, instructions, brief(base), folder, picture, MAX_STEPS, MAX_SUBMITS, "body", resume)
-    summary = {"outcome": outcome, "steps": steps, "submits": shop.submits, "best_score": shop.best["score"] if shop.best else None,
-               "features": shop.features, "style": "character", "tokens": tokens, "seconds": seconds}
+    summary = {"result": harness.result_label(shop.best, LOOK_TARGET, bool(picture)), "outcome": outcome, "steps": steps,
+               "submits": shop.submits, "best_score": shop.best["score"] if shop.best else None, "features": shop.features,
+               "style": "character", "skipped_gates": getattr(shop, "skipped_gates", []), "tokens": tokens, "seconds": seconds}
     (folder / "summary.json").write_text(json.dumps(summary, indent=1, default=str), encoding="utf-8")
     if not shop.best:
         return None, None, summary
