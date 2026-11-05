@@ -65,7 +65,12 @@ def wire_meshes(design):
     return found
 
 
-def build(folder, title=None):
+def html_text(value):
+    import html
+    return html.escape(str(value)) if value is not None else ""
+
+
+def build(folder, title=None, outcome=None):
     folder = Path(folder)
     design = json.loads((folder / "design.json").read_text(encoding="utf-8"))
     vectors = explode_vectors(design)
@@ -87,8 +92,21 @@ def build(folder, title=None):
     if report_path.exists():
         report = json.loads(report_path.read_text(encoding="utf-8"))
         passed = sum(r["ok"] for r in report["results"])
-        checks = f"{passed} of {len(report['results'])} checks pass."
-        failures = "".join(f"<li>{r['check']}: {r['part']}</li>" for r in report["results"] if not r["ok"])
+        failed = report.get("failed", [r for r in report["results"] if not r["ok"]])
+        warned = report.get("warnings", [])
+        checks = f"{passed} of {len(report['results'])} checks pass: {len(failed)} failed, {len(warned)} warnings."
+        item = lambda r: f"<li>{html_text(r['check'])}: {html_text(r.get('part'))}</li>"
+        if failed:
+            failures += f"<p class=\"s\"><b>Failed ({len(failed)})</b></p><ul>" + "".join(item(r) for r in failed) + "</ul>"
+        if warned:
+            failures += f"<details><summary class=\"s\">Warnings ({len(warned)}): passed, worth improving</summary><ul>" + "".join(item(r) for r in warned) + "</ul></details>"
+    look_path = folder / "look.json"
+    if look_path.exists():
+        look = json.loads(look_path.read_text(encoding="utf-8"))
+        if look.get("score") is not None:
+            checks += f" Look {look['score']}/10."
+    if outcome:
+        checks = f"<b>{html_text(outcome)}</b>. " + checks
     html = TEMPLATE.replace("__TITLE__", title or folder.name).replace("__DATA__", json.dumps(data)).replace("__CHECKS__", checks).replace("__FAILS__", failures)
     out = folder / "viewer.html"
     out.write_text(html, encoding="utf-8")
@@ -111,7 +129,7 @@ output{font-variant-numeric:tabular-nums;font-weight:600}
 @media(max-width:760px){body{grid-template-columns:1fr;grid-template-rows:auto 60vh}}
 </style>
 <aside>
-<div><h1>__TITLE__</h1><p class="s" id="size"></p><p class="s">__CHECKS__ Shown exactly as exported, with flat facets. Not printed.</p><ul>__FAILS__</ul></div>
+<div><h1>__TITLE__</h1><p class="s" id="size"></p><p class="s">__CHECKS__ Shown exactly as exported, with flat facets. Not printed.</p>__FAILS__</div>
 <section><h2>Look</h2><div class="row"><button id="exact" aria-pressed="true">Exact parts</button><button id="finish" aria-pressed="false">Finished</button></div><div class="row" id="tones" style="margin-top:6px"><button data-tone="#a9bfa4">Sage</button><button data-tone="#efe6d6">Cream</button><button data-tone="#34383c">Charcoal</button></div><p class="s">Finished is one colour with soft light and smooth shading, to judge the look. The shape is unchanged. Use Exact parts to check the fit.</p></section>
 <section><h2>Show</h2><label><input type="checkbox" id="see"> Transparent</label><label><input type="checkbox" id="dims"> Dimensions</label><label><input type="checkbox" id="ref"> Size reference (apple)</label></section>
 <section><h2>Parts</h2><div id="parts"></div></section>

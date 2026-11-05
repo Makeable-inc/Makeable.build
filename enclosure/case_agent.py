@@ -156,10 +156,17 @@ class Workshop:
         passed = report["passed"] and not (look and look["problems"])
         score = (look or {}).get("score") or 0
         self.last_fixes = (look or {}).get("fix", []) or [p.get("fix") for p in problems if p.get("fix")]
+        # The report (and look.json, written by the review) travel with the snapshot, so its viewer shows the real checks.
+        (self.work / "report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
         snapshot = self.folder / f"submit-{self.submits}"
         if snapshot.exists():
             shutil.rmtree(snapshot)
         shutil.copytree(self.work, snapshot)
+        try:
+            from viewer import build
+            build(snapshot)
+        except Exception as error:
+            print(f"no viewer: {error}", flush=True)
         if passed and (self.best is None or score > self.best["score"]):
             self.best = {"score": score, "code": self.code, "folder": snapshot, "status": report.get("status")}
         result = {"passed": passed, "failed": problems[:12], "look_score": score if look else None,
