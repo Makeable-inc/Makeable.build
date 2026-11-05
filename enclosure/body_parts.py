@@ -155,17 +155,21 @@ def superblob(width, depth, height, roundness=3.0, top=2.5, at=(0, 0, 0), sectio
     roundness: the outline seen from above (2 = oval, 3 = soft rounded box, 5 = nearly a box).
     top: how the sides curve into the top (2 = a full dome, 3 = a soft cushion, 5 = upright sides, flat top).
     Fuller at the bottom than an egg: the sole keeps the full outline, so it stands flat and holds the parts."""
-    faces = []
-    for i in range(sections):
-        f = i / sections
-        shrink = (1 - f ** top) ** (1 / top)
-        faces.append(Face(_superellipse(width / 2 * shrink, depth / 2 * shrink, roundness, Plane.XY.offset(height * f))))
-    faces.append(Vertex(0, 0, height))   # closes the top in a point, so it has no flat nub
-    body = one_solid(loft(faces, ruled=False), "superblob")
+    def build(reach):
+        faces = []
+        for i in range(sections):
+            # slices closer together near the top, where the outline turns fastest, so the smooth loft does not swing
+            f = math.sin(i / sections * math.pi / 2)
+            shrink = (1 - f ** top) ** (1 / top)
+            faces.append(Face(_superellipse(width / 2 * shrink, depth / 2 * shrink, roundness, Plane.XY.offset(reach * f))))
+        faces.append(Vertex(0, 0, reach))   # closes the top in a point, so it has no flat nub
+        return one_solid(loft(faces, ruled=False), "superblob")
+    body = build(height)
     top_z = bounds(body)[1][2]
     if abs(top_z - height) > 0.05:
-        # a smooth loft bulges a little past its last section: bring it back to the exact height
-        body = one_solid(scale(body, by=(1, 1, height / top_z)), "superblob")
+        # a smooth loft bulges a little past its top point: rebuild once with the sections lowered by that much
+        # (scaling the solid instead crashes OpenCascade on these lofts)
+        body = build(height * height / top_z)
     return placed(step_safe(body), at)
 
 
