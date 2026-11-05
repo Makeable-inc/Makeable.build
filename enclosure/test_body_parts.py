@@ -100,5 +100,21 @@ class Example(unittest.TestCase):
         self.assertAlmostEqual(bp.bounds(body)[0][2], 0.0, places=2)
 
 
+class StepRoundTrip(unittest.TestCase):
+    def test_a_joined_ellipsoid_survives_step_on_every_side(self):
+        """The robot's left arm vanished from BODY.step (still in BODY.stl): the case stage loads the STEP."""
+        import tempfile
+        from build123d import Box, export_step, import_step
+        import body_parts as bp
+        with tempfile.TemporaryDirectory() as tmp:
+            for at in ((-52.5, 0, 0), (52.5, 0, 0), (0, 0, 32)):
+                joined = bp.join(Box(100, 50, 60), bp.ellipsoid(10.5, 8, 7.5, at=at), "arm")
+                path = f"{tmp}/arm.step"
+                export_step(joined, path)
+                np_before, np_after = bp.bounds(joined), bp.bounds(import_step(path))
+                for a, b in zip(np_before[0] + np_before[1], np_after[0] + np_after[1]):
+                    self.assertAlmostEqual(a, b, delta=0.2, msg=f"arm at {at}")
+
+
 if __name__ == "__main__":
     unittest.main()

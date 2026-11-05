@@ -16,6 +16,15 @@ DROP_LIMIT = 2   # a look score this far under the body's is a problem to fix, n
 PROMPT = """You check how a finished 3D-printed case looks. Image 1 is the concept picture. Image 2 is the chosen body
 (the outside the case must keep). Image 3 is the finished case from four angles (front, straight on, side, back), with
 the screen, knob and board in place. Ignore colours.
+Design principles a good case follows:
+- The silhouette and proportions match the concept; the case keeps the body's outside exactly.
+- One consistent softness: every outer edge rounded alike; no sharp edges next to soft ones.
+- The screen sits in an even, deliberate bezel; openings are sized and rounded to suit the form.
+- Features (ears, arms, feet, antennas) are in proportion and grow out of the body, not stuck on.
+- No screws, seams, bosses or patches showing on the front or the top.
+- Details suit the character (for example a knob cap shaped for it), and nothing looks unfinished.
+Score anchors: 2 = a plain box; 3 = a box with stickers on; 5 = recognisable as the concept but crude;
+7 = a good toy a shop would sell; 9 = a polished product with every principle met.
 Judge the finished case against the concept and the body:
 - Is each required feature still there and recognisable? A feature cut off, left loose or hidden counts as missing.
 - What did the case add or change that spoils the look (a lump, a screw boss or seam showing on the front, a window,

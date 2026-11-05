@@ -8,7 +8,7 @@ import math
 
 from build123d import (Axis, Box, Cone, Cylinder, Ellipse, Kind, Circle, Plane, Polygon, Pos, Rectangle, RectangleRounded, Rot, Sphere, extrude,
                        fillet, loft,
-                       offset, scale)
+                       offset, scale, Solid)
 
 BIG = 2000.0
 CORE = {}     # the main form's size before the first feature joins (mm), for the width / height rule
@@ -23,10 +23,26 @@ def one_solid(shape, name="part"):
     return solid
 
 
+def step_safe(solid):
+    """The same solid with its closed faces (spheres, ellipsoids, rings) split in two. A closed face whose seam
+    crosses a join can come back from a STEP file trimmed on the wrong side, so a joined arm or ear silently
+    vanishes from BODY.step while BODY.stl still shows it; split faces survive the round trip."""
+    from OCP.ShapeUpgrade import ShapeUpgrade_ShapeDivideClosed
+    try:
+        divide = ShapeUpgrade_ShapeDivideClosed(solid.wrapped)
+        divide.SetNbSplitPoints(2)
+        divide.Perform()
+        out = Solid(divide.Result())
+        return out if abs(out.volume - solid.volume) < 0.01 * solid.volume + 0.5 else solid
+    except Exception:
+        return solid
+
+
 def fuse(a, b, name="part"):
     """a + b as one valid solid, checked: OpenCascade can silently drop most of a shape when two surfaces line up
-    exactly, so the result must keep at least the larger of the two volumes."""
-    out = one_solid(a + b, name)
+    exactly, so the result must keep at least the larger of the two volumes. Closed faces are split first so the
+    result survives export to STEP."""
+    out = one_solid(step_safe(a) + step_safe(b), name)
     assert out.volume >= max(a.volume, b.volume) - 0.5, f"{name}: the join lost volume ({out.volume:.0f} mm3 left of {max(a.volume, b.volume):.0f})"
     return out
 
