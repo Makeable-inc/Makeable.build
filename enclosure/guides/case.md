@@ -9,7 +9,10 @@ included. The fixed checks decide; your job is to make them pass and make the ca
 |---|---|---|
 | `docs(name)` | before using a library piece you are not sure of | its signature and what it does |
 | `measure(code)` | you need a position: where the front is at a spot, the room left, a side's surface | what the snippet prints |
-| `run(code)` | after each change; always pass the complete script | "Ran." or the error |
+| `write(code)` | once, for the first draft of the script | "Saved" |
+| `edit(old, new)` | for every later change: replace one exact piece, copied from `show()` | which line changed, or why nothing did |
+| `show(find=... or start, end)` | to see the part you are about to change, never the whole file | numbered lines |
+| `run()` | after each change; it runs the saved script | "Ran." or the error |
 | `check(group)` | after a run, for the group the last change touched | the failed checks in that group, with fixes |
 | `render()` | after the parts and openings are in, and after each look change | a picture of your case next to the concept |
 | `submit()` | when `check("all")` would pass, or to keep a better-looking version | all checks plus the look review |
@@ -38,9 +41,15 @@ included. The fixed checks decide; your job is to make them pass and make the ca
 - No screw heads, seams or patches on the front or the top: fasteners go in from the back.
 - Details suit the character: a paw-shaped knob cap for an animal, a dial for a radio.
 
+## Working on the saved script
+
+Write the script once with `write`, then change it with `edit`: replace only the lines that need to change, copied
+exactly from `show`. An edit that matches 0 or 2+ places changes nothing and says so; include more lines around it.
+Every run that works is kept as a snapshot, so a broken edit never loses a version that ran.
+
 ## Do not
 
-- Do not rewrite the whole script when one group fails: change only what the failed checks name.
+- Do not rewrite the whole script when one group fails: `edit` only what the failed checks name.
 - Do not cut an opening through a feature. Move the opening or the part instead.
 - Do not guess a number you can `measure`.
 - Do not make more calls than you need: every call resends everything so far, so a long session runs out of budget.

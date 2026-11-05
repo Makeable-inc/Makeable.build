@@ -9,6 +9,7 @@ from pathlib import Path
 import body_parts
 import body_rules
 import harness
+import script_file
 from case_look import ask, sheet
 from checks import load_stl
 from sandbox import run_design
@@ -47,8 +48,9 @@ Image 1 is the concept, image 2 is the body so far. Answer this one question in 
 the single most useful change in mm or proportions: """
 
 TOOLS = [
-    {"type": "function", "name": "build", "description": "Save this as the complete body script and run it. Returns what it printed, or the error.",
-     "parameters": {"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"], "additionalProperties": False}},
+    *script_file.TOOLS,
+    {"type": "function", "name": "build", "description": "Run the saved body script. Returns what it printed, or the error. (Passing code saves it first, as write does.)",
+     "parameters": {"type": "object", "properties": {"code": {"type": "string", "description": "Optional: a complete script to save first."}}, "additionalProperties": False}},
     {"type": "function", "name": "check", "description": "Run the body rules on the last body built, for one group: build, size, room, back, features, or all.",
      "parameters": {"type": "object", "properties": {"group": {"type": "string", "enum": [*body_rules.GROUPS, "all"]}}, "required": ["group"], "additionalProperties": False}},
     {"type": "function", "name": "measure", "description": "Run a short read-only snippet with `body` (the last body built, from BODY.step) and every body_parts helper loaded; returns what it prints. For example print(surface_z(body, 30, 0)).",
@@ -70,17 +72,26 @@ class BodyShop:
         self.features = base.get("features") or []
         self.work = self.folder / "work"
         self.work.mkdir(parents=True, exist_ok=True)
-        self.code, self.ran, self.mesh, self.output = None, False, None, ""
+        self.script = script_file.ScriptFile(self.folder / "script.py")
+        self.ran, self.mesh, self.output = False, None, ""
         self.best, self.submits, self.tools, self.last_fixes, self.target = None, 0, TOOLS, [], LOOK_TARGET
 
     def done(self):
         return self.best is not None and self.best["score"] >= LOOK_TARGET
 
-    def build(self, code):
+    @property
+    def code(self):
+        return self.script.text
+
+    def build(self, code=None):
+        if code:
+            self.script.write(code)
+        code = self.script.text
+        if code is None:
+            return "There is no script yet. Write it with write(code)."
         shutil.copy(HERE / "body_parts.py", self.work / "body_parts.py")
         for name in ("BODY.stl", "BODY.step", "preview.png"):
             (self.work / name).unlink(missing_ok=True)
-        self.code = code
         ok, message = run_design(code, self.work)
         self.ran, self.mesh = False, None
         if not ok:
@@ -88,6 +99,7 @@ class BodyShop:
         if not (self.work / "BODY.stl").exists() or not (self.work / "BODY.step").exists():
             return "It ran but did not export BODY.stl and BODY.step. End with export_stl and export_step as the instructions say."
         self.ran, self.mesh = True, load_stl(self.work / "BODY.stl")
+        self.script.snapshot()
         self.output = (self.work / "output.txt").read_text(encoding="utf-8", errors="replace")
         return ("Ran.\n" + self.output[-1500:]).strip()
 
@@ -170,8 +182,14 @@ class BodyShop:
         return json.dumps(result, default=str)[-OUTPUT_LIMIT:]
 
     def execute(self, name, arguments):
+        if name == "write":
+            return self.script.write(arguments.get("code", "")), None
+        if name == "edit":
+            return self.script.edit(arguments.get("old", ""), arguments.get("new", ""))[1], None
+        if name == "show":
+            return self.script.show(arguments.get("start"), arguments.get("end"), arguments.get("find")), None
         if name == "build":
-            return self.build(arguments.get("code", "")), None
+            return self.build(arguments.get("code")), None
         if name == "check":
             return self.check(arguments.get("group", "all")), None
         if name == "render":

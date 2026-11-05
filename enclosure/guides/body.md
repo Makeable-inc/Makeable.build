@@ -9,7 +9,10 @@ rules decide whether it fits and prints; the look review judges how it reads.
 | Tool | Call it when | You get back |
 |---|---|---|
 | `docs(name)` | before using a building block you are not sure of | its signature and what it does |
-| `build(code)` | after each change; always pass the complete script | its printed lines (added, skipped, size), or the error |
+| `write(code)` | once, for the first draft of the script | "Saved" |
+| `edit(old, new)` | for every later change: replace one exact piece, copied from `show()` | which line changed, or why nothing did |
+| `show(find=... or start, end)` | to see the part you are about to change, never the whole file | numbered lines |
+| `build()` | after each change; it runs the saved script | its printed lines (added, skipped, size), or the error |
 | `check(group)` | after a build, for the group the last change touched | the failed rules in that group, with fixes |
 | `measure(code)` | you need a number from the current body: a surface height, a front position | what the snippet prints |
 | `render()` | after the main form, and after each feature | a picture of your body next to the concept |
@@ -41,6 +44,12 @@ screen limits, the main form's proportion), `room` (the parts' box fits inside),
 - Features in proportion, grown out of the body (sunk in, broad roots), never perched on top or stuck on.
 - Features clear of the walls where openings go (the brief says which: USB side, front controls).
 - Simple, bold shapes read better than small detail: a 3D print is judged from a metre away.
+
+## Working on the saved script
+
+Write the script once with `write`, then change it with `edit`: replace only the lines that need to change, copied
+exactly from `show`. An edit that matches 0 or 2+ places changes nothing and says so; include more lines around it.
+Every run that works is kept as a snapshot, so a broken edit never loses a version that ran.
 
 ## Do not
 

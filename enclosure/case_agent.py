@@ -10,6 +10,7 @@ from pathlib import Path
 
 import checks
 import harness
+import script_file
 from sandbox import run_design
 
 HERE = Path(__file__).resolve().parent
@@ -29,8 +30,9 @@ GROUPS = {
 }
 
 TOOLS = [
-    {"type": "function", "name": "run", "description": "Save this as the complete case script (design.py) and run it. Returns its printed output, or the error.",
-     "parameters": {"type": "object", "properties": {"code": {"type": "string", "description": "The complete Python script."}}, "required": ["code"], "additionalProperties": False}},
+    *script_file.TOOLS,
+    {"type": "function", "name": "run", "description": "Run the saved case script. Returns its printed output, or the error. (Passing code saves it first, as write does.)",
+     "parameters": {"type": "object", "properties": {"code": {"type": "string", "description": "Optional: a complete script to save first."}}, "additionalProperties": False}},
     {"type": "function", "name": "check", "description": "Run the fixed checks on the last script that ran and return the results for one group: build, fit, openings, fasteners, outside, or all.",
      "parameters": {"type": "object", "properties": {"group": {"type": "string", "enum": [*GROUPS, "all"]}}, "required": ["group"], "additionalProperties": False}},
     {"type": "function", "name": "render", "description": "A picture of the last case that ran (front, straight on, side, back), next to the concept picture.",
@@ -56,7 +58,8 @@ class Workshop:
         shutil.copy(body_stl, self.work / "BODY.stl")
         shutil.copy(HERE / "case_parts.py", self.work / "case_parts.py")
         write_data(part_ids, self.work)
-        self.code, self.ran, self.report = None, False, None
+        self.script = script_file.ScriptFile(self.folder / "script.py")
+        self.ran, self.report = False, None
         self.best, self.submits, self.look = None, 0, None
         self.tools, self.last_fixes, self.target = TOOLS, [], LOOK_TARGET
 
@@ -70,13 +73,22 @@ class Workshop:
         (self.work / "base_design.json").write_text(json.dumps(self.base, indent=1), encoding="utf-8")
         shutil.copy(self.body_stl, self.work / "BODY.stl")
 
-    def run(self, code):
-        self.code = code
+    @property
+    def code(self):
+        return self.script.text
+
+    def run(self, code=None):
+        if code:
+            self.script.write(code)
+        code = self.script.text
+        if code is None:
+            return "There is no script yet. Write it with write(code)."
         self.ran, message = run_design(code, self.work)
         self.report = None
         if not self.ran:
             return message[-OUTPUT_LIMIT:]
         self.finish_run()
+        self.script.snapshot()
         output = (self.work / "output.txt").read_text(encoding="utf-8", errors="replace")
         return ("Ran.\n" + output[-1200:]) if output.strip() else "Ran."
 
@@ -178,8 +190,14 @@ class Workshop:
 
     def execute(self, name, arguments):
         """Every tool is one call: name + arguments -> (text, picture or None)."""
+        if name == "write":
+            return self.script.write(arguments.get("code", "")), None
+        if name == "edit":
+            return self.script.edit(arguments.get("old", ""), arguments.get("new", ""))[1], None
+        if name == "show":
+            return self.script.show(arguments.get("start"), arguments.get("end"), arguments.get("find")), None
         if name == "run":
-            return self.run(arguments.get("code", "")), None
+            return self.run(arguments.get("code")), None
         if name == "check":
             return self.check(arguments.get("group", "all")), None
         if name == "render":
