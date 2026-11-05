@@ -47,6 +47,26 @@ Reply with only JSON: {"features": {"<feature name>": "present" | "weak" | "miss
 Required features:
 """
 
+CHOOSE = RUBRIC + """
+Image 1 is the concept. Images 2 and 3 are two candidate main forms (A, then B) for the same parts: the features
+(ears, spikes, tail, eyes...) are not on yet, so do not judge whether they read as the character. Pick the one whose
+silhouette, proportions and softness are closer to the concept, then give advice for it. Reply with only JSON:
+{"pick": "A" or "B", "why": "<one sentence>", "proportions": "<at most 2 sentences on the picked one>",
+ "fix": ["<up to 2 concrete changes in mm or proportions>"]}"""
+
+MIN_FORMS = 2       # main forms built and compared before any feature
+BOX_BLOCKS = ("soft_box", "Box", "rounded_loft")
+ORGANIC_BLOCKS = ("superblob", "spine_body", "oval_loft")
+
+
+def main_block(code):
+    """The building block the main form starts from ('own code' if it is not one of them)."""
+    import re
+    line = re.search(r"^body\s*=.*$", code or "", re.M)
+    found = re.search(r"\b(superblob|spine_body|soft_box|oval_loft|rounded_loft|Box)\(", line.group(0)) if line else None
+    return found.group(1) if found else "own code"
+
+
 PROPORTION = RUBRIC + """
 Image 1 is the concept, image 2 is the main form only: the features (ears, spikes, tail, eyes...) are not on yet, so
 do not judge whether it reads as the character. Judge only the proportions and silhouette against the concept:
@@ -92,6 +112,7 @@ class BodyShop:
         self.best, self.submits, self.tools, self.last_fixes, self.target = None, 0, TOOLS, [], LOOK_TARGET
         self.built = None            # the script text of the last build that worked: only that can be submitted
         self.proportion_done = False
+        self.forms = []            # main forms that fit, before any feature: {code, block, picture}
         self.character = {"score": None, "tries": 0, "done": False}
         self.skipped_gates = []
         self.features_built = set()  # features already on an accepted build, so the next may add one new kind
@@ -107,12 +128,13 @@ class BodyShop:
         """What resume needs beyond the saved script: the counters and the best result."""
         best = dict(self.best, folder=str(self.best["folder"])) if self.best else None
         return {"submits": self.submits, "best": {k: v for k, v in (best or {}).items() if k != "code"} or None,
-                "last_fixes": self.last_fixes, "proportion_done": self.proportion_done, "character": self.character,
+                "last_fixes": self.last_fixes, "proportion_done": self.proportion_done, "forms": self.forms, "character": self.character,
                 "skipped_gates": self.skipped_gates, "features_built": sorted(self.features_built)}
 
     def restore(self, saved):
         self.submits, self.last_fixes = saved.get("submits", 0), saved.get("last_fixes", [])
         self.proportion_done = saved.get("proportion_done", False)
+        self.forms = saved.get("forms", [])
         self.character = saved.get("character", self.character)
         self.skipped_gates = saved.get("skipped_gates", [])
         self.features_built = set(saved.get("features_built", []))
@@ -152,9 +174,9 @@ class BodyShop:
             return None
         added = set(body_rules.printed(output, "added") or [])
         if not self.proportion_done and added:
-            return ("Not accepted: this build adds features (" + ", ".join(sorted(added)) + ") before the main form's "
-                    "proportions were reviewed. Build the main form alone first (no try_join), with room and size "
-                    "passing, so it can be reviewed; then add the features.")
+            return ("Not accepted: this build adds features (" + ", ".join(sorted(added)) + ") before the main forms "
+                    f"were compared. Build the main form alone first (no features), with room and size passing, {MIN_FORMS} "
+                    f"different ones ({len(self.forms)} so far), so the closer one is picked; then add the features.")
         def kind_of(feature):
             # "left ear" and "right ear" are one kind, as are "spike 1" and "spike 2"
             words = [w for w in feature["name"].lower().split() if w not in SIDE_WORDS and not w.isdigit()]
@@ -189,13 +211,30 @@ class BodyShop:
         notes = []
         added = set(body_rules.printed(self.output, "added") or [])
         features_on = bool(self.features) and all(f["name"] in added for f in self.features)
-        if not self.proportion_done and not features_on and not [r for r in self.rules(("room", "size")) if not r["ok"]]:
-            self.proportion_done = True
-            board = sheet(self.picture, self.view(), self.view(), self.work / "look_sheet.png")
-            found, _ = ask(PROPORTION + "\n\n" + self.facts(), board)
-            fixes = self.fixes_that_fit(found.get("fix", []) if isinstance(found.get("fix"), list) else [])
-            notes.append(f"Proportion review (advice; features not judged yet): {found.get('proportions', '')} "
-                         + (f"Fixes: {'; '.join(fixes)}" if fixes else ""))
+        fits = not [r for r in self.rules(("room", "size")) if not r["ok"]]
+        if not self.proportion_done and not added and fits and self.built not in [f["code"] for f in self.forms]:
+            # a main form that fits: keep it as a candidate (its picture too), and compare once there are two
+            keep = self.folder / f"form-{len(self.forms) + 1}.png"
+            shutil.copy(self.view(), keep)
+            self.forms.append({"code": self.built, "block": main_block(self.built), "picture": str(keep)})
+            if len(self.forms) < MIN_FORMS:
+                notes.append(f"Main form {len(self.forms)} fits (kept as candidate {'AB'[len(self.forms) - 1]}). Before any "
+                             "feature, build a second main form to compare with it: a different block, or clearly different "
+                             "settings (rounder or flatter, longer or taller). The review then picks the one closer to the concept.")
+            else:
+                self.proportion_done = True
+                a, b = self.forms[-2], self.forms[-1]
+                board = sheet(self.picture, a["picture"], b["picture"], self.work / "look_sheet.png",
+                              labels=("1 concept", "2 main form A", "3 main form B"))
+                found, _ = ask(CHOOSE + "\n\n" + self.facts(), board)
+                pick = a if str(found.get("pick", "B")).strip().upper().startswith("A") else b
+                fixes = self.fixes_that_fit(found.get("fix", []) if isinstance(found.get("fix"), list) else [])
+                notes.append(f"Main form review: {'A' if pick is a else 'B'} ({pick['block']}) is closer to the concept: "
+                             f"{found.get('why', '')} {found.get('proportions', '')} " + (f"Fixes: {'; '.join(fixes)}" if fixes else ""))
+                if pick is not b:
+                    # the saved script becomes the picked form, so the features go onto it
+                    self.script.write(pick["code"])
+                    notes.append("Your saved script is now main form A again: build() it, then add the features to it.")
         if features_on and not self.character["done"]:
             board = sheet(self.picture, self.view(), self.view(), self.work / "look_sheet.png")
             found, _ = ask(CHARACTER + "\n\n" + self.facts(), board)
@@ -357,6 +396,13 @@ def design_body(base, picture, folder, resume=False):
     summary = {"result": harness.result_label(shop.best, LOOK_TARGET, bool(picture)), "outcome": outcome, "steps": steps,
                "submits": shop.submits, "best_score": shop.best["score"] if shop.best else None, "features": shop.features,
                "style": "character", "skipped_gates": getattr(shop, "skipped_gates", []), "tokens": tokens, "seconds": seconds}
+    # Which main form the result is built on, and an honest note when an organic form was tried and a box was kept.
+    final = main_block((shop.best or {}).get("code") or shop.built)
+    tried = sorted({f["block"] for f in shop.forms})
+    summary["main_form"], summary["forms_tried"] = final, tried
+    if final in BOX_BLOCKS and any(t in ORGANIC_BLOCKS for t in tried):
+        summary["fallback"] = f"kept a {final} main form after trying {', '.join(t for t in tried if t in ORGANIC_BLOCKS)}"
+        summary["result"] += f" ({summary['fallback']})"
     (folder / "summary.json").write_text(json.dumps(summary, indent=1, default=str), encoding="utf-8")
     if not shop.best:
         return None, None, summary

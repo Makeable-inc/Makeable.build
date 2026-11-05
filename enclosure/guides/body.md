@@ -30,7 +30,8 @@ screen limits, the main form's proportion), `room` (the parts' box fits inside),
    flows into a tail, neck or nose, `soft_box` for a boxy one.
    Start the rounding above the parts' room (superblob's `shoulder`, soft_box's `max_round`), as round as it allows.
    `build`, then `check("room")` and `check("size")`, then `render()`.
-2. **Proportions.** Compare the render with the concept's silhouette. Fix the main form before adding anything.
+2. **A second main form.** Build another main form that also fits (a different block, or clearly different settings).
+   The main form review then compares the two and picks the one closer to the concept; the features go on that one.
 3. **Features, one at a time.** Grow each feature out of the body with `grow(body, name, at, profile, added, skipped)`
    under its exact listed name: `at` from `surface_z` / `surface_x` / `surface_y_front`, `profile` its sizes from the
    root to the tip. Its base flares into the body, so it reads as part of it, not stuck on. Use `ear`, `paw`, `ellipsoid`
@@ -44,8 +45,9 @@ screen limits, the main form's proportion), `room` (the parts' box fits inside),
 ## The look reviews that come with a build
 
 `build()` adds two reviews by itself, so you do not need to ask for them:
-- **Proportions**, once the main form fits (room and size pass) and before features: advice on length, height and
-  softness. Act on it before adding features if it says the form is off.
+- **Main forms**, once two main forms fit (room and size pass) and before features: it picks the one closer to the
+  concept and gives advice on length, height and softness. If it picks the earlier one, your saved script is set back
+  to it. Act on its advice before adding features.
 - **Character**, once every listed feature is on: does it read as the concept? Under 7/10, `submit` is refused
   until a later build reaches 7 (two tries, then it moves on and the skip is recorded).
 The reviewers know the real parts and limits; a fix they give always fits them. `submit` also refuses a script that

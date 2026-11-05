@@ -38,7 +38,7 @@ Required features:
 """
 
 
-def sheet(picture, body_view, case_view, out):
+def sheet(picture, body_view, case_view, out, labels=("1 concept", "2 chosen body", "3 finished case")):
     images = [Image.open(p).convert("RGB") for p in (picture, body_view, case_view)]
     h = 420
     images = [i.resize((max(1, round(i.width * h / i.height)), h)) for i in images]
@@ -48,7 +48,7 @@ def sheet(picture, body_view, case_view, out):
         font = ImageFont.truetype("arial.ttf", 24)
     except OSError:
         font = None
-    for row, (label, image) in enumerate(zip(("1 concept", "2 chosen body", "3 finished case"), images)):
+    for row, (label, image) in enumerate(zip(labels, images)):
         draw.text((10, row * (h + 36) + 6), label, fill=(0, 0, 0), font=font)
         board.paste(image, (0, row * (h + 36) + 36))
     board.save(out)

@@ -69,5 +69,15 @@ class Troubles(unittest.TestCase):
         self.assertNotIn("Traceback", text)
 
 
+
+
+class MainBlock(unittest.TestCase):
+    def test_the_main_form_block_is_read_from_the_script(self):
+        import body_agent
+        for code, block in (("body = superblob(1, 2, 3)", "superblob"), ("body = flat_sole(spine_body([], []))", "spine_body"),
+                            ("body = Pos(0, 0, 18) * Box(110, 62, 36)", "Box"), ("body = my_shape()", "own code")):
+            self.assertEqual(body_agent.main_block("x = 1\n" + code + "\nbody = try_join(body, f)"), block)
+
+
 if __name__ == "__main__":
     unittest.main()

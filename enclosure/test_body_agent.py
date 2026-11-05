@@ -17,6 +17,7 @@ PAWS_AT = EXAMPLE.index('for side, name in ((-1, "left paw")')
 BACK_AT = EXAMPLE.index("# The back is cut flat")
 MAIN_ONLY = EXAMPLE[:EARS_AT] + EXAMPLE[BACK_AT:]           # the main form alone
 WITH_EARS = EXAMPLE[:PAWS_AT] + EXAMPLE[BACK_AT:]           # then one kind of feature
+SECOND_FORM = MAIN_ONLY.replace("WIDTH, DEPTH, HEIGHT = 110.0, 64.0, 58.0", "WIDTH, DEPTH, HEIGHT = 108.0, 64.0, 57.0")
 KITTEN = [{"name": n, "where": w} for n, w in (("left ear", "top left"), ("right ear", "top right"),
                                                ("left paw", "bottom left front"), ("right paw", "bottom right front"))]
 BASE = {"features": KITTEN, "max_depth": 80, "width_to_height": [1.5, 2.6], "min_body": {"width": 101, "depth": 42, "height": 53},
@@ -92,11 +93,12 @@ class Gates(unittest.TestCase):
 
     def fake_ask(self, prompt, _board):
         self.asked.append(prompt)
-        return {"score": self.score, "fix": ["Increase body height by 40% to match the concept", "Make the ears broader at the root"]}, 10
+        return {"score": self.score, "pick": getattr(self, "pick", "B"),
+                "fix": ["Increase body height by 40% to match the concept", "Make the ears broader at the root"]}, 10
 
     def build_in_order(self):
         """Main form, then ears, then paws: the order the agent must follow."""
-        for script in (MAIN_ONLY, WITH_EARS, EXAMPLE):
+        for script in (MAIN_ONLY, SECOND_FORM, WITH_EARS, EXAMPLE):
             result = self.shop.build(script + EXPORT)
             self.assertTrue(result.startswith("Ran."), result[:300])
 
@@ -108,8 +110,22 @@ class Gates(unittest.TestCase):
 
     def test_two_kinds_of_feature_in_one_build_are_refused(self):
         self.shop.build(MAIN_ONLY + EXPORT)
+        self.shop.build(SECOND_FORM + EXPORT)
         result = self.shop.build(EXAMPLE + EXPORT)
         self.assertIn("more than one kind of feature", result)
+
+    def test_features_wait_for_a_second_main_form(self):
+        first = self.shop.build(MAIN_ONLY + EXPORT)
+        self.assertIn("build a second main form", first)
+        self.assertIn("2 different ones (1 so far)", self.shop.build(WITH_EARS + EXPORT))
+
+    def test_picking_the_first_form_sets_the_script_back_to_it(self):
+        self.pick = "A"
+        self.shop.build(MAIN_ONLY + EXPORT)
+        result = self.shop.build(SECOND_FORM + EXPORT)
+        self.assertIn("A (soft_box) is closer", result)
+        self.assertEqual(self.shop.script.text, MAIN_ONLY + EXPORT)
+        self.assertTrue(any("two candidate main forms" in p for p in self.asked))
 
     def test_the_character_gate_blocks_submit_then_records_a_skip(self):
         self.build_in_order()
