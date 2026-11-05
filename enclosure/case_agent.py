@@ -4,21 +4,19 @@ The AI proposes; the fixed checks still decide. submit() runs every check, and o
 
 Every step is logged to <folder>/steps.jsonl, and the best passing script is kept, so a bad step never loses one
 that worked. Uniform tools: each is execute(name, arguments) -> text (plus a picture for render)."""
-import base64
 import json
 import shutil
-import time
 from pathlib import Path
 
-import agent
 import checks
+import harness
 from sandbox import run_design
 
 HERE = Path(__file__).resolve().parent
 MAX_STEPS = 40          # tool calls in one run
 MAX_SUBMITS = 4         # full-check submits
 LOOK_TARGET = 8         # a passing case under this look score gets polish submits, while they last
-OUTPUT_LIMIT = 6000     # characters of a tool result sent back
+OUTPUT_LIMIT = 2500     # characters of a tool result sent back: every result is resent on each later step
 
 GROUPS = {
     "build": {"design_file", "files", "sealed", "part", "not_rescaled", "one_piece", "case", "holds"},
@@ -30,16 +28,6 @@ GROUPS = {
     "outside": {"flat_on_bed", "stands", "outer_parts", "keeps_body"},
 }
 
-STEPS = """Work in small steps, checking each before the next. A good order:
-1. Load the body, place the parts (screen, inputs, controller) and split at the seam; run, then check("fit").
-2. Cut the pockets and fitted openings; run, then check("openings").
-3. Add screws or snaps, stops and the holder; run, then check("fasteners") and check("outside").
-4. render() and compare with the concept: the case must keep every feature of the body and look like the concept.
-5. submit(). If it fails, fix what it names and submit again. If it passes but the look is under target, polish the
-   look (bezel, knob cap, openings that suit the character) and submit again; the best passing case is kept.
-Change one thing at a time. Use measure() instead of guessing a position. Never cut through a feature of the body
-(an arm, ear, foot or antenna): move the opening or the part instead."""
-
 TOOLS = [
     {"type": "function", "name": "run", "description": "Save this as the complete case script (design.py) and run it. Returns its printed output, or the error.",
      "parameters": {"type": "object", "properties": {"code": {"type": "string", "description": "The complete Python script."}}, "required": ["code"], "additionalProperties": False}},
@@ -49,25 +37,11 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"type": "function", "name": "measure", "description": "Run a short read-only snippet with `body` (the frozen body), `data` (the part data) and every case_parts helper already loaded; returns what it prints. For example print(front_surface(body, 30, 25)).",
      "parameters": {"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"], "additionalProperties": False}},
+    {"type": "function", "name": "docs", "description": "The signature and description of case_parts functions and classes whose names contain this text (for example 'Screw', 'pocket'). Use it instead of reading the library's source.",
+     "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"], "additionalProperties": False}},
     {"type": "function", "name": "submit", "description": "Run every check and the look review on the last case that ran. A passing submit is kept; you may submit again to improve the look.",
      "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
 ]
-
-
-def call(body, previous=None):
-    request = {"model": agent.MODEL, "tools": TOOLS, "reasoning": {"effort": "medium"}, **body}
-    if previous:
-        request["previous_response_id"] = previous
-    import urllib.request
-    data = agent.send_with_retries(urllib.request.Request(
-        "https://api.openai.com/v1/responses", data=json.dumps(request).encode(),
-        headers={"Authorization": f"Bearer {agent.api_key()}", "Content-Type": "application/json"}))
-    agent.spend(data.get("usage", {}))
-    return data
-
-
-def image_part(path):
-    return {"type": "input_image", "image_url": "data:image/png;base64," + base64.b64encode(Path(path).read_bytes()).decode()}
 
 
 class Workshop:
@@ -84,6 +58,12 @@ class Workshop:
         write_data(part_ids, self.work)
         self.code, self.ran, self.report = None, False, None
         self.best, self.submits, self.look = None, 0, None
+        self.tools = TOOLS
+
+    def done(self):
+        """The best passing case is good enough to stop: the look target is met, or the look is not reviewed."""
+        reviewed = self.picture and self.base.get("style") == "character"
+        return self.best is not None and (not reviewed or self.best["score"] >= LOOK_TARGET)
 
     def finish_run(self):
         # Written after the code runs, so the script cannot replace the rules it is checked against.
@@ -98,7 +78,7 @@ class Workshop:
             return message[-OUTPUT_LIMIT:]
         self.finish_run()
         output = (self.work / "output.txt").read_text(encoding="utf-8", errors="replace")
-        return ("Ran.\n" + output)[-OUTPUT_LIMIT:]
+        return ("Ran.\n" + output[-1200:]) if output.strip() else "Ran."
 
     def checked(self):
         if self.report is None:
@@ -114,6 +94,9 @@ class Workshop:
         failed = [{k: r.get(k) for k in fields} for r in report["failed"] if names is None or r["check"] in names]
         warned = [{k: r.get(k) for k in fields} for r in report.get("warnings", []) if names is None or r["check"] in names][:6]
         counted = sum(1 for r in report["results"] if names is None or r["check"] in names)
+        if group == "all" and not report["failed"]:
+            # Every check passes: submit now, so a passing case is kept before any polishing.
+            return "Every check passes, so this case was submitted.\n" + self.submit()
         text = json.dumps({"group": group, "checks_run": counted, "failed": failed, "warnings": warned}, default=str)
         if not report.get("complete", True):
             text += "\nSome checks did not run because the build itself failed; fix the build group first."
@@ -139,6 +122,19 @@ class Workshop:
         ok, message = run_design(head + code, probe)
         output = (probe / "output.txt").read_text(encoding="utf-8", errors="replace") if (probe / "output.txt").exists() else ""
         return (output if ok else message)[-OUTPUT_LIMIT:] or "(printed nothing)"
+
+    def docs(self, name):
+        import inspect
+        import case_parts
+        found = []
+        for key, value in inspect.getmembers(case_parts):
+            if name.lower() in key.lower() and (inspect.isfunction(value) or inspect.isclass(value)) and value.__module__ == "case_parts":
+                try:
+                    signature = str(inspect.signature(value))
+                except (TypeError, ValueError):
+                    signature = "(...)"
+                found.append(f"{key}{signature}: {inspect.getdoc(value) or ''}")
+        return ("\n\n".join(found) or f"Nothing in case_parts is named like {name!r}.")[:OUTPUT_LIMIT]
 
     def submit(self):
         if not self.ran:
@@ -182,79 +178,28 @@ class Workshop:
             return self.render()
         if name == "measure":
             return self.measure(arguments.get("code", "")), None
+        if name == "docs":
+            return self.docs(arguments.get("name", "")), None
         if name == "submit":
             return self.submit(), None
         return f"Unknown tool {name}.", None
 
 
-def log(folder, **entry):
-    with open(Path(folder) / "steps.jsonl", "a", encoding="utf-8") as f:
-        f.write(json.dumps({"time": round(time.time(), 1), **entry}, default=str)[:20000] + "\n")
-
-
 def design_case(brief, folder, base, body_stl, picture, part_ids, system):
-    """Runs the agent. Returns a summary like agent.design_part, with the best passing case copied to <folder>/best."""
+    """Runs the agent. Returns a summary, with the best passing case copied to <folder>/best."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     shop = Workshop(folder, base, body_stl, picture, part_ids)
-    started, steps, tokens = time.time(), 0, 0
     # The one-shot system prompt asks for a single script reply; here the script goes through run() instead.
     system = system.replace("Reply with only the script, in one ```python block. ", "Pass the complete script to the run tool each time. ")
-    instructions = system + "\n\nYou work through tools, not one reply.\n" + STEPS
-    content = [{"type": "input_text", "text": brief}]
-    if picture:
-        content.append(image_part(picture))
-    data = call({"instructions": instructions, "input": [{"role": "user", "content": content}]})
-    outcome = None
-    while True:
-        tokens += data.get("usage", {}).get("total_tokens", 0)
-        calls = [item for item in data["output"] if item["type"] == "function_call"]
-        said = "".join(c.get("text", "") for item in data["output"] if item["type"] == "message" for c in item["content"])
-        if said:
-            log(folder, step=steps, said=said[:2000])
-        if not calls:
-            outcome = "stopped: the agent stopped calling tools"
-            break
-        results, pictures = [], []
-        for item in calls:
-            steps += 1
-            arguments = json.loads(item.get("arguments") or "{}")
-            began = time.time()
-            text, picture_out = shop.execute(item["name"], arguments)
-            log(folder, step=steps, tool=item["name"], arguments=arguments, result=text[:3000], seconds=round(time.time() - began, 1))
-            print(f"step {steps}: {item['name']} {text[:160]!r}", flush=True)
-            results.append({"type": "function_call_output", "call_id": item["call_id"], "output": text})
-            if picture_out:
-                pictures.append(picture_out)
-        follow = list(results)
-        if pictures:
-            parts = [{"type": "input_text", "text": "Concept, then your case:"}]
-            if picture:
-                parts.append(image_part(picture))
-            parts += [image_part(p) for p in pictures]
-            follow.append({"role": "user", "content": parts})
-        best = shop.best
-        if best and (best["score"] >= LOOK_TARGET or not (picture and base.get("style") == "character")):
-            outcome = best["status"] or "passed"
-            break
-        if shop.submits >= MAX_SUBMITS:
-            outcome = best["status"] if best else "stopped: used all submits"
-            break
-        if steps >= MAX_STEPS:
-            outcome = best["status"] if best else f"stopped: used all {MAX_STEPS} steps"
-            break
-        if agent.job_out_of_tokens():
-            outcome = best["status"] if best else agent.token_limit_reason()
-            break
-        if steps >= MAX_STEPS - 3:
-            follow.append({"role": "user", "content": [{"type": "input_text", "text": "Only a few steps are left: submit your best case now."}]})
-        data = call({"input": follow}, previous=data["id"])
+    instructions = system + "\n\n" + harness.guide("case")
+    outcome, steps, tokens, seconds = harness.run(shop, instructions, brief, folder, picture, MAX_STEPS, MAX_SUBMITS, "case")
     if shop.best:
         target = folder / "best"
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(shop.best["folder"], target)
     summary = {"outcome": outcome, "steps": steps, "submits": shop.submits, "look_score": shop.best["score"] if shop.best else None,
-               "best": str(folder / "best") if shop.best else None, "tokens": tokens, "seconds": round(time.time() - started, 1)}
+               "best": str(folder / "best") if shop.best else None, "tokens": tokens, "seconds": seconds}
     (folder / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
     return summary

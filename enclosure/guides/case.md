@@ -1,0 +1,46 @@
+# Case guide: build the inside of a frozen body, step by step
+
+You work through tools, not one reply. The body is fixed: the case must keep its outside exactly, every feature
+included. The fixed checks decide; your job is to make them pass and make the case look like the concept.
+
+## The tools and when to call them
+
+| Tool | Call it when | You get back |
+|---|---|---|
+| `docs(name)` | before using a library piece you are not sure of | its signature and what it does |
+| `measure(code)` | you need a position: where the front is at a spot, the room left, a side's surface | what the snippet prints |
+| `run(code)` | after each change; always pass the complete script | "Ran." or the error |
+| `check(group)` | after a run, for the group the last change touched | the failed checks in that group, with fixes |
+| `render()` | after the parts and openings are in, and after each look change | a picture of your case next to the concept |
+| `submit()` | when `check("all")` would pass, or to keep a better-looking version | all checks plus the look review |
+
+`check("all")` with nothing failing submits for you.
+
+## The order that works
+
+1. **Read first, briefly.** One or two `docs()` calls for the pieces you will use (Part, split, pocket, the
+   opening for your input, Screw or Snap). Do not read the library's source.
+2. **Place the parts.** Load the body, place the screen, the inputs and the controller with `Part`, read the front
+   with `deepest_front` / `front_surface`, split at the seam. `run`, then `check("fit")`.
+3. **Openings.** Cut pockets, the window, the input's opening and the USB opening. `run`, then `check("openings")`.
+4. **Fasteners and outside.** Add screws (or snaps), stops and the holder. Pick positions from `free_spots` and
+   `stop_spots`, never by guessing. `run`, then `check("fasteners")` and `check("outside")`.
+5. **Look.** `render()`. Compare with the concept: does the case keep every feature, is the bezel even, do the
+   openings suit the character? Fix the worst thing, `run`, `render()` again.
+6. **Submit.** `submit()`. If it fails, fix what it names, one thing at a time. If it passes under the look target,
+   polish (bezel, knob cap shaped for the character, softer openings) and submit again. The best pass is kept,
+   so polishing can never make the result worse.
+
+## What good looks like
+
+- Every feature of the body is still there: arms, ears, feet and antennas are never cut, hollowed or left loose.
+- The screen sits in an even bezel; openings are sized and rounded to suit the form.
+- No screw heads, seams or patches on the front or the top: fasteners go in from the back.
+- Details suit the character: a paw-shaped knob cap for an animal, a dial for a radio.
+
+## Do not
+
+- Do not rewrite the whole script when one group fails: change only what the failed checks name.
+- Do not cut an opening through a feature. Move the opening or the part instead.
+- Do not guess a number you can `measure`.
+- Do not make more calls than you need: every call resends everything so far, so a long session runs out of budget.

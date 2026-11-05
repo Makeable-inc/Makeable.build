@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 import case_agent
+import harness
 
 
 def reply(*calls, said=""):
@@ -20,8 +21,11 @@ class FakeShop:
     """Submits pass with the given look scores, in order."""
 
     def __init__(self, scores, folder):
-        self.scores, self.submits, self.best, self.calls = list(scores), 0, None, []
+        self.scores, self.submits, self.best, self.calls, self.tools = list(scores), 0, None, [], []
         self.folder = Path(folder)
+
+    def done(self):
+        return self.best is not None and self.best["score"] >= case_agent.LOOK_TARGET
 
     def execute(self, name, arguments):
         self.calls.append(name)
@@ -48,7 +52,7 @@ class Loop(unittest.TestCase):
     def run_agent(self, replies, scores):
         shop = FakeShop(scores, self.folder)
         replies = iter(replies)
-        with mock.patch.object(case_agent, "call", lambda _b, previous=None: next(replies)), \
+        with mock.patch.object(harness, "call", lambda _t, _b, previous=None: next(replies)), \
                 mock.patch.object(case_agent, "Workshop", lambda *a, **k: shop):
             summary = case_agent.design_case("brief", self.folder, {"style": "character"}, "BODY.stl", self.picture, [], "system")
         return summary, shop
