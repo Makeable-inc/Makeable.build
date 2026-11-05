@@ -84,5 +84,15 @@ class Harness(unittest.TestCase):
         self.assertEqual(outcome[0], "pass")
 
 
+class CostCount(unittest.TestCase):
+    def test_cached_input_counts_at_a_tenth(self):
+        import agent
+        agent.start_job()
+        agent.spend({"total_tokens": 10_000, "input_tokens_details": {"cached_tokens": 9_000}})
+        self.assertEqual(agent.job_tokens(), 1_900)
+        agent.spend(500)
+        self.assertEqual(agent.job_tokens(), 2_400)
+
+
 if __name__ == "__main__":
     unittest.main()

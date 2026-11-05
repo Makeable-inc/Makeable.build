@@ -24,7 +24,7 @@ GUIDES = Path(__file__).resolve().parent / "guides"
 MAX_NUDGES = 2          # times the agent is sent back when it stops short of the goal with budget left
 SHORT_LIMIT = 1500      # characters: a longer tool result is stored and shortened
 HEAD, TAIL = 900, 300   # characters of a shortened result kept from its start and its end
-COMPACT_AT = int(os.environ.get("ENCLOSURE_COMPACT_AT", 0))  # input tokens on one call; 0 = never compact
+COMPACT_AT = int(os.environ.get("ENCLOSURE_COMPACT_AT", 30_000))  # input tokens on one call (0 = never); set from the dino log: calls grow ~700 tokens each, so this compacts about once per stage
 SUMMARY_LIMIT = 1500    # characters in a handoff summary
 
 RECALL = {"type": "function", "name": "recall", "description": "The full text of an earlier tool result that was shortened, by its reference, for example recall('r12').",
