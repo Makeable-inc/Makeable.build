@@ -605,7 +605,7 @@ def check_case(design, meshes, purchased, cards, transforms, only=None):
         results.extend(check_layout(design, cards, transforms, union))
     if want("access") and design.get("base_design", {}) and design["base_design"].get("use_library"):
         from access import check_access
-        results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms))
+        results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms, fitted))
     return results
 
 

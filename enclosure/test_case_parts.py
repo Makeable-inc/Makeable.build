@@ -209,6 +209,16 @@ class AccessRules(unittest.TestCase):
             self.assertFalse(check_access(["a"], {"PRINT_Shell": wall}, {"PURCHASE_Part2": card}, transforms)[0]["ok"])
             self.assertTrue(check_access(["a"], {"PRINT_Shell": beside}, {"PURCHASE_Part2": card}, transforms)[0]["ok"])
 
+    def test_a_cap_fitted_on_the_part_is_how_you_reach_it_not_a_block(self):
+        # full-v2 hamster run: the knob's printed cap on its shaft failed access ("blocked") on an otherwise valid case
+        card = {"front": "+z", "features": {"shaft": {"min": [-1, -1, 0], "max": [1, 1, 5], "points": "+z"}}}
+        transforms = {"PURCHASE_Part3": np.eye(4)}
+        cap = trimesh.creation.box(extents=(12, 12, 8), transform=trimesh.transformations.translation_matrix((0, 0, 6)))
+        with mock.patch("access.access_list", return_value=[("PURCHASE_Part3", "shaft", "you turn it")]):
+            self.assertFalse(check_access(["a"], {"PRINT_Knob": cap}, {"PURCHASE_Part3": card}, transforms)[0]["ok"])
+            self.assertTrue(check_access(["a"], {"PRINT_Knob": cap}, {"PURCHASE_Part3": card}, transforms,
+                                         fitted={"PRINT_Knob": "PURCHASE_Part3"})[0]["ok"])
+
 
 class GlueLimits(unittest.TestCase):
     def test_a_part_you_press_cannot_be_glued(self):
