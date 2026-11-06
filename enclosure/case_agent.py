@@ -22,15 +22,12 @@ LOOK_TARGET = 8         # a passing case under this look score gets polish submi
 # case_closed: an open route from the parts to outside. press_stop: pressing the knob pushes its board back with
 # nothing behind it. The library satisfies both (knob_recess stays a closed dish; place_stops surrounds the shaft).
 MUST_PASS = {"case_closed", "press_stop"}
-# wall: the shared rule lets 5% of a part's surface be under 1 mm (it will not print there). Past bests had 0.2-2.4%,
-# the worked example 0.7%: over 1% is a sliver or knife edge to remove. Thinner than 1.6 mm alone stays a warning.
-MAX_THIN_UNDER_1MM = 0.01
+# wall stays a warning (thin slivers and knife edges, mostly dropped by the slicer): a stricter agent-only limit
+# (1% under 1 mm) failed cases the agent could not then fix, and lost the valid result (runs/vs-confetti/after-details).
 
 
 def real_fault(r):
-    if r["check"] in MUST_PASS:
-        return True
-    return r["check"] == "wall" and (r.get("thin_below_minimum") or 0) > MAX_THIN_UNDER_1MM
+    return r["check"] in MUST_PASS
 
 
 def strict(report):

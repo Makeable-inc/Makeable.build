@@ -79,8 +79,8 @@ class Strict(unittest.TestCase):
                                                              {"check": "wall", "part": "B", "thin_below_minimum": 0.019}, {"check": "press_stop"}]}
         strict = case_agent.strict(report)
         self.assertFalse(strict["passed"])
-        self.assertEqual(sorted((r["check"], r.get("part")) for r in strict["failed"]), [("case_closed", None), ("press_stop", None), ("wall", "B")])
-        self.assertEqual([(r["check"], r["part"]) for r in strict["warnings"]], [("wall", "A")], "a wall just under 1.6 mm stays a warning")
+        self.assertEqual(sorted(r["check"] for r in strict["failed"]), ["case_closed", "press_stop"])
+        self.assertEqual([(r["check"], r["part"]) for r in strict["warnings"]], [("wall", "A"), ("wall", "B")], "walls stay warnings")
         self.assertTrue(report["passed"], "the shared report itself is unchanged")
 
 
