@@ -4,6 +4,7 @@ The case goes together along world y: the screen faces -y, and the flat rear cov
 Each piece keeps its safe limits. A piece raises a clear error, rather than building something that cannot print or cannot be assembled.
 """
 import json
+import math
 
 from build123d import Box, Cylinder, Pos, Rot, export_stl
 
@@ -12,6 +13,7 @@ GAP = 0.15
 MIN_WALL = 1.6
 HOLDER_WALL = 2.4
 MIN_STOP_WIDTH = 4.0
+STOP_TOUCH = 0.4        # mm: a stop counts as holding a board only if it ends this close behind the board
 MAX_STOP_SLENDERNESS = 8.0
 POST_RADIUS = 2.8
 PLUG_WIDTH = 2.8
@@ -200,12 +202,34 @@ def shaft_hole(part, gap=GAP):
     return along_y(x, z, -FAR, high[1], radius)
 
 
-def knob_recess(part, depth_from_y, room=5.0):
-    """Finger room around the knob, cut into the front from outside down to depth_from_y."""
+def knob_recess(part, depth_from_y, room=5.0, data=None):
+    """Finger room around the knob: a round dish cut into the front from outside down to depth_from_y. It never opens
+    into the case: anything of the part in front of that depth (its body, the bushing in the wall, and, with data, its
+    jumper plugs) keeps MIN_WALL of plastic to the dish. The dish narrows to stay clear of it; if it would get too
+    tight for fingers, it gets shallower instead. The only way in stays the shaft hole."""
     low, high = part.feature("knob")
     x, z = (low[0] + high[0]) / 2, (low[2] + high[2]) / 2
-    radius = max(high[0] - low[0], high[2] - low[2]) / 2 + room + 0.2
-    return along_y(x, z, -FAR, depth_from_y, radius)
+    knob_radius = max(high[0] - low[0], high[2] - low[2]) / 2
+    radius, depth = knob_radius + room + 0.2, depth_from_y
+    knob, shaft = part.feature("knob"), part.feature("shaft")
+    inside = lambda box, f: all(f[0][i] - 0.01 <= box[0][i] and box[1][i] <= f[1][i] + 0.01 for i in range(3))
+    boxes = [b for b in part.solids(include_later=True) if not inside(b, knob) and not inside(b, shaft)]
+    boxes += part.plugs(data) if data else []
+    keep = GAP + MIN_WALL
+    for _ in range(2):
+        ahead = [b for b in boxes if b[0][1] - keep < depth]   # reaches forward past the dish floor
+        for b in ahead:
+            # the box's nearest point to the dish axis, seen from the front
+            dx, dz = max(b[0][0] - x, 0, x - b[1][0]), max(b[0][2] - z, 0, z - b[1][2])
+            reach = math.hypot(dx, dz) - keep
+            if reach <= 0:
+                depth = min(depth, b[0][1] - keep)    # right under the dish (the bushing, the can): stop in front
+            elif reach < radius:
+                if reach >= knob_radius + 2.0:
+                    radius = reach                    # narrow the dish to keep a wall to it
+                else:
+                    depth = min(depth, b[0][1] - keep)  # too tight for fingers: make the dish shallower instead
+    return along_y(x, z, -FAR, depth, radius)
 
 
 def touch_opening(part, depth=2.0):
@@ -367,21 +391,42 @@ def place_screws(parts, x0, x1, z0, z1, back_y, seam_y, towers=(), body=None, co
     return screws
 
 
-def place_stops(part, cover_y, clear_of=(), count=2):
-    """`count` stops behind `part` on spots that fit (stop_spots), spread apart; a refused spot is skipped and the next
-    tried. Returns the stop solids. Raises with a clear reason if none fits."""
+def place_stops(part, cover_y, clear_of=(), count=None):
+    """Stops behind `part` on spots that fit (stop_spots), spread evenly around its middle, so the part cannot tip:
+    around the shaft for a knob (3 stops, so pressing it pushes against plastic on every side), around the board's
+    middle otherwise (2, on opposite sides). Each direction takes the farthest spot that fits there; a refused spot is
+    skipped and the next one tried. Returns the stop solids; raises with a clear reason if none fits."""
+    features = part.data["features"]
+    if "shaft" in features:
+        low, high = part.feature("shaft")
+    else:
+        x0, x1, z0, z1 = outline(part)
+        low, high = (x0, 0, z0), (x1, 0, z1)
+    cx, cz = (low[0] + high[0]) / 2, (low[2] + high[2]) / 2
+    count = count or (3 if "shaft" in features else 2)
+    rear = part.feature("pcb")[1][1] if "pcb" in features else None   # the board's back, which the stops press on
     spots = stop_spots(part, clear_of=clear_of)
     stops, refused, used = [], [], []
-    for x, z in spread(spots, len(spots)):
-        if len(stops) >= count:
-            break
-        if any(abs(x - a) < 6 and abs(z - b) < 6 for a, b in used):
-            continue
-        try:
-            stops.append(stop(part, x, z, cover_y, clear_of=clear_of))
+    for k in range(count):
+        # aim at evenly spaced directions around the middle; rank the spots by how far they reach that way
+        angle = math.pi / 4 + 2 * math.pi * k / count
+        ux, uz = math.cos(angle), math.sin(angle)
+        ranked = sorted(spots, key=lambda s: -((s[0] - cx) * ux + (s[1] - cz) * uz - 0.5 * abs(-(s[0] - cx) * uz + (s[1] - cz) * ux)))
+        for x, z in ranked:
+            if (x - cx) * ux + (z - cz) * uz <= 0 or any(abs(x - a) < 6 and abs(z - b) < 6 for a, b in used):
+                continue
+            try:
+                made = stop(part, x, z, cover_y, clear_of=clear_of)
+            except AssertionError as error:
+                refused.append(str(error))
+                continue
+            if rear is not None and made.bounding_box().min.Y - rear > STOP_TOUCH:
+                # it would rest on pins or solder tails behind the board, not on the board: it holds nothing when pressed
+                refused.append(f"A stop at x={x}, z={z} would stop {made.bounding_box().min.Y - rear:.1f} mm behind the board, on its pins.")
+                continue
+            stops.append(made)
             used.append((x, z))
-        except AssertionError as error:
-            refused.append(str(error))
+            break
     assert stops, (f"No stop fits behind {part.name} ({len(spots)} spots tried)." + (f" Last refusal: {refused[-1]}" if refused else ""))
     return stops
 

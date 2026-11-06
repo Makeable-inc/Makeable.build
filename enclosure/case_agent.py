@@ -17,6 +17,21 @@ HERE = Path(__file__).resolve().parent
 MAX_STEPS = 60          # tool calls in one run
 MAX_SUBMITS = 6         # full-check submits
 LOOK_TARGET = 8         # a passing case under this look score gets polish submits, while they last
+# Warnings the shared checks allow (the live pipeline is unchanged) that the agents must not ship: real faults.
+# case_closed: an open route from the parts to outside. press_stop: pressing the knob pushes its board back with
+# nothing behind it. The library satisfies both (knob_recess stays a closed dish; place_stops surrounds the shaft).
+MUST_PASS = {"case_closed", "press_stop"}
+
+
+def strict(report):
+    """The check report with MUST_PASS warnings moved to failures, for the agents."""
+    if not report or "warnings" not in report:
+        return report
+    moved = [r for r in report["warnings"] if r["check"] in MUST_PASS]
+    if not moved:
+        return report
+    return {**report, "warnings": [r for r in report["warnings"] if r["check"] not in MUST_PASS],
+            "failed": list(report["failed"]) + moved, "passed": False}
 OUTPUT_LIMIT = 2500     # characters of a tool result sent back: every result is resent on each later step
 
 GROUPS = {
@@ -125,7 +140,7 @@ class Workshop:
 
     def checked(self):
         if self.report is None:
-            self.report = checks.check_design(self.work, "case")
+            self.report = strict(checks.check_design(self.work, "case"))
         return self.report
 
     def check_crash(self):

@@ -338,6 +338,9 @@ class WorkedExample(unittest.TestCase):
             self.assertEqual(done.returncode, 0, done.stderr[-1500:])
             report = checks.check_design(folder, "case")
             self.assertTrue(report["passed"], json.dumps([[r["check"], r["part"], r["measured"]] for r in report["failed"]], default=str))
+            # the faults agents used to copy from this example: an open route beside the knob, no stop around its shaft
+            warned = {r["check"] for r in report.get("warnings", [])}
+            self.assertFalse({"case_closed", "press_stop"} & warned, sorted(warned))
 
 
 if __name__ == "__main__":

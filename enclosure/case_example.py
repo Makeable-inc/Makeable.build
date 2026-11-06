@@ -18,7 +18,7 @@ shell, cover = split(body, seam_y)
 usb = usb_opening(controller, data)
 wire_room = block([knob.feature("pcb")[0][0], knob.feature("pcb")[1][1] + 1.0, 4.0], [50.5, seam_y + 1, 50.0])
 cuts = [pocket(screen, seam_y + 1, data), pocket(knob, seam_y + 1, data), pocket(controller, seam_y + 1, data), tower_room(controller, seam_y + 1), wire_room,
-        window(screen), shaft_hole(knob), knob_recess(knob, knob.feature("bushing")[0][1] + 1.0), usb]
+        window(screen), shaft_hole(knob), knob_recess(knob, knob.feature("bushing")[0][1] + 1.0, data=data), usb]
 shell = one_solid(shell - joined(cuts), "hollow shell")
 
 # Screws and stops go on spots that fit, found by the library and spread to the corners: never typed in by hand.
@@ -28,7 +28,7 @@ shell = one_solid(shell + (joined([s.post() for s in screws]) & body), "shell wi
 shell = one_solid(shell - joined([s.shell_cut() for s in screws]) - usb, "drilled shell")
 
 inner = back_y - COVER_THICKNESS + 0.5
-extras = [tower(controller, inner)] + place_stops(screen, inner, clear_of=[controller], count=2) + place_stops(knob, inner, count=1)
+extras = [tower(controller, inner)] + place_stops(screen, inner, clear_of=[controller]) + place_stops(knob, inner)
 cover = one_solid(cover + joined(extras), "cover with tower and stops")
 cover = one_solid(cover - joined([s.cover_cut() for s in screws]) - usb, "PRINT_Base")
 

@@ -72,5 +72,16 @@ class CheckCrash(unittest.TestCase):
         self.assertEqual(shown["source"], "tool")
 
 
+class Strict(unittest.TestCase):
+    def test_real_faults_fail_the_agents_but_not_the_shared_report(self):
+        import case_agent
+        report = {"passed": True, "failed": [], "warnings": [{"check": "case_closed"}, {"check": "wall"}, {"check": "press_stop"}]}
+        strict = case_agent.strict(report)
+        self.assertFalse(strict["passed"])
+        self.assertEqual(sorted(r["check"] for r in strict["failed"]), ["case_closed", "press_stop"])
+        self.assertEqual([r["check"] for r in strict["warnings"]], ["wall"])
+        self.assertTrue(report["passed"], "the shared report itself is unchanged")
+
+
 if __name__ == "__main__":
     unittest.main()
