@@ -128,6 +128,17 @@ class Workshop:
             self.report = checks.check_design(self.work, "case")
         return self.report
 
+    def check_crash(self):
+        """The case checks themselves crashed (not the agent's script): the crash, worded so the harness marks it as a
+        shared-tool failure and its circuit breaker can stop the run. None if the checks ran."""
+        try:
+            self.checked()
+            return None
+        except Exception:
+            import traceback
+            self.report = None
+            return "The code crashed:\n" + traceback.format_exc()[-OUTPUT_LIMIT:]
+
     def stale(self):
         """The saved script changed since the last run, so the last results are not for it."""
         return self.script.text != self.ran_code
@@ -137,6 +148,9 @@ class Workshop:
             return "Nothing has run yet, or the last run failed. Call run() with a script that works."
         if self.stale():
             return "The saved script changed since the last run, so there is nothing current to check. run() it first."
+        crash = self.check_crash()
+        if crash:
+            return crash
         report = self.checked()
         names = None if group == "all" else GROUPS[group]
         fields = ("check", "part", "measured", "limit", "where", "fix")
@@ -192,6 +206,9 @@ class Workshop:
             return "Nothing has run yet."
         if self.stale():
             return "The saved script changed since the last run, so this case has not been checked. run() it first."
+        crash = self.check_crash()
+        if crash:
+            return crash   # not counted as a submit: nothing was checked
         self.submits += 1
         report = self.checked()
         look = None

@@ -52,17 +52,37 @@ def ring(outer, inner, start, direction, length):
     return trimesh.boolean.difference([cylinder(outer, start, direction, length), cylinder(inner, np.array(start) - np.array(direction) * 0.5, direction, length + 1)], engine="manifold")
 
 
+NEAR_MARGIN = 5.0     # mm: points farther than this from the other part's bounds cannot be the closest pair
+QUERY_BATCH = 1000    # points per closest-point query, so its memory stays small on dense meshes
+
+
+def nearest_gaps(mesh, points):
+    """(distances, points) from each point near `mesh` to its surface. Points farther than NEAR_MARGIN from the
+    mesh's bounds are left out: they cannot be the closest, and for a point far from a surface the closest-point search
+    gathers thousands of candidate triangles (a full query ran out of memory on two runs). Queried in batches."""
+    lo, hi = mesh.bounds[0] - NEAR_MARGIN, mesh.bounds[1] + NEAR_MARGIN
+    near = points[np.all((points >= lo) & (points <= hi), axis=1)]
+    if not len(near):
+        return np.array([]), near
+    found = [trimesh.proximity.closest_point(mesh, near[i:i + QUERY_BATCH])[1] for i in range(0, len(near), QUERY_BATCH)]
+    return np.concatenate(found), near
+
+
 def check_plastic_pairs(meshes):
     results = []
     names = list(meshes)
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             volume = overlap(meshes[a], meshes[b])
-            points_a, points_b = plastic_points(meshes[a]), plastic_points(meshes[b])
-            _, one, _ = trimesh.proximity.closest_point(meshes[b], points_a)
-            _, two, _ = trimesh.proximity.closest_point(meshes[a], points_b)
-            gap = float(min(one.min(), two.min()))
-            place = rounded(points_a[np.argmin(one)] if one.min() <= two.min() else points_b[np.argmin(two)])
+            one, near_a = nearest_gaps(meshes[b], plastic_points(meshes[a]))
+            two, near_b = nearest_gaps(meshes[a], plastic_points(meshes[b]))
+            if not len(one) and not len(two):
+                # nowhere within NEAR_MARGIN of each other: the gap is at least that
+                gap, place = NEAR_MARGIN, rounded(meshes[a].centroid)
+            elif not len(two) or (len(one) and one.min() <= two.min()):
+                gap, place = float(one.min()), rounded(near_a[np.argmin(one)])
+            else:
+                gap, place = float(two.min()), rounded(near_b[np.argmin(two)])
             results.append(result("parts_gap", f"{a} / {b}", volume < 1e-3 and gap >= MIN_GAP - GAP_TOLERANCE, measured=round(gap, 3), limit=f"at least {MIN_GAP} mm and no overlap", where=f"closest at {place}, overlap {volume:.3f} mm3",
                                   fix=f"{a} and {b} overlap or touch near {place}. Keep every mating surface at least {MIN_GAP} mm apart."))
     return results

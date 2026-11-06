@@ -99,7 +99,7 @@ DIAGNOSE = ("Diagnose before switching: read the error, check your assumptions, 
 CAD_WORDS = ("loft", "shell", "fillet", "brep", "stdfail", "standard_", "not a valid solid", "boolean", "offset")
 
 
-HELPER_FILES = ("body_parts.py", "case_parts.py")   # the shared building blocks the agents call
+HELPER_FILES = ("body_parts.py", "case_parts.py", "case_checks.py", "checks.py", "body_rules.py", "case_agent.py", "body_agent.py")   # shared code the agents call or are checked by
 REFUSALS = ("Not accepted", "Nothing has", "Nothing to", "The saved script changed", "There is no script",
             "It ran but did not export", "Import of", "Unknown tool", "Inspection limit")
 TOOL_FAILURE_LIMIT = 2   # the same shared-tool failure twice (one focused retry) stops the run as blocked by tool
