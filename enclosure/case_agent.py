@@ -8,6 +8,7 @@ import json
 import shutil
 from pathlib import Path
 
+import case_details
 import checks
 import harness
 import script_file
@@ -21,16 +22,25 @@ LOOK_TARGET = 8         # a passing case under this look score gets polish submi
 # case_closed: an open route from the parts to outside. press_stop: pressing the knob pushes its board back with
 # nothing behind it. The library satisfies both (knob_recess stays a closed dish; place_stops surrounds the shaft).
 MUST_PASS = {"case_closed", "press_stop"}
+# wall: the shared rule lets 5% of a part's surface be under 1 mm (it will not print there). Past bests had 0.2-2.4%,
+# the worked example 0.7%: over 1% is a sliver or knife edge to remove. Thinner than 1.6 mm alone stays a warning.
+MAX_THIN_UNDER_1MM = 0.01
+
+
+def real_fault(r):
+    if r["check"] in MUST_PASS:
+        return True
+    return r["check"] == "wall" and (r.get("thin_below_minimum") or 0) > MAX_THIN_UNDER_1MM
 
 
 def strict(report):
-    """The check report with MUST_PASS warnings moved to failures, for the agents."""
+    """The check report with real-fault warnings moved to failures, for the agents."""
     if not report or "warnings" not in report:
         return report
-    moved = [r for r in report["warnings"] if r["check"] in MUST_PASS]
+    moved = [r for r in report["warnings"] if real_fault(r)]
     if not moved:
         return report
-    return {**report, "warnings": [r for r in report["warnings"] if r["check"] not in MUST_PASS],
+    return {**report, "warnings": [r for r in report["warnings"] if not real_fault(r)],
             "failed": list(report["failed"]) + moved, "passed": False}
 OUTPUT_LIMIT = 2500     # characters of a tool result sent back: every result is resent on each later step
 
@@ -77,13 +87,15 @@ class Workshop:
         self.script = script_file.ScriptFile(self.folder / "script.py")
         self.ran, self.report, self.ran_code = False, None, None   # ran_code: the script text the last run used
         self.best, self.submits, self.look = None, 0, None
+        self.last_submit, self.uncounted = None, False   # uncounted: the last call did nothing, so it costs no step
         self.tools, self.last_fixes, self.target = TOOLS, [], LOOK_TARGET
         self.troubles = []   # what kept the case from fitting this body, for the body stage if the case fails
 
     def done(self):
         """The best passing case is good enough to stop: the look target is met, or the look is not reviewed."""
         reviewed = self.picture and self.base.get("style") == "character"
-        return self.best is not None and (not reviewed or self.best["score"] >= LOOK_TARGET)
+        return (self.best is not None and not self.best.get("unfinished")
+                and (not reviewed or self.best["score"] >= LOOK_TARGET))
 
     def state(self):
         """What resume needs beyond the saved script: the counters and the best result."""
@@ -161,8 +173,10 @@ class Workshop:
 
     def check(self, group):
         if not self.ran:
+            self.uncounted = True
             return "Nothing has run yet, or the last run failed. Call run() with a script that works."
         if self.stale():
+            self.uncounted = True
             return "The saved script changed since the last run, so there is nothing current to check. run() it first."
         crash = self.check_crash()
         if crash:
@@ -178,6 +192,8 @@ class Workshop:
         if group == "all" and not report["failed"]:
             # Every check passes: submit now, so a passing case is kept before any polishing.
             return "Every check passes, so this case was submitted.\n" + self.submit()
+        if counted == 0:
+            self.uncounted = True   # nothing in this group ran: no step spent
         text = json.dumps({"group": group, "checks_run": counted, "failed": failed, "warnings": warned}, default=str)
         if not report.get("complete", True):
             text += "\nSome checks did not run because the build itself failed; fix the build group first."
@@ -219,9 +235,16 @@ class Workshop:
 
     def submit(self):
         if not self.ran:
+            self.uncounted = True
             return "Nothing has run yet."
         if self.stale():
+            self.uncounted = True
             return "The saved script changed since the last run, so this case has not been checked. run() it first."
+        last = getattr(self, "last_submit", None)
+        if last and last[0] == self.ran_code:
+            # the same case as the last submit (often the one check("all") just submitted): the same answer, no cost
+            self.uncounted = True
+            return "This exact case was already submitted; its result:\n" + last[1]
         crash = self.check_crash()
         if crash:
             return crash   # not counted as a submit: nothing was checked
@@ -233,7 +256,8 @@ class Workshop:
             from preview import render
             render(self.work)
             try:
-                look = case_look.review(self.work, self.picture, self.base, self.base.get("body_score"))
+                look = case_look.review(self.work, self.picture, self.base, self.base.get("body_score"),
+                                        {d: case_details.DETAILS[d][1] for d in case_details.applies(report)})
             except Exception as error:
                 print(f"no look review: {error}", flush=True)
         problems = [{k: r.get(k) for k in ("check", "part", "measured", "limit", "where", "fix")} for r in report["failed"]]
@@ -241,11 +265,24 @@ class Workshop:
             self.note_trouble(f"{r['check']} ({r.get('part')}): {r.get('fix') or r.get('measured')}")
         if look and look["problems"]:
             problems.append({"check": "look_review", "fix": " ".join(look["problems"])})
+        # the finishing details: each one unfinished until its rule and the reviewer both say it is done
+        ids = case_details.applies(report)
+        if not look:
+            ids = [d for d in ids if case_details.rule(d, self.code, report, {})[0] is not None]
+        design = {}
+        try:
+            design = json.loads((self.work / "design.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        states = case_details.verify(ids, self.code, report, design, (look or {}).get("details") if look else
+                                     {d: "done" for d in ids})
+        unfinished = case_details.unfinished(states)
         passed = report["passed"] and not (look and look["problems"])
         score = (look or {}).get("score") or 0
-        self.last_fixes = (look or {}).get("fix", []) or [p.get("fix") for p in problems if p.get("fix")]
+        self.last_fixes = case_details.fixes(states) + ((look or {}).get("fix", []) or [p.get("fix") for p in problems if p.get("fix")])
         # The report (and look.json, written by the review) travel with the snapshot, so its viewer shows the real checks.
         (self.work / "report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
+        (self.work / "details.json").write_text(json.dumps(states, indent=1), encoding="utf-8")
         snapshot = self.folder / f"submit-{self.submits}"
         if snapshot.exists():
             shutil.rmtree(snapshot)
@@ -255,14 +292,25 @@ class Workshop:
             build(snapshot)
         except Exception as error:
             print(f"no viewer: {error}", flush=True)
-        if passed and (self.best is None or score > self.best["score"]):
-            self.best = {"score": score, "code": self.code, "folder": snapshot, "status": report.get("status")}
+        # the best valid case: fewest unfinished details first, then the look; a worse submit never replaces it
+        rank = (-len(unfinished), score)
+        if passed and (self.best is None or rank > (-len(self.best.get("unfinished", [])), self.best["score"])):
+            self.best = {"score": score, "code": self.code, "folder": snapshot, "status": report.get("status"),
+                         "unfinished": unfinished}
         result = {"passed": passed, "failed": problems[:12], "look_score": score if look else None,
+                  "unfinished_details": {d: states[d]["why"] for d in unfinished},
                   "look_fixes": (look or {}).get("fix", []), "submits_left": MAX_SUBMITS - self.submits}
         if passed:
-            result["note"] = ("Accepted and kept. " + (f"The look is {score}/10, under the target {LOOK_TARGET}: polish it "
-                              "and submit again if you can; a worse submit never replaces this one." if score < LOOK_TARGET and look else "Done."))
-        return json.dumps(result, default=str)[-OUTPUT_LIMIT:]
+            todo = []
+            if unfinished:
+                todo.append(f"unfinished details: {', '.join(unfinished)} (see unfinished_details)")
+            if look and score < LOOK_TARGET:
+                todo.append(f"the look is {score}/10, under the target {LOOK_TARGET}")
+            result["note"] = ("Accepted and kept, but not finished: " + "; ".join(todo) + ". Fix these and submit again "
+                              "if you can; a worse submit never replaces this one." if todo else "Accepted and kept. Done.")
+        text = json.dumps(result, default=str)[-OUTPUT_LIMIT:]
+        self.last_submit = (self.ran_code, text)
+        return text
 
     def execute(self, name, arguments):
         """Every tool is one call: name + arguments -> (text, picture or None)."""
@@ -310,6 +358,7 @@ def design_case(brief, folder, base, body_stl, picture, part_ids, system, resume
             print(f"no viewer: {error}", flush=True)
     summary = {"result": label, "outcome": outcome, "steps": steps, "submits": shop.submits,
                "look_score": shop.best["score"] if shop.best else None, "best": str(folder / "best") if shop.best else None,
+               "unfinished_details": shop.best.get("unfinished", []) if shop.best else None,
                "skipped_gates": getattr(shop, "skipped_gates", []), "tokens": tokens, "seconds": seconds,
                "body_feedback": None if shop.best or not hasattr(shop, "body_feedback") else shop.body_feedback()}
     (folder / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")

@@ -176,6 +176,17 @@ class Harness(unittest.TestCase):
         tools = [s for s in steps if "tool" in s]
         self.assertEqual([s["step"] for s in tools], [1, 1, 2], "the repeat costs no step")
 
+    def test_a_call_that_did_nothing_costs_no_step(self):
+        class Idle(Shop):
+            def execute(self, name, arguments):
+                if name == "check":
+                    self.uncounted = True   # e.g. nothing current to check
+                    return "Nothing has run yet.", None
+                return super().execute(name, arguments)
+        outcome, sent, steps = self.run_shop(Idle(), [reply(("check", {"group": "all"})), reply(("submit", {}))])
+        tools = [s for s in steps if "tool" in s]
+        self.assertEqual([(s["step"], s["inspections"]) for s in tools], [(0, 1), (1, 1)])
+
     def test_looking_costs_no_build_step_until_its_own_limit(self):
         with mock.patch.object(harness, "MAX_INSPECTIONS", 2):
             outcome, sent, steps = self.run_shop(Shop(), [reply(("docs", {"name": "a"})), reply(("docs", {"name": "b"})),

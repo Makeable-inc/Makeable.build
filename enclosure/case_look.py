@@ -32,7 +32,8 @@ Judge the finished case against the concept and the body:
 - What did the case add or change that spoils the look (a lump, a screw boss or seam showing on the front, a window,
   control or opening that clashes with the character, the body's softness lost)?
 Reply with only JSON:
-{"features": {"<feature name>": "present" | "weak" | "missing"}, "score": <0-10, 10 = reads clearly as the concept>,
+{"features": {"<feature name>": "present" | "weak" | "missing"}, "details": {"<detail id>": "done" | "not done"},
+ "score": <0-10, 10 = reads clearly as the concept>,
  "fix": ["<up to 4 concrete changes to the case script, most important first, with where on the case>"]}
 Required features:
 """
@@ -81,8 +82,14 @@ def body_view(attempt):
     return out
 
 
-def review(attempt, picture, base, body_score=None):
-    """Looks at one case try. Returns {score, features, fix, problems}; problems are what fails the try."""
+DETAILS_HEAD = """
+Finishing details: judge each one on its own, only from image 3. "done" only if you can see it finished everywhere:
+"""
+
+
+def review(attempt, picture, base, body_score=None, details=None):
+    """Looks at one case try. Returns {score, features, details, fix, problems}; problems are what fails the try.
+    details: {id: question} the reviewer marks one by one (case_details); its marks are returned, never trusted alone."""
     attempt = Path(attempt)
     features = base.get("features") or []
     names = "\n".join(f"- {f['name']} ({f.get('where', '')})" for f in features) or "- (none listed)"
@@ -94,10 +101,14 @@ def review(attempt, picture, base, body_score=None):
         size = review_facts.body_size(load_stl(attempt / "BODY.stl"))
     except Exception:
         pass
-    prompt = PROMPT.replace("__PARTS__", review_facts.parts_phrase(base)) + names + "\n\n" + review_facts.facts(base, size)
+    prompt = PROMPT.replace("__PARTS__", review_facts.parts_phrase(base)) + names
+    if details:
+        prompt += DETAILS_HEAD + "\n".join(f'- "{d}": {q}' for d, q in details.items())
+    prompt += "\n\n" + review_facts.facts(base, size)
     found, tokens = ask(prompt, board)
     score = found.get("score") if isinstance(found.get("score"), (int, float)) else None
     marks = found.get("features") if isinstance(found.get("features"), dict) else {}
+    detail_marks = found.get("details") if isinstance(found.get("details"), dict) else {}
     fixes = [str(f) for f in found.get("fix", []) if isinstance(f, str)][:4] if isinstance(found.get("fix"), list) else []
     fixes, dropped = review_facts.filter_fixes(fixes, base, size)
     problems = []
@@ -112,7 +123,7 @@ def review(attempt, picture, base, body_score=None):
         problems.append(f"The finished case lost these features of the body: {', '.join(gone)}. Keep every feature joined to the Shell and visible.")
     if score is not None and body_score is not None and score <= body_score - DROP_LIMIT:
         problems.append(f"The finished case looks clearly worse than the chosen body ({score}/10 against {body_score}/10).")
-    result = {"score": score, "features": marks, "fix": fixes, "dropped_fixes": dropped, "problems": problems, "tokens": tokens}
+    result = {"score": score, "features": marks, "details": {str(k): str(v) for k, v in detail_marks.items()}, "fix": fixes, "dropped_fixes": dropped, "problems": problems, "tokens": tokens}
     (attempt / "look.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
     return result
 

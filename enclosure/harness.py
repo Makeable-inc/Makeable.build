@@ -206,6 +206,8 @@ def result_label(best, target, reviewed=True):
     the target is a draft for inspection, never a finished enclosure."""
     if not best:
         return "failed"
+    if best.get("unfinished"):
+        return f"draft: fits, unfinished details: {', '.join(best['unfinished'])}"
     if reviewed and (best.get("score") or 0) < target:
         return f"draft: fits, look goal not met ({best.get('score') or 0}/10)"
     return "done"
@@ -310,6 +312,10 @@ def run(shop, instructions, brief, folder, picture=None, max_steps=40, max_submi
                 text, picture_out = store.recall(arguments.get("ref", "")), None
             else:
                 text, picture_out = shop.execute(item["name"], arguments)
+            if getattr(shop, "uncounted", False):
+                # the call did nothing (nothing current to check, the same submit again): an inspection, not a step
+                shop.uncounted = False
+                free = looking = inspections < MAX_INSPECTIONS
             repeat = not looking and failed(text) and seen.get(key, (None, None))[1] == text
             if free:
                 inspections += 1
