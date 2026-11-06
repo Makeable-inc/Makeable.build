@@ -26,7 +26,12 @@ last run: run it first.
    opening for your input, Screw or Snap). Do not read the library's source.
 2. **Place the parts.** Load the body, place the screen, the inputs and the controller with `Part`, read the front
    with `deepest_front` / `front_surface`, split at the seam. `run`, then `check("fit")`.
-3. **Openings.** Cut pockets, the window, the input's opening and the USB opening. `run`, then `check("openings")`.
+3. **Openings, finished.** Cut pockets, the input's opening and the USB opening. The screen opening is
+   `screen_bezel(screen, body)` (a rounded, sloped frame tight round the glass), not a plain `window`. A knob gets
+   `knob_recess(knob, depth, data=data)` (a closed finger dish) and a printed cap: `dish = knob_dish(...)`, then
+   `knob_cap(knob, profile=..., squash=..., fit_radius=dish[3])`, passed to
+   `finish(..., extra_prints={"PRINT_Knob": cap}, fitted_on={"PRINT_Knob": knob})`. Choose the cap's profile and squash
+   to match the concept (a dome, a dial, an upright seed). `run`, then `check("openings")`.
 4. **Fasteners and outside.** Add screws (or snaps), stops and the holder. Use `place_screws` and `place_stops`: they
    choose spots that fit and spread them to the corners. Never type a screw or stop position by hand. `run`, then `check("fasteners")` and `check("outside")`.
 5. **Look.** `render()`. Compare with the concept: does the case keep every feature, is the bezel even, do the

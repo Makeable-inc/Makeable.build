@@ -6,7 +6,8 @@ Each piece keeps its safe limits. A piece raises a clear error, rather than buil
 import json
 import math
 
-from build123d import Box, Cylinder, Pos, Rot, export_stl
+from build123d import (Align, Box, Cylinder, Ellipse, Plane, Pos, RectangleRounded, Rot, Sphere, export_stl, extrude,
+                       loft, scale)
 
 # Limits, in mm. A real print may change these numbers; nothing else needs to.
 GAP = 0.15
@@ -202,11 +203,8 @@ def shaft_hole(part, gap=GAP):
     return along_y(x, z, -FAR, high[1], radius)
 
 
-def knob_recess(part, depth_from_y, room=5.0, data=None):
-    """Finger room around the knob: a round dish cut into the front from outside down to depth_from_y. It never opens
-    into the case: anything of the part in front of that depth (its body, the bushing in the wall, and, with data, its
-    jumper plugs) keeps MIN_WALL of plastic to the dish. The dish narrows to stay clear of it; if it would get too
-    tight for fingers, it gets shallower instead. The only way in stays the shaft hole."""
+def knob_dish(part, depth_from_y, room=5.0, data=None):
+    """(x, z, depth, radius) of the finger dish knob_recess cuts: the room a knob cap may use (knob_cap(fit_radius=...))."""
     low, high = part.feature("knob")
     x, z = (low[0] + high[0]) / 2, (low[2] + high[2]) / 2
     knob_radius = max(high[0] - low[0], high[2] - low[2]) / 2
@@ -217,18 +215,25 @@ def knob_recess(part, depth_from_y, room=5.0, data=None):
     boxes += part.plugs(data) if data else []
     keep = GAP + MIN_WALL
     for _ in range(2):
-        ahead = [b for b in boxes if b[0][1] - keep < depth]   # reaches forward past the dish floor
-        for b in ahead:
-            # the box's nearest point to the dish axis, seen from the front
+        for b in [b for b in boxes if b[0][1] - keep < depth]:
             dx, dz = max(b[0][0] - x, 0, x - b[1][0]), max(b[0][2] - z, 0, z - b[1][2])
             reach = math.hypot(dx, dz) - keep
             if reach <= 0:
-                depth = min(depth, b[0][1] - keep)    # right under the dish (the bushing, the can): stop in front
+                depth = min(depth, b[0][1] - keep)
             elif reach < radius:
                 if reach >= knob_radius + 2.0:
-                    radius = reach                    # narrow the dish to keep a wall to it
+                    radius = reach
                 else:
-                    depth = min(depth, b[0][1] - keep)  # too tight for fingers: make the dish shallower instead
+                    depth = min(depth, b[0][1] - keep)
+    return x, z, depth, radius
+
+
+def knob_recess(part, depth_from_y, room=5.0, data=None):
+    """Finger room around the knob: a round dish cut into the front from outside down to depth_from_y. It never opens
+    into the case: anything of the part in front of that depth (its body, the bushing in the wall, and, with data, its
+    jumper plugs) keeps MIN_WALL of plastic to the dish. The dish narrows to stay clear of it; if it would get too
+    tight for fingers, it gets shallower instead. The only way in stays the shaft hole."""
+    x, z, depth, radius = knob_dish(part, depth_from_y, room, data)
     return along_y(x, z, -FAR, depth, radius)
 
 
@@ -571,9 +576,169 @@ def wire_paths(data, parts, lane_y, lane_step=0.6):
     return paths
 
 
-def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base", insert_from="-y", snaps=()):
+
+# ---------- finishing: a printed knob cap and a rounded screen bezel ----------
+
+KNOB_LIFT = 0.0          # mm the cap's back stands out past where the included knob's back sits
+CAP_WALL = 1.6           # mm of plastic round the socket
+SHAFT_FIT = 0.4          # mm under the shaft's modelled size: a push fit on a knurled split shaft (check with a test print)
+GROOVE_RADIUS = 0.45     # mm: a cap's grooves are half-round, this deep
+KNOB_TURN_ROOM = 0.5     # mm a cap keeps from its dish while it turns (the knob_turns check wants 0.3)
+
+
+def _knob_axis(part):
+    """(base point, outward unit vector) of the knob: from the bushing's outer face along the shaft."""
+    import numpy as np
+    shaft_lo, shaft_hi = (np.array(v) for v in part.feature("shaft"))
+    bush_lo, bush_hi = (np.array(v) for v in part.feature("bushing"))
+    s_mid, b_mid = (shaft_lo + shaft_hi) / 2, (bush_lo + bush_hi) / 2
+    outward = s_mid - b_mid
+    axis = int(np.argmax(np.abs(outward)))
+    unit = np.zeros(3); unit[axis] = 1.0 if outward[axis] > 0 else -1.0
+    base = b_mid.copy(); base[axis] = (bush_hi if unit[axis] > 0 else bush_lo)[axis]
+    tip = s_mid.copy(); tip[axis] = (shaft_hi if unit[axis] > 0 else shaft_lo)[axis]
+    return base, unit, float(abs(tip[axis] - base[axis]))
+
+
+def _cap(part, profile, squash, grooves, ridges, socket):
+    """Builds one knob cap; knob_cap() sizes it."""
+    import numpy as np
+    base, unit, reach = _knob_axis(part)
+    knob_lo, knob_hi = part.feature("knob")
+    # the cap's back goes where the included knob's back is (the dish and finger room were made round it)
+    axis_i = int(np.argmax(np.abs(unit)))
+    knob_back = (knob_lo if unit[axis_i] > 0 else knob_hi)[axis_i]
+    shift = (knob_back - base[axis_i]) * unit[axis_i] - KNOB_LIFT
+    base = base + unit * shift
+    reach -= shift
+    shaft_lo, shaft_hi = part.feature("shaft")
+    across = [i for i in range(3) if unit[i] == 0]
+    shaft_d = min(shaft_hi[i] - shaft_lo[i] for i in across)
+    socket = socket or shaft_d - SHAFT_FIT
+    assert len(profile) >= 2 and all(b[0] > a[0] for a, b in zip(profile, profile[1:])), "knob_cap: profile distances must rise"
+    assert min(r for _, r in profile[:2]) >= socket / 2 + CAP_WALL, f"knob_cap: the back sections need a radius of at least {socket / 2 + CAP_WALL:.1f} mm round the socket"
+    up = np.zeros(3); up[2 if across[1] == 2 or across[0] == 2 else across[1]] = 1.0
+    side = np.cross(up, unit)
+    start = base + unit * KNOB_LIFT
+    sections = []
+    for distance, radius in profile:
+        plane = Plane(origin=tuple(start + unit * distance), x_dir=tuple(side), z_dir=tuple(unit))
+        sections.append(plane * Ellipse(radius, radius * squash))
+    body = loft(sections)
+    # a round top: an ellipsoid starting half a millimetre inside the loft's end, as wide as it, so the
+    # two overlap and join cleanly (an ellipsoid whose rim sat exactly on the loft's end left a hidden inner face)
+    last_d, last_r = profile[-1]
+    dome = min(2.5, last_r)
+    sink = 0.5
+    size = abs(side) * last_r + abs(up) * last_r * squash + abs(unit) * (dome + sink)
+    top = Pos(*(start + unit * (last_d - sink))) * scale(Sphere(1), by=tuple(size))
+    cap = one_solid((body + top).clean(), "knob cap")   # clean: no seam left inside where the two meet
+    whole = cap   # before the socket: the grooves are measured on the outside only
+    # the socket stops a full wall short of the front, grooves included
+    hole_depth = min(reach - KNOB_LIFT - 0.5, last_d + dome - CAP_WALL - (GROOVE_RADIUS if grooves else 0.0))
+    # and only as deep as the cap stays thick enough all round it (a seed narrows toward its tip)
+    need = socket / 2 + CAP_WALL + (GROOVE_RADIUS if grooves else 0.0)
+    for (d0, r0), (d1, r1) in zip(profile, profile[1:]):
+        r0, r1 = r0 * min(1.0, squash), r1 * min(1.0, squash)
+        if r1 < need <= r0:
+            hole_depth = min(hole_depth, d0 + (d1 - d0) * (r0 - need) / (r0 - r1))
+            break
+        if r0 < need:
+            hole_depth = min(hole_depth, d0)
+            break
+    assert hole_depth >= 4.0, f"knob_cap: the cap is too thin to hold the shaft (a {hole_depth:.1f} mm socket); make its back sections wider"
+    socket_solid = Plane(origin=tuple(start - unit * 0.1), x_dir=tuple(side), z_dir=tuple(unit)) * Cylinder(socket / 2, hole_depth + 0.1, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    cap = one_solid(cap - socket_solid, "knob cap socket")
+    front = last_d + dome
+    if grooves:
+        # lengthwise grooves: thin round rods laid along the face (along `up`) and cut away, each leaving a half-round
+        # groove GROOVE_RADIUS deep that follows the surface; spread across the width, clear of the rim
+        from build123d import Axis as _Axis
+        widest = max(r for _, r in profile)
+        for k in range(grooves):
+            t = (k + 0.5) / grooves * 2 - 1
+            for v in np.linspace(-0.6, 0.6, 7):
+                # a short rod at a time, following the face's curve from bottom to top
+                origin = start + unit * (front + 5) + side * (t * widest * 0.6) + up * (v * widest * squash)
+                hits = whole.find_intersection_points(_Axis(tuple(origin), tuple(-unit)))
+                pts = [p for p, _ in hits] if hits and isinstance(hits[0], tuple) else list(hits)
+                if not pts:
+                    continue
+                surface = max(pts, key=lambda q: np.dot(np.array([q.X, q.Y, q.Z]), unit))
+                centre = np.array([surface.X, surface.Y, surface.Z])
+                if (centre - start) @ unit > last_d - sink - GROOVE_RADIUS - 0.3:
+                    continue   # grooves stay on the lofted face, clear of the rounded top and its join
+                rod =Plane(origin=tuple(centre), x_dir=tuple(side), z_dir=tuple(up)) * Cylinder(GROOVE_RADIUS, widest * squash * 1.2 / 6 + 0.6)
+                try:
+                    cap = one_solid(cap - rod, "knob cap grooves")
+                except Exception:
+                    continue
+    if ridges:
+        radius = max(r for _, r in profile)
+        for k in range(ridges):
+            a = 2 * np.pi * k / ridges
+            centre = start + unit * (profile[1][0] / 2) + (side * np.cos(a) + up * np.sin(a)) * radius
+            rib = Plane(origin=tuple(centre), x_dir=tuple(side), z_dir=tuple(unit)) * Cylinder(0.7, max(profile[1][0], 2.0))
+            cap = one_solid(cap + rib, "knob cap ridges")
+    return cap
+
+
+def knob_cap(part, profile=None, squash=1.0, grooves=0, ridges=0, socket=None, fit_radius=None):
+    """A printed cap pushed onto the knob's shaft, in place of the bare metal knob: its own part (PRINT_Knob, pass it
+    to finish(..., extra_prints={"PRINT_Knob": cap})).
+    profile: [(distance out from the cap's back, radius), ...] from the back to the front; the default is a soft dome
+      16 mm across. squash: height over width of each section (1 round; 1.4 an upright seed or egg).
+    grooves: lengthwise grooves on its face (a sunflower seed has about 5). ridges: grip ridges round its side (a dial).
+    socket: the socket's diameter (default: the shaft's modelled size less SHAFT_FIT, a push fit; check with a print).
+    fit_radius: the dish it turns in (knob_dish(...)[3]): the cap is scaled down to keep KNOB_TURN_GAP from it, with a
+    note. It sits where the part's own knob sits; the knob_turns check turns it all the way round."""
+    import numpy as np
+    profile = profile or [(0.0, 8.0), (5.0, 8.0), (9.0, 6.0), (11.5, 3.0)]
+    cap = _cap(part, profile, squash, grooves, ridges, socket)
+    if not fit_radius:
+        return cap
+    base, unit, _ = _knob_axis(part)
+    room = fit_radius - KNOB_TURN_ROOM
+    for _ in range(3):
+        # its real reach from the shaft's axis, measured on the built cap (the round top and grooves count)
+        pts = np.array([[v.X, v.Y, v.Z] for v in cap.vertices()] + [list(p) for p in cap.tessellate(0.1, 0.3)[0]])
+        rel = pts - base
+        reach = float(np.max(np.linalg.norm(rel - np.outer(rel @ unit, unit), axis=1)))
+        if reach <= room:
+            return cap
+        k = room / reach * 0.995
+        print(f"knob_cap note: scaled to {k:.2f} to turn inside the {fit_radius:.1f} mm dish (it reached {reach:.1f} mm)")
+        profile = [(d, r * k) for d, r in profile]
+        cap = _cap(part, profile, squash, grooves, ridges, socket)
+    return cap
+
+
+def screen_bezel(part, body, width=3.0, corner=2.5, gap=0.2):
+    """The screen opening as a finished bezel: tight round the glass at the glass face (window_fit), then opening out
+    with rounded corners to `width` mm wider each side at the front surface, a soft sloped frame instead of a square
+    hole (it also clears the view from an angle). Use it in place of window(part)."""
+    low, high = part.feature("glass")
+    x, z = (low[0] + high[0]) / 2, (low[2] + high[2]) / 2
+    w, h = high[0] - low[0] + 2 * gap, high[2] - low[2] + 2 * gap
+    glass_y = low[1]
+    surface = front_surface(body, x, z)
+    depth = max(glass_y - surface, 0.6)
+    inner = Plane.XZ.offset(-glass_y) * RectangleRounded(w, h, min(corner * 0.4, w / 2 - 0.01, h / 2 - 0.01))
+    outer_w, outer_h = w + 2 * width, h + 2 * width
+    outer = Plane.XZ.offset(-(surface - 0.05)) * RectangleRounded(outer_w, outer_h, min(corner + width, outer_w / 2 - 0.01, outer_h / 2 - 0.01))
+    slope = loft([Pos(x, 0, z) * inner, Pos(x, 0, z) * outer])
+    out = Pos(x, 0, z) * (Plane.XZ.offset(-(surface - 0.04)) * extrude(RectangleRounded(outer_w, outer_h, min(corner + width, outer_w / 2 - 0.01, outer_h / 2 - 0.01)), FAR))
+    through = block([low[0] - gap, glass_y - 0.01, low[2] - gap], [high[0] + gap, high[1], high[2] + gap])
+    return joined([one_solid(slope, "bezel slope"), one_solid(out, "bezel front"), through])
+
+
+def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base", insert_from="-y", snaps=(),
+           extra_prints=None, fitted_on=None):
     """Checks each printed part is one solid, exports it, and writes design.json with the build order. The cover and controller go first, and the Shell closes over everything last."""
     prints = {"PRINT_Shell": one_solid(shell, "PRINT_Shell"), "PRINT_Base": one_solid(base, "PRINT_Base")}
+    # extra printed parts fitted after the case is closed, such as a knob cap pushed on from outside
+    extra = {name: one_solid(shape, name) for name, shape in (extra_prints or {}).items()}
+    prints.update(extra)
     for name, shape in prints.items():
         assert shape.is_valid, f"{name} is not a valid solid."
         export_stl(shape, f"{name}.stl", tolerance=0.01)
@@ -583,12 +748,15 @@ def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), 
         "purchased": {p.name: {"part_id": p.part_id, "transform": p.matrix} for p in parts},
         "holds": {holder: {"part": controller.name, "insert_from": insert_from}},
         "case": {
-            "assembly": [{"add": "PRINT_Base"}, {"add": controller.name, "from": "-y"}] + [{"add": p.name, "from": "-y"} for p in screen_and_inputs] + [{"add": "PRINT_Shell", "from": "-y"}],
+            "assembly": [{"add": "PRINT_Base"}, {"add": controller.name, "from": "-y"}] + [{"add": p.name, "from": "-y"} for p in screen_and_inputs] + [{"add": "PRINT_Shell", "from": "-y"}]
+                        + [{"add": name, "from": "-y"} for name in extra],
             "screws": [s.entry() for s in screws],
             "glued": list(glued),
             "snaps": [snap.entry() for snap in snaps],
         },
         "wires": wires,
+        # a printed part fitted onto a purchased part from outside, such as a knob cap on its shaft
+        "fitted_on": {name: part.name for name, part in (fitted_on or {}).items()},
     }
     with open("design.json", "w", encoding="utf-8") as file:
         json.dump(design, file, indent=1)

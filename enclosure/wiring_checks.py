@@ -340,7 +340,9 @@ def wire_colours(wires):
 
 def check_wiring(design, meshes, purchased, cards, transforms):
     results = []
-    union = merged(meshes.values())
+    # a cap fitted on a knob's shaft stands on the shaft: the shaft and finger checks look at the case without it
+    fitted = design.get("fitted_on") or {}
+    union = merged([m for n, m in meshes.items() if n not in fitted])
     all_points = {n: apply(transforms[n], part_surface(purchased[n]["part_id"])[1]) for n in transforms}
     screen_normal = None
     for name, card in cards.items():

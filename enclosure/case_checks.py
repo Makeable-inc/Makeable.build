@@ -119,7 +119,7 @@ def allow_glue(results, glued):
     return results
 
 
-def check_assembly(steps, meshes, purchased, part_points):
+def check_assembly(steps, meshes, purchased, part_points, fitted=None):
     """Each part must reach its final place in a straight line, past everything already placed."""
     expected = set(meshes) | set(purchased)
     listed = [s.get("add") for s in steps]
@@ -132,6 +132,8 @@ def check_assembly(steps, meshes, purchased, part_points):
         worst, where, blocker, moving_at, blocker_at = np.inf, None, None, None, None
         depth = 0.0
         for other in placed:
+            if (fitted or {}).get(moving) == other:
+                continue   # a cap is pushed onto its part's shaft: meeting that part is the point
             pairs = []
             if moving in meshes:
                 source = plastic_points(meshes[other]) if other in meshes else part_points[other]
@@ -451,15 +453,15 @@ OUTER_SKIN_ALLOWANCE = 6.0
 MAX_WRONG_OUTSIDE = 20.0
 
 
-def check_outer_parts(meshes, front, body):
+def check_outer_parts(meshes, front, body, fitted=()):
     """Only the Shell and the flat back of the rear cover may form the outside. A holder or stop showing through the wall prints, but shows as a patch. The outside is the frozen body's surface."""
     if "PRINT_Shell" not in meshes or body is None:
         return []
     back = -direction_vector(front)
     results = []
     for name, mesh in meshes.items():
-        if name == "PRINT_Shell":
-            continue
+        if name == "PRINT_Shell" or name in fitted:
+            continue   # a cap fitted on a shaft from outside is meant to be on the outside
         points, faces = trimesh.sample.sample_surface(mesh, 5000, seed=5)
         _, distance, _ = trimesh.proximity.closest_point(body, points)
         on_outside = distance < 0.3
@@ -523,7 +525,8 @@ def check_case(design, meshes, purchased, cards, transforms):
     results.extend(check_flat_on_bed(meshes))
     body_path = design.get("body_stl")
     body = load_stl(body_path) if body_path else None
-    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), body))
+    fitted = design.get("fitted_on") or {}
+    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), body, fitted))
     results.extend(check_keeps_body(meshes, body))
     union = merged(meshes.values())
     part_points = {}
@@ -531,6 +534,8 @@ def check_case(design, meshes, purchased, cards, transforms):
         part_id = purchased[name]["part_id"]
         part_points[name] = apply(transform, part_surface(part_id)[2])
         for mesh_name, mesh in meshes.items():
+            if fitted.get(mesh_name) == name:
+                continue   # the cap grips this part's shaft by design; knob_turns checks it instead
             gap, inside, where = clearance(mesh, part_id, transform)
             place = rounded(where) if where is not None else None
             results.append(result("clearance", f"{mesh_name} / {name}", gap >= MIN_GAP - GAP_TOLERANCE and inside == 0, measured=None if np.isinf(gap) else round(gap, 3), limit=f"at least {MIN_GAP} mm", where=f"at {place}, {inside} points inside the plastic",
@@ -559,7 +564,8 @@ def check_case(design, meshes, purchased, cards, transforms):
                 keep &= ~np.all((local >= np.array(feature["min"]) - 0.01) & (local <= np.array(feature["max"]) + 0.01), axis=1)
         assembly_points[name] = points[keep]
     snaps = case.get("snaps") or []
-    results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points))
+    results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points, fitted))
+    results.extend(check_knob_turns(meshes, fitted, cards, transforms))
     results.extend(check_snaps(snaps, meshes))
     results.extend(check_screws(case.get("screws") or [], meshes, part_points, case.get("snaps") or []))
     from wiring_checks import check_wiring
@@ -569,4 +575,50 @@ def check_case(design, meshes, purchased, cards, transforms):
     if design.get("base_design", {}) and design["base_design"].get("use_library"):
         from access import check_access
         results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms))
+    return results
+
+
+KNOB_TURN_GAP = 0.3   # mm the cap keeps from the case while it turns
+
+
+def check_knob_turns(meshes, fitted, cards, transforms):
+    """A cap fitted on a knob turns with it: turned all the way round, it must keep KNOB_TURN_GAP from the case.
+    Measured as a sweep: in each band along the shaft, the cap's farthest reach from the axis against the case's
+    nearest plastic around it."""
+    results = []
+    for cap_name, part_name in fitted.items():
+        card = cards.get(part_name)
+        if cap_name not in meshes or part_name not in transforms or not card or "shaft" not in card["features"]:
+            continue
+        shaft, bushing = card["features"]["shaft"], card["features"]["bushing"]
+        s_mid = apply(transforms[part_name], ((np.array(shaft["min"]) + np.array(shaft["max"])) / 2)[None])[0]
+        b_mid = apply(transforms[part_name], ((np.array(bushing["min"]) + np.array(bushing["max"])) / 2)[None])[0]
+        axis = (s_mid - b_mid) / np.linalg.norm(s_mid - b_mid)
+        cap = meshes[cap_name]
+        others = merged([m for n, m in meshes.items() if n != cap_name and n not in fitted])
+
+        def polar(points):
+            along = (points - b_mid) @ axis
+            radius = np.linalg.norm((points - b_mid) - np.outer(along, axis), axis=1)
+            return along, radius
+        cap_points = trimesh.sample.sample_surface(cap, 6000, seed=7)[0]
+        c_along, c_radius = polar(np.vstack([cap_points, cap.vertices]))
+        w_points = trimesh.sample.sample_surface(others, 40000, seed=8)[0]
+        w_along, w_radius = polar(w_points)
+        worst, where = np.inf, None
+        for low in np.arange(c_along.min(), c_along.max(), 0.5):
+            band = (c_along >= low) & (c_along < low + 0.5)
+            wall = (w_along >= low - 0.25) & (w_along < low + 0.75)
+            if not band.any() or not wall.any():
+                continue
+            reach = c_radius[band].max()
+            near = w_radius[wall] - reach
+            outside = near > -0.5 * reach   # plastic beyond the cap's own reach (the socket's inside is not the case)
+            if outside.any():
+                gap = float(near[outside].min())
+                if gap < worst:
+                    worst, where = gap, rounded(w_points[wall][outside][np.argmin(near[outside])])
+        results.append(result("knob_turns", cap_name, worst >= KNOB_TURN_GAP, measured=None if np.isinf(worst) else round(worst, 2),
+                              limit=f"at least {KNOB_TURN_GAP} mm from the case all the way round", where=where,
+                              fix=f"{cap_name} would rub the case near {where} when it turns. Make the dish round it wider, or the cap narrower there."))
     return results

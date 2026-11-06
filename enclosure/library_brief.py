@@ -18,7 +18,8 @@ The library, all in millimetres, with the screen facing -y and the rear cover cl
 - split(body, seam_y): the Shell blank and the flat cover.
 - deepest_front(body, x0, x1, z0, z1), front_surface(body, x, z): the outside of a curved front at that spot.
 - pocket(part, to_y, data): the room for a part in the Shell, including its plugs. It only widens toward the back.
-- window(part), shaft_hole(part), knob_recess(part, depth_from_y), touch_opening(part), usb_opening(part, data): fitted openings. Cut usb_opening from every printed part.
+- screen_bezel(screen, body): the screen opening as a rounded sloped frame (use it instead of window(part)). shaft_hole(part), knob_recess(part, depth_from_y, data=data) (a closed dish), touch_opening(part), usb_opening(part, data): fitted openings. Cut usb_opening from every printed part.
+- knob_dish(part, depth_from_y, data=data) -> (x, z, depth, radius); knob_cap(part, profile, squash, fit_radius=radius): a printed cap on the knob's shaft, sized to turn in its dish; pass it to finish(..., extra_prints={"PRINT_Knob": cap}, fitted_on={"PRINT_Knob": knob}).
 - tower(part, cover_y), tower_room(part, to_y): a holder for a small controller, built into the cover, and the room it needs in the Shell. Keep the holder's room inside the body, or the holder will show on the outside and fail the outside check.
 - stop(part, x, z, cover_y, clear_of=[...]): a column from the cover to just behind a part. It thickens when long. Put stops behind boards that have no other support, and one behind a knob so pressing it pushes against plastic.
 - Screw(x, z, back_y, seam_y, parts=[...], towers=[...], body=body): has post(), shell_cut(), cover_cut() and entry(). It refuses a post in a part's path or outside the body.
