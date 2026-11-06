@@ -21,14 +21,14 @@ cuts = [pocket(screen, seam_y + 1, data), pocket(knob, seam_y + 1, data), pocket
         window(screen), shaft_hole(knob), knob_recess(knob, knob.feature("bushing")[0][1] + 1.0), usb]
 shell = one_solid(shell - joined(cuts), "hollow shell")
 
-spots = free_spots([screen, knob], -50, 50, 3, 51, towers=[controller], body=body, y=seam_y)
-screws = [Screw(x, z, back_y, seam_y, parts=[screen, knob], towers=[controller], body=body) for x, z in ((-42.0, 50.5), (42.0, 50.5), (49.0, 8.0))]
-print(f"{len(spots)} places fit a screw post, for example {spots[:3]}")
+# Screws and stops go on spots that fit, found by the library and spread to the corners: never typed in by hand.
+screws = place_screws([screen, knob], -50, 50, 3, 51, back_y, seam_y, towers=[controller], body=body, count=3)
+print("screws at", [(s.x, s.z) for s in screws])
 shell = one_solid(shell + (joined([s.post() for s in screws]) & body), "shell with posts")
 shell = one_solid(shell - joined([s.shell_cut() for s in screws]) - usb, "drilled shell")
 
 inner = back_y - COVER_THICKNESS + 0.5
-extras = [tower(controller, inner), stop(screen, -15.0, 8.0, inner, clear_of=[controller]), stop(screen, -15.0, 44.0, inner, clear_of=[controller]), stop(knob, 35.0, 27.0, inner)]
+extras = [tower(controller, inner)] + place_stops(screen, inner, clear_of=[controller], count=2) + place_stops(knob, inner, count=1)
 cover = one_solid(cover + joined(extras), "cover with tower and stops")
 cover = one_solid(cover - joined([s.cover_cut() for s in screws]) - usb, "PRINT_Base")
 

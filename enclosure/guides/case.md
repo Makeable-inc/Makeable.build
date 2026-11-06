@@ -27,8 +27,8 @@ last run: run it first.
 2. **Place the parts.** Load the body, place the screen, the inputs and the controller with `Part`, read the front
    with `deepest_front` / `front_surface`, split at the seam. `run`, then `check("fit")`.
 3. **Openings.** Cut pockets, the window, the input's opening and the USB opening. `run`, then `check("openings")`.
-4. **Fasteners and outside.** Add screws (or snaps), stops and the holder. Pick positions from `free_spots` and
-   `stop_spots`, never by guessing. `run`, then `check("fasteners")` and `check("outside")`.
+4. **Fasteners and outside.** Add screws (or snaps), stops and the holder. Use `place_screws` and `place_stops`: they
+   choose spots that fit and spread them to the corners. Never type a screw or stop position by hand. `run`, then `check("fasteners")` and `check("outside")`.
 5. **Look.** `render()`. Compare with the concept: does the case keep every feature, is the bezel even, do the
    openings suit the character? Fix the worst thing, `run`, `render()` again.
 6. **Submit.** `submit()`. If it fails, fix what it names, one thing at a time. If it passes under the look target,

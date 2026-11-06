@@ -293,10 +293,15 @@ def free_spots(parts, x0, x1, z0, z1, reach=POST_RADIUS, towers=(), step=2.0, bo
     """Places a post or stop can go without blocking any part: every (x, z) in the area that is clear of each part's outline by reach. With the body and a y given, only places where it fits inside the body. Ask this first, rather than guessing."""
     outlines = [outline(p) for p in parts] + [outline(p, GAP + HOLDER_WALL) for p in towers]
     spots = []
-    count_x, count_z = int((x1 - x0) / step), int((z1 - z0) / step)
-    for i in range(count_x + 1):
-        for j in range(count_z + 1):
-            x, z = x0 + i * step, z0 + j * step
+    # the grid, plus the exact edges where each outline's keep-out ends, so a strip narrower than the grid step
+    # between two parts (or between a part and the wall) is still found
+    xs = {round(x0 + i * step, 2) for i in range(int((x1 - x0) / step) + 1)} | {x1}
+    zs = {round(z0 + j * step, 2) for j in range(int((z1 - z0) / step) + 1)} | {z1}
+    for a, b, c, d in outlines:
+        xs |= {round(a - reach - 0.05, 2), round(b + reach + 0.05, 2)}
+        zs |= {round(c - reach - 0.05, 2), round(d + reach + 0.05, 2)}
+    for x in sorted(v for v in xs if x0 <= v <= x1):
+        for z in sorted(v for v in zs if z0 <= v <= z1):
             if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines):
                 if body is None or all(inside(body, px, y - depth, pz) for px, pz in ((x - reach - 0.4, z), (x + reach + 0.4, z), (x, z - reach - 0.4), (x, z + reach + 0.4)) for depth in (0.3, 9.0)):
                     spots.append((round(x, 2), round(z, 2)))
@@ -319,6 +324,66 @@ def stop_spots(part, clear_of=(), width=MIN_STOP_WIDTH, step=2.0):
             z += step
         x += step
     return spots
+
+
+
+# ---------- placing fasteners and stops from the spots that fit, never by guessing ----------
+
+CORNERS = ((-1, 1), (1, 1), (1, -1), (-1, -1))   # the order screws are spread: top left, top right, bottom right, ...
+
+
+def spread(spots, count, centre=None):
+    """Spots spread to the corners around `centre` (default: the middle of the spots), best first: the screw-spread
+    rule wants one in each half across and up. spots: [(x, z), ...]."""
+    if not spots:
+        return []
+    xs, zs = [s[0] for s in spots], [s[1] for s in spots]
+    cx, cz = centre or ((min(xs) + max(xs)) / 2, (min(zs) + max(zs)) / 2)
+    order = []
+    for sx, sz in CORNERS:
+        ranked = sorted(spots, key=lambda s: -(sx * (s[0] - cx) + sz * (s[1] - cz)))
+        order += [s for s in ranked if s not in order][:1]
+    order += [s for s in spots if s not in order]
+    return order[:max(count, len(order))]
+
+
+def place_screws(parts, x0, x1, z0, z1, back_y, seam_y, towers=(), body=None, count=3):
+    """`count` screws on spots that fit (free_spots), spread to the corners; a spot whose post is refused is skipped
+    and the next one tried. Returns the Screw list. Raises with a clear reason if fewer than `count` fit."""
+    spots = free_spots(parts, x0, x1, z0, z1, towers=towers, body=body, y=seam_y)
+    screws, refused = [], []
+    for x, z in spread(spots, len(spots), centre=((x0 + x1) / 2, (z0 + z1) / 2)):
+        if len(screws) >= count:
+            break
+        if any(abs(x - s.x) < 4 * POST_RADIUS and abs(z - s.z) < 4 * POST_RADIUS for s in screws):
+            continue   # not on top of a screw already placed
+        try:
+            screws.append(Screw(x, z, back_y, seam_y, parts=parts, towers=towers, body=body))
+        except AssertionError as error:
+            refused.append(str(error))
+    assert len(screws) >= count, (f"Only {len(screws)} of {count} screw posts fit between x {x0} and {x1}, z {z0} and {z1} "
+                                  f"({len(spots)} spots fit). Widen the area, or hold a side with a Snap instead."
+                                  + (f" Last refusal: {refused[-1]}" if refused else ""))
+    return screws
+
+
+def place_stops(part, cover_y, clear_of=(), count=2):
+    """`count` stops behind `part` on spots that fit (stop_spots), spread apart; a refused spot is skipped and the next
+    tried. Returns the stop solids. Raises with a clear reason if none fits."""
+    spots = stop_spots(part, clear_of=clear_of)
+    stops, refused, used = [], [], []
+    for x, z in spread(spots, len(spots)):
+        if len(stops) >= count:
+            break
+        if any(abs(x - a) < 6 and abs(z - b) < 6 for a, b in used):
+            continue
+        try:
+            stops.append(stop(part, x, z, cover_y, clear_of=clear_of))
+            used.append((x, z))
+        except AssertionError as error:
+            refused.append(str(error))
+    assert stops, (f"No stop fits behind {part.name} ({len(spots)} spots tried)." + (f" Last refusal: {refused[-1]}" if refused else ""))
+    return stops
 
 
 def inside(body, x, y, z):
