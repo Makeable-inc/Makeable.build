@@ -128,6 +128,10 @@ def crash_cause(text):
     # a helper that raises AssertionError / ValueError itself is refusing the values it was given: the script's to fix
     refused = deepest is not None and deepest[0] in HELPER_FILES and kind in ("AssertionError", "ValueError")
     source = "tool" if helper and not refused else "script"
+    if "RunStoppedError" in text:
+        # the run died before printing anything (out of memory, a killed process): the machine, not the script
+        kind, helper, operation, source = "RunStoppedError", "sandbox", "start", "tool"
+        error = next((l.strip() for l in lines if "exit code" in l), error)
     return {"type": kind, "error": error[:400], "helper": helper, "operation": operation, "source": source, "at": at}
 
 

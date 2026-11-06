@@ -82,6 +82,19 @@ class ToolBroken(Shop):
 
 
 class Causes(unittest.TestCase):
+    def test_a_run_that_dies_without_output_is_the_machine_not_the_script(self):
+        # kitten and dino second bodies in runs/tuning-6a-v4: the PC ran out of memory, every build "crashed" empty
+        import sandbox, subprocess, tempfile
+        from unittest import mock
+        dead = subprocess.CompletedProcess(args=[], returncode=3221225477, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(sandbox.subprocess, "run", return_value=dead):
+            ok, text = sandbox.run_design("x = 1\n", Path(tmp))
+        self.assertFalse(ok)
+        self.assertIn("printed nothing", text)
+        shown = json.loads(harness.marked(text))
+        self.assertEqual((shown["source"], shown["helper"]), ("tool", "sandbox"))
+        self.assertIn("exit code 3221225477", shown["error"])
+
     def test_a_crash_inside_a_shared_helper_is_the_tool_s_fault(self):
         cause = harness.crash_cause(TOOL_CRASH)
         self.assertEqual((cause["source"], cause["helper"], cause["operation"], cause["type"]),
