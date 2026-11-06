@@ -23,7 +23,7 @@ LOOK_TARGET = 8         # a passing case under this look score gets polish submi
 # nothing behind it. The library satisfies both (knob_recess stays a closed dish; place_stops surrounds the shaft).
 MUST_PASS = {"case_closed", "press_stop"}
 # wall stays a warning (thin slivers and knife edges, mostly dropped by the slicer): a stricter agent-only limit
-# (1% under 1 mm) failed cases the agent could not then fix, and lost the valid result (runs/vs-confetti/after-details).
+# (1% under 1 mm) failed cases the agent could not then fix, and lost the valid result (a hamster test run, 6 Nov).
 
 
 def real_fault(r):
