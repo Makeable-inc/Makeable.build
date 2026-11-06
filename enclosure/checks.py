@@ -11,6 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+import nearest as exact_nearest
 import trimesh
 from scipy.spatial import cKDTree
 
@@ -127,7 +128,7 @@ def clearance(carrier, part_id, transform):
     near = world[np.isfinite(rough)]
     gap, where = np.inf, None
     if len(near):
-        _, distances, _ = trimesh.proximity.closest_point(carrier, near)
+        _, distances, _ = exact_nearest.closest_point(carrier, near)
         i = int(np.argmin(distances))
         gap, where = float(distances[i]), near[i]
     # Inside tests cover both the close points and an even spread, so a part buried deep in thick plastic is still found.
@@ -135,7 +136,7 @@ def clearance(carrier, part_id, transform):
     tested = tested[np.all((tested > carrier.bounds[0]) & (tested < carrier.bounds[1]), axis=1)]
     inside = carrier.contains(tested) if len(tested) else np.zeros(0, dtype=bool)
     if inside.any():
-        _, depths, _ = trimesh.proximity.closest_point(carrier, tested[inside])
+        _, depths, _ = exact_nearest.closest_point(carrier, tested[inside])
         i = int(np.argmax(depths))
         gap, where = -float(depths[i]), tested[inside][i]
 
@@ -143,7 +144,7 @@ def clearance(carrier, part_id, transform):
     rough, _ = cKDTree(points).query(local, distance_upper_bound=NEAR)
     local = local[np.isfinite(rough)]
     if len(local):
-        _, back, _ = trimesh.proximity.closest_point(mesh, local)
+        _, back, _ = exact_nearest.closest_point(mesh, local)
         if back.min() < gap:
             i = int(np.argmin(back))
             gap, where = float(back[i]), apply(transform, local[i:i + 1])[0]
@@ -230,7 +231,9 @@ def check_holder(holder, carrier, part_name, part, card, transform, insert_from)
     return results
 
 
-def check_design(folder, stage="carrier"):
+def check_design(folder, stage="carrier", only=None):
+    """only: a set of check names; the case checks then run just the families that make them (a focused check while
+    editing). The file, mesh and holder checks always run. A focused report is never a full one."""
     folder = Path(folder)
     report = {"folder": str(folder), "results": []}
     results = report["results"]
@@ -243,6 +246,7 @@ def check_design(folder, stage="carrier"):
         report["passed"] = not report["failed"] and bool(results)
         report["status"] = "fail" if not report["passed"] else "pass_with_warnings" if report["warnings"] else "pass"
         # These failures skip later checks, so this report's count of failures cannot be compared with a full one.
+        report["focused"] = only is not None
         report["complete"] = not any(r["check"] in ("design_file", "files", "sealed", "part", "not_rescaled", "holds", "case") for r in report["failed"])
         return report
 
@@ -296,7 +300,7 @@ def check_design(folder, stage="carrier"):
         design["base_design"] = json.loads(base_file.read_text(encoding="utf-8")) if base_file.exists() else None
         body_file = folder / "BODY.stl"
         design["body_stl"] = str(body_file) if body_file.exists() else None
-        results.extend(check_case(design, meshes, purchased, cards, transforms))
+        results.extend(check_case(design, meshes, purchased, cards, transforms, only))
     return finish()
 
 

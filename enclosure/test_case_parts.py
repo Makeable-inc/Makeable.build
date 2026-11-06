@@ -341,6 +341,13 @@ class WorkedExample(unittest.TestCase):
             # the faults agents used to copy from this example: an open route beside the knob, no stop around its shaft
             warned = {r["check"] for r in report.get("warnings", [])}
             self.assertFalse({"case_closed", "press_stop"} & warned, sorted(warned))
+            # a focused check (one group, while editing) gives the same results as the full check for that group
+            import case_agent
+            key = lambda r: json.dumps([r["check"], r["part"], r["ok"], r.get("measured")], default=str)
+            for group, names in case_agent.GROUPS.items():
+                focused = checks.check_design(folder, "case", only=names)
+                self.assertEqual(sorted(key(r) for r in focused["results"] if r["check"] in names),
+                                 sorted(key(r) for r in report["results"] if r["check"] in names), group)
 
 
 if __name__ == "__main__":

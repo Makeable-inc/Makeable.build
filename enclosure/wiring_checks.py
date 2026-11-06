@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+import nearest as exact_nearest
 import trimesh
 from scipy.spatial import ConvexHull, QhullError, cKDTree
 
@@ -150,7 +151,7 @@ def check_wire(net, ends, declared, meshes, union, hull, part_points, usb_rooms)
     samples = path_samples(path)
     length = float(np.linalg.norm(np.diff(path, axis=0), axis=1).sum())
     results.append(result("wire_length", label, length <= WIRE_MAX_LENGTH, measured=round(length, 1), limit=f"at most {WIRE_MAX_LENGTH} mm", fix=f"Shorten {net}'s route to fit a {WIRE_MAX_LENGTH} mm jumper."))
-    _, distances, _ = trimesh.proximity.closest_point(union, samples)
+    _, distances, _ = exact_nearest.closest_point(union, samples)
     inside = union.contains(samples)
     worst = int(np.argmax(inside.astype(float) * 1000 - distances))
     results.append(result("wire_clear_plastic", label, not inside.any() and distances.min() >= WIRE_RADIUS, measured=round(float(-distances[worst] if inside[worst] else distances[worst]), 2), limit=f"wire centre at least {WIRE_RADIUS} mm from plastic", where=rounded(samples[worst]),

@@ -2,6 +2,7 @@
 import json
 
 import numpy as np
+import nearest as exact_nearest
 import trimesh
 from scipy.spatial import ConvexHull, QhullError
 
@@ -64,7 +65,7 @@ def nearest_gaps(mesh, points):
     near = points[np.all((points >= lo) & (points <= hi), axis=1)]
     if not len(near):
         return np.array([]), near
-    found = [trimesh.proximity.closest_point(mesh, near[i:i + QUERY_BATCH])[1] for i in range(0, len(near), QUERY_BATCH)]
+    found = [exact_nearest.closest_point(mesh, near[i:i + QUERY_BATCH])[1] for i in range(0, len(near), QUERY_BATCH)]
     return np.concatenate(found), near
 
 
@@ -463,7 +464,7 @@ def check_outer_parts(meshes, front, body, fitted=()):
         if name == "PRINT_Shell" or name in fitted:
             continue   # a cap fitted on a shaft from outside is meant to be on the outside
         points, faces = trimesh.sample.sample_surface(mesh, 5000, seed=5)
-        _, distance, _ = trimesh.proximity.closest_point(body, points)
+        _, distance, _ = exact_nearest.closest_point(body, points)
         on_outside = distance < 0.3
         allowed = np.zeros(len(points), dtype=bool)
         if name == "PRINT_Base":
@@ -512,7 +513,26 @@ def check_keeps_body(meshes, body):
     return results
 
 
-def check_case(design, meshes, purchased, cards, transforms):
+# the check names each family makes, so a focused check can run only the families it needs
+FAMILIES = {
+    "pairs": {"parts_gap"}, "bed": {"flat_on_bed"}, "outer": {"outer_parts"}, "keeps": {"keeps_body"},
+    "clearance": {"clearance"}, "retained": {"retained"}, "usb": {"usb_access", "usb_above_desk"},
+    "screen": {"screen_faces_viewer", "screen_share", "viewing_angle", "window_fit", "window_view"},
+    "standing": {"stands"}, "assembly": {"assembly", "insertable"}, "knob_turns": {"knob_turns"},
+    "snaps": {"snap_strain", "snap_flex", "snap_catch"},
+    "screws": {"screw_clear", "screw_count", "screw_driver", "screw_fit", "screw_gap", "screw_grip", "screw_seat", "screw_spread"},
+    "wiring": {"knob_place", "knob_room", "plug_clear_parts", "plug_inside", "plug_room", "press_not_on_wire", "press_stop",
+               "shaft_hole", "wire_bend", "wire_clear_parts", "wire_clear_plastic", "wire_clear_usb", "wire_inside",
+               "wire_length", "wire_reach", "wire_route", "button_reach", "touch_depth", "touch_opening", "touch_place", "touch_rim"},
+    "layout": {"base_depth", "base_facing", "base_place", "base_proportion", "base_usb", "body_kept", "body_no_growth",
+               "case_closed", "opening_fit", "see_through", "wire_bay", "wire_crossing", "wire_hidden", "wire_room"},
+    "access": {"access"},
+}
+
+
+def check_case(design, meshes, purchased, cards, transforms, only=None):
+    def want(family):
+        return only is None or bool(FAMILIES[family] & set(only))
     case = design.get("case")
     if not isinstance(case, dict):
         return [result("case", "design.json", False, fix="design.json needs a case section with assembly and screws.")]
@@ -521,28 +541,32 @@ def check_case(design, meshes, purchased, cards, transforms):
         return [result("case", "design.json", False, measured=missing, limit=REQUIRED_PARTS, fix="A case is at least PRINT_Shell and PRINT_Base. The controller's holder may be built into one of them or be its own PRINT_Carrier.")]
     if not all(m.is_watertight for m in meshes.values()) or set(transforms) != set(purchased):
         return []
-    results = check_plastic_pairs(meshes)
-    results.extend(check_flat_on_bed(meshes))
+    results = check_plastic_pairs(meshes) if want("pairs") else []
+    if want("bed"):
+        results.extend(check_flat_on_bed(meshes))
     body_path = design.get("body_stl")
     body = load_stl(body_path) if body_path else None
     fitted = design.get("fitted_on") or {}
-    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), body, fitted))
-    results.extend(check_keeps_body(meshes, body))
+    if want("outer"):
+        results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), body, fitted))
+    if want("keeps"):
+        results.extend(check_keeps_body(meshes, body))
     union = merged(meshes.values())
     part_points = {}
     for name, transform in transforms.items():
         part_id = purchased[name]["part_id"]
         part_points[name] = apply(transform, part_surface(part_id)[2])
-        for mesh_name, mesh in meshes.items():
+        for mesh_name, mesh in (meshes.items() if want("clearance") else ()):
             if fitted.get(mesh_name) == name:
                 continue   # the cap grips this part's shaft by design; knob_turns checks it instead
             gap, inside, where = clearance(mesh, part_id, transform)
             place = rounded(where) if where is not None else None
             results.append(result("clearance", f"{mesh_name} / {name}", gap >= MIN_GAP - GAP_TOLERANCE and inside == 0, measured=None if np.isinf(gap) else round(gap, 3), limit=f"at least {MIN_GAP} mm", where=f"at {place}, {inside} points inside the plastic",
                                   fix=f"{mesh_name} is too close to {name} at {place}. Move that surface away until the gap is at least {MIN_GAP} mm."))
-        results.extend(allow_glue(check_retained(name, part_points[name], union), glueable(set((design.get("case") or {}).get("glued") or []), cards)))
+        if want("retained"):
+            results.extend(allow_glue(check_retained(name, part_points[name], union), glueable(set((design.get("case") or {}).get("glued") or []), cards)))
         card = cards[name]
-        if "usb" in card["features"]:
+        if "usb" in card["features"] and want("usb"):
             room = port_room_box(card["features"]["usb"], transform)
             blocked = sum(overlap(m, room) for m in meshes.values())
             path = f"{rounded(room.bounds[0])} to {rounded(room.bounds[1])}"
@@ -550,11 +574,12 @@ def check_case(design, meshes, purchased, cards, transforms):
             desk = union.bounds[0][2]
             results.append(result("usb_above_desk", name, room.bounds[0][2] >= desk, measured=round(float(room.bounds[0][2] - desk), 2), limit="plug stays above the desk (0 or more)", where=f"plug path lowest z {room.bounds[0][2]:.2f}, desk z {desk:.2f}",
                                   fix="The plug would hit the desk. Turn the board so the USB faces sideways or backward, or raise it, so the whole plug path stays above the lowest point of the case."))
-        if "screen" in card["features"] and "glass" in card["features"]:
+        if "screen" in card["features"] and "glass" in card["features"] and want("screen"):
             results.extend(check_screen(name, card, transform, union))
-    if "PRINT_Carrier" in meshes:
+    if "PRINT_Carrier" in meshes and want("retained"):
         results.extend(check_retained("PRINT_Carrier", plastic_points(meshes["PRINT_Carrier"]), merged(m for n, m in meshes.items() if n != "PRINT_Carrier")))
-    results.extend(check_standing(meshes))
+    if want("standing"):
+        results.extend(check_standing(meshes))
     assembly_points = {}
     for name, points in part_points.items():
         keep = np.ones(len(points), dtype=bool)
@@ -564,15 +589,21 @@ def check_case(design, meshes, purchased, cards, transforms):
                 keep &= ~np.all((local >= np.array(feature["min"]) - 0.01) & (local <= np.array(feature["max"]) + 0.01), axis=1)
         assembly_points[name] = points[keep]
     snaps = case.get("snaps") or []
-    results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points, fitted))
-    results.extend(check_knob_turns(meshes, fitted, cards, transforms))
-    results.extend(check_snaps(snaps, meshes))
-    results.extend(check_screws(case.get("screws") or [], meshes, part_points, case.get("snaps") or []))
-    from wiring_checks import check_wiring
-    results.extend(check_wiring(design, meshes, purchased, cards, transforms))
-    from layout_checks import check_layout
-    results.extend(check_layout(design, cards, transforms, union))
-    if design.get("base_design", {}) and design["base_design"].get("use_library"):
+    if want("assembly"):
+        results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points, fitted))
+    if want("knob_turns"):
+        results.extend(check_knob_turns(meshes, fitted, cards, transforms))
+    if want("snaps"):
+        results.extend(check_snaps(snaps, meshes))
+    if want("screws"):
+        results.extend(check_screws(case.get("screws") or [], meshes, part_points, case.get("snaps") or []))
+    if want("wiring"):
+        from wiring_checks import check_wiring
+        results.extend(check_wiring(design, meshes, purchased, cards, transforms))
+    if want("layout"):
+        from layout_checks import check_layout
+        results.extend(check_layout(design, cards, transforms, union))
+    if want("access") and design.get("base_design", {}) and design["base_design"].get("use_library"):
         from access import check_access
         results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms))
     return results

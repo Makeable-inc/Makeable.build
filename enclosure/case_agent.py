@@ -124,6 +124,7 @@ class Workshop:
         self.ran, message = run_design(code, self.work)
         self.ran_code = code if self.ran else None
         self.report = None
+        self.focused = None
         if not self.ran:
             self.note_trouble(message)
             return message[-OUTPUT_LIMIT:]
@@ -148,16 +149,24 @@ class Workshop:
         return ("The case could not be built inside this body. The last problems it hit:\n"
                 + "\n".join(f"- {t}" for t in named[-5:])) if named else None
 
-    def checked(self):
-        if self.report is None:
+    def checked(self, group="all"):
+        """The check report for the last run: every check, or (for one group, while no full report exists yet) only the
+        check families that group needs. A full report is never replaced by a focused one; submit always runs all."""
+        if self.report is not None:
+            return self.report
+        if group == "all":
             self.report = strict(checks.check_design(self.work, "case"))
-        return self.report
+            return self.report
+        focused = getattr(self, "focused", None)
+        if focused is None or focused[0] != (self.ran_code, group):
+            self.focused = ((self.ran_code, group), strict(checks.check_design(self.work, "case", only=GROUPS[group])))
+        return self.focused[1]
 
-    def check_crash(self):
+    def check_crash(self, group="all"):
         """The case checks themselves crashed (not the agent's script): the crash, worded so the harness marks it as a
         shared-tool failure and its circuit breaker can stop the run. None if the checks ran."""
         try:
-            self.checked()
+            self.checked(group)
             return None
         except Exception:
             import traceback
@@ -175,10 +184,10 @@ class Workshop:
         if self.stale():
             self.uncounted = True
             return "The saved script changed since the last run, so there is nothing current to check. run() it first."
-        crash = self.check_crash()
+        crash = self.check_crash(group)
         if crash:
             return crash
-        report = self.checked()
+        report = self.checked(group)
         names = None if group == "all" else GROUPS[group]
         fields = ("check", "part", "measured", "limit", "where", "fix")
         failed = [{k: r.get(k) for k in fields} for r in report["failed"] if names is None or r["check"] in names]

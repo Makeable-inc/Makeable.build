@@ -329,11 +329,16 @@ def free_spots(parts, x0, x1, z0, z1, reach=POST_RADIUS, towers=(), step=2.0, bo
     for a, b, c, d in outlines:
         xs |= {round(a - reach - 0.05, 2), round(b + reach + 0.05, 2)}
         zs |= {round(c - reach - 0.05, 2), round(d + reach + 0.05, 2)}
-    for x in sorted(v for v in xs if x0 <= v <= x1):
-        for z in sorted(v for v in zs if z0 <= v <= z1):
-            if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines):
-                if body is None or all(inside(body, px, y - depth, pz) for px, pz in ((x - reach - 0.4, z), (x + reach + 0.4, z), (x, z - reach - 0.4), (x, z + reach + 0.4)) for depth in (0.3, 9.0)):
-                    spots.append((round(x, 2), round(z, 2)))
+    clear = [(x, z) for x in sorted(v for v in xs if x0 <= v <= x1) for z in sorted(v for v in zs if z0 <= v <= z1)
+             if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines)]
+    if body is None:
+        return [(round(x, 2), round(z, 2)) for x, z in clear]
+    # each spot fits if 8 points round it (4 sides, 2 depths) are inside the body: tested all at once
+    probes = [(px, y - depth, pz) for x, z in clear
+              for px, pz in ((x - reach - 0.4, z), (x + reach + 0.4, z), (x, z - reach - 0.4), (x, z + reach + 0.4))
+              for depth in (0.3, 9.0)]
+    found = inside_many(body, probes).reshape(-1, 8) if clear else []
+    spots = [(round(x, 2), round(z, 2)) for (x, z), ok in zip(clear, found) if ok.all()]
     return spots
 
 
@@ -442,13 +447,80 @@ def inside(body, x, y, z):
     return body.is_inside(Vector(x, y, z))
 
 
+_classifiers = {}
+SLICE_SPACING = 0.2     # mm between outline points of a slice (chord error well under 0.01 mm on these bodies)
+SLICE_BAND = 0.02       # mm: a point this close to a slice outline gets the exact CAD test
+SLICE_FROM = 20         # points at one y before slicing pays off
+
+
+def _exact(body, points):
+    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+    from OCP.gp import gp_Pnt
+    from OCP.TopAbs import TopAbs_IN
+    import numpy as np
+    key = id(body)
+    if key not in _classifiers or _classifiers[key][0] is not body:
+        _classifiers[key] = (body, BRepClass3d_SolidClassifier(body.wrapped))
+    classifier = _classifiers[key][1]
+    found = np.zeros(len(points), dtype=bool)
+    for i, (x, y, z) in enumerate(points):
+        classifier.Perform(gp_Pnt(float(x), float(y), float(z)), 1.0e-6)
+        found[i] = classifier.State() == TopAbs_IN or classifier.IsOnAFace()
+    return found
+
+
+def _slice(body, y):
+    """The body's cross-section at this y, as a shapely shape in (x, z)."""
+    return _cut_slice(body, y)
+
+
+def _cut_slice(body, y):
+    import numpy as np
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    cut = body & Plane.XZ.offset(-y)
+    shapes = []
+    for face in (cut.faces() if cut is not None else []):
+        rings = []
+        for wire in [face.outer_wire()] + list(face.inner_wires()):
+            # points along the whole loop in order (joining edge by edge can run an edge backwards)
+            n = max(8, int(wire.length / SLICE_SPACING) + 1)
+            rings.append([(v.X, v.Z) for v in wire.positions(list(np.linspace(0, 1, n, endpoint=False)))])
+        shapes.append(Polygon(rings[0], rings[1:]).buffer(0))
+    return unary_union(shapes) if shapes else None
+
+
+def inside_many(body, points):
+    """inside() for many points, the same answers: points sharing a y are tested against one slice of the body; a
+    point within SLICE_BAND of the slice outline, or a y with few points, gets the exact CAD test. (build123d's
+    is_inside sets up its classifier for every point: ~50 ms each on a curved body.)"""
+    import numpy as np
+    import shapely
+    points = np.asarray(points, dtype=float).reshape(-1, 3)
+    found = np.zeros(len(points), dtype=bool)
+    ys = np.round(points[:, 1], 6)
+    for y in np.unique(ys):
+        rows = np.flatnonzero(ys == y)
+        section = _slice(body, float(y)) if len(rows) >= SLICE_FROM else None
+        if section is None or section.is_empty:
+            found[rows] = _exact(body, points[rows]) if section is None else False
+            continue
+        flat = shapely.points(points[rows][:, [0, 2]])
+        found[rows] = shapely.contains(section, flat)
+        near = rows[shapely.distance(section.boundary, flat) < SLICE_BAND]
+        if len(near):
+            found[near] = _exact(body, points[near])
+    return found
+
+
 def outside_points(body, low, high, wall=MIN_WALL, levels=3):
     """Points around a box, grown by a wall, that are not inside the body. Empty means the box keeps at least that wall all round."""
     xs, zs = (low[0] - wall, high[0] + wall), (low[2] - wall, high[2] + wall)
     ys = [low[1] + (high[1] - low[1]) * i / (levels - 1) for i in range(levels)]
     points = [(x, y, z) for x in xs for z in zs for y in ys]
     points += [((low[0] + high[0]) / 2, y, z) for z in zs for y in ys] + [(x, y, (low[2] + high[2]) / 2) for x in xs for y in ys]
-    return [p for p in points if not inside(body, *p)]
+    found = inside_many(body, points)
+    return [p for p, f in zip(points, found) if not f]
 
 
 def tower_room(part, to_y, wall=HOLDER_WALL, gap=GAP, body=None):

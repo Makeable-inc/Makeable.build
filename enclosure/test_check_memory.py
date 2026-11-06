@@ -41,12 +41,12 @@ class Gap(unittest.TestCase):
         dense = trimesh.creation.icosphere(subdivisions=6, radius=30)          # 82k faces, 41k vertices
         plate = box((80, 3, 80), (0, 34, 0))
         sizes = []
-        real = trimesh.proximity.closest_point
+        real = case_checks.exact_nearest.closest_point
 
         def spy(mesh, points):
             sizes.append(len(points))
             return real(mesh, points)
-        with mock.patch.object(case_checks.trimesh.proximity, "closest_point", spy):
+        with mock.patch.object(case_checks.exact_nearest, "closest_point", spy):
             case_checks.check_plastic_pairs({"PRINT_Shell": dense, "PRINT_Base": plate})
         self.assertLessEqual(max(sizes), case_checks.QUERY_BATCH)
         self.assertLess(sum(sizes), len(dense.vertices) + 8000, "points far from the plate are not queried")

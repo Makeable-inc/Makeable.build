@@ -1,5 +1,6 @@
 """Checks that a case matches its base design, plus two wiring checks that came from looking at a real result: wires must not cross and must not show from outside."""
 import numpy as np
+import nearest as exact_nearest
 import trimesh
 
 from card import DIRECTIONS
@@ -122,7 +123,7 @@ def check_body_kept(body_path, union):
     outside = points[~body.contains(points)]
     results = []
     if len(outside):
-        _, distance, _ = trimesh.proximity.closest_point(body, outside)
+        _, distance, _ = exact_nearest.closest_point(body, outside)
         worst = float(distance.max())
         place = rounded(outside[int(np.argmax(distance))])
     else:
@@ -130,7 +131,7 @@ def check_body_kept(body_path, union):
     results.append(result("body_no_growth", "case", worst <= BODY_TOLERANCE, measured=round(worst, 3), limit=f"nothing more than {BODY_TOLERANCE} mm outside the frozen body", where=place,
                           fix=f"Plastic stands {worst:.2f} mm outside the frozen body near {place}. Remove it; the body cannot change."))
     samples = trimesh.sample.sample_surface(body, 20000, seed=5)[0]
-    _, distance, _ = trimesh.proximity.closest_point(union, samples)
+    _, distance, _ = exact_nearest.closest_point(union, samples)
     kept = float((distance <= BODY_TOLERANCE).mean())
     results.append(result("body_kept", "case", kept >= MIN_BODY_KEPT, measured=round(kept, 3), limit=f"at least {MIN_BODY_KEPT} of the frozen body's surface kept", where=None,
                           fix=f"Only {kept:.0%} of the frozen body's outside survives. Keep cuts to the window, knob, USB and screw holes and the seam."))
