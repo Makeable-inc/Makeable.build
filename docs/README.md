@@ -5,6 +5,8 @@
 - [torn-paper-effect.md](torn-paper-effect.md): the torn-paper grain effect as a portable snippet.
 - [enclosure.md](enclosure.md): the enclosure generator: flow, checks, what a customer gets, results and what is not built yet.
 - [enclosure-jobs.md](enclosure-jobs.md): the enclosure job API: routes, how a job moves, limits, stuck-job cleanup and tests.
+- [enclosure-agents.md](enclosure-agents.md): the body and case agents: their loop, tools and building blocks, how they are tested, and results against a commercial tool.
+- [enclosure-agents/size-rule/index.html](enclosure-agents/size-rule/index.html): before and after loosening the body size rule, on eight designs (concept, before and after renders).
 - [enclosure-parts-library.md](enclosure-parts-library.md): how the enclosure generator builds the inside of a case from tested pieces, its rules, and how it was tested.
 - [specs/](specs/): design specs for shipped features.
 - [archive/](archive/): earlier plans and reports, kept for history. They describe the older AWS and `/pilot` setup and may not match the current code.

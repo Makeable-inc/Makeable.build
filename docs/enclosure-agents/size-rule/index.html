@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Body Size Rule Results</title>
+<style>
+  :root { --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e2e0da; --good: #2f7d4f; --bad: #b3412e; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1b1b1a; --card: #262624; --ink: #f1f0ec; --muted: #a8a69f; --line: #3a3936; --good: #6fc08f; --bad: #e07a63; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.note { color: var(--muted); margin: 0 0 16px; }
+  .wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; background: var(--card); border: 1px solid var(--line); margin-bottom: 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 18px; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  .row { display: grid; grid-template-columns: 1fr 3fr 3fr; gap: 12px; align-items: start; }
+  @media (max-width: 800px) { .row { grid-template-columns: 1fr; } }
+  figure { margin: 0; }
+  figure img { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  figcaption b { color: var(--ink); }
+  .good { color: var(--good); font-weight: 600; }
+  .bad { color: var(--bad); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Body size rule: before and after</h1>
+  <p class="note">Same agent pipeline, parts and concept pictures. Before: the body's front was capped so the screen covered at least 40-50% of it, which squashed every body to the screen's height. After: the screen only has to cover 35% along its long side and 20% across, and the body takes its proportions from the concept. Eight full runs (body, then case) on 8 Nov 2026. Scores are the look reviewer's, out of 10. Frog, whale and rocket are held-back designs never used for tuning. The hamster's concept picture came from a commercial AI design tool, given the same parts.</p>
+
+  <div class="wrap"><table>
+    <tr><th>Design</th><th>Before</th><th>After</th><th>Inside fits (every must-pass check)</th><th>Closer to the concept?</th></tr>
+    <tr><td>Hamster</td><td>6</td><td class="good">7</td><td class="good">yes</td><td class="good">yes, clearly</td></tr>
+    <tr><td>TV</td><td>6</td><td class="good">7</td><td class="good">yes</td><td class="good">yes</td></tr>
+    <tr><td>Dino</td><td>6</td><td>6 (body 7)</td><td class="good">yes</td><td class="good">yes, clearly</td></tr>
+    <tr><td>Kitten</td><td>6</td><td>6</td><td class="good">yes</td><td class="good">yes</td></tr>
+    <tr><td>Frog (held back)</td><td>6</td><td class="bad">5</td><td class="good">yes</td><td>shape yes; a rough cut by the screen</td></tr>
+    <tr><td>Robot</td><td>7</td><td class="bad">6</td><td class="good">yes</td><td>about the same</td></tr>
+    <tr><td>Whale (held back)</td><td>6</td><td>6</td><td class="good">yes</td><td class="bad">no</td></tr>
+    <tr><td>Rocket (held back)</td><td>5</td><td class="bad">failed</td><td class="bad">no case</td><td>its body was the closest yet, but a rule rejected it: the nose and fins were not added as named features</td></tr>
+  </table></div>
+
+  <section><h2>Hamster</h2><div class="row">
+    <figure><img src="hamster-concept.jpg" alt="Hamster concept"><figcaption><b>Concept</b> (from a commercial AI design tool)</figcaption></figure>
+    <figure><img src="hamster-before.jpg" alt="Hamster before"><figcaption><b>Before</b>: 6/10</figcaption></figure>
+    <figure><img src="hamster-after.jpg" alt="Hamster after"><figcaption><b>After</b>: 7/10</figcaption></figure>
+  </div></section>
+  <section><h2>TV</h2><div class="row">
+    <figure><img src="tv-concept.jpg" alt="TV concept"><figcaption><b>Concept</b></figcaption></figure>
+    <figure><img src="tv-before.jpg" alt="TV before"><figcaption><b>Before</b>: 6/10</figcaption></figure>
+    <figure><img src="tv-after.jpg" alt="TV after"><figcaption><b>After</b>: 7/10</figcaption></figure>
+  </div></section>
+  <section><h2>Dino</h2><div class="row">
+    <figure><img src="dino-concept.jpg" alt="Dino concept"><figcaption><b>Concept</b></figcaption></figure>
+    <figure><img src="dino-before.jpg" alt="Dino before"><figcaption><b>Before</b>: 6/10</figcaption></figure>
+    <figure><img src="dino-after.jpg" alt="Dino after"><figcaption><b>After</b>: 6/10 (body 7/10)</figcaption></figure>
+  </div></section>
+  <section><h2>Kitten</h2><div class="row">
+    <figure><img src="kitten-concept.jpg" alt="Kitten concept"><figcaption><b>Concept</b></figcaption></figure>
+    <figure><img src="kitten-before.jpg" alt="Kitten before"><figcaption><b>Before</b>: 6/10</figcaption></figure>
+    <figure><img src="kitten-after.jpg" alt="Kitten after"><figcaption><b>After</b>: 6/10</figcaption></figure>
+  </div></section>
+  <section><h2>Frog (held back)</h2><div class="row">
+    <figure><img src="frog-concept.jpg" alt="Frog concept"><figcaption><b>Concept</b></figcaption></figure>
+    <figure><img src="frog-before.jpg" alt="Frog before"><figcaption><b>Before</b>: 6/10</figcaption></figure>
+    <figure><img src="frog-after.jpg" alt="Frog after"><figcaption><b>After</b>: 5/10</figcaption></figure>
+  </div></section>
+  <section><h2>Robot</h2><div class="row">
+    <figure><img src="robot-concept.jpg" alt="Robot concept"><figcaption><b>Concept</b></figcaption></figure>
+    <figure><img src="robot-before.jpg" alt="Robot before"><figcaption><b>Before</b>: 7/10</figcaption></figure>
+    <figure><img src="robot-after.jpg" alt="Robot after"><figcaption><b>After</b>: 6/10</figcaption></figure>
+  </div></section>
+  <section><h2>Whale (held back)</h2><div class="row">
+    <figure><img src="whale-concept.jpg" alt="Whale concept"><figcaption><b>Concept</b></figcaption></figure>
+    <figure><img src="whale-before.jpg" alt="Whale before"><figcaption><b>Before</b>: 6/10</figcaption></figure>
+    <figure><img src="whale-after.jpg" alt="Whale after"><figcaption><b>After</b>: 6/10</figcaption></figure>
+  </div></section>
+  <section><h2>Rocket (held back)</h2><div class="row">
+    <figure><img src="rocket-concept.jpg" alt="Rocket concept"><figcaption><b>Concept</b></figcaption></figure>
+    <figure><img src="rocket-before.jpg" alt="Rocket before"><figcaption><b>Before</b>: 5/10</figcaption></figure>
+    <figure><img src="rocket-after.jpg" alt="Rocket after, body only"><figcaption><b class="bad">After: failed</b>. The body stage never passed, so no case was made. Its last body try is shown.</figcaption></figure>
+  </div></section>
+</main>
+</body>
+</html>

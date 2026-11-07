@@ -18,11 +18,12 @@ The library, all in millimetres, with the screen facing -y and the rear cover cl
 - split(body, seam_y): the Shell blank and the flat cover.
 - deepest_front(body, x0, x1, z0, z1), front_surface(body, x, z): the outside of a curved front at that spot.
 - pocket(part, to_y, data): the room for a part in the Shell, including its plugs. It only widens toward the back.
-- window(part), shaft_hole(part), knob_recess(part, depth_from_y), touch_opening(part), usb_opening(part, data): fitted openings. Cut usb_opening from every printed part.
+- screen_bezel(screen, body): the screen opening as a rounded sloped frame (use it instead of window(part)). shaft_hole(part), knob_recess(part, depth_from_y, data=data) (a closed dish), touch_opening(part), usb_opening(part, data): fitted openings. Cut usb_opening from every printed part.
+- knob_dish(part, depth_from_y, data=data) -> (x, z, depth, radius); knob_cap(part, profile, squash, fit_radius=radius): a printed cap on the knob's shaft, sized to turn in its dish; pass it to finish(..., extra_prints={"PRINT_Knob": cap}, fitted_on={"PRINT_Knob": knob}).
 - tower(part, cover_y), tower_room(part, to_y): a holder for a small controller, built into the cover, and the room it needs in the Shell. Keep the holder's room inside the body, or the holder will show on the outside and fail the outside check.
 - stop(part, x, z, cover_y, clear_of=[...]): a column from the cover to just behind a part. It thickens when long. Put stops behind boards that have no other support, and one behind a knob so pressing it pushes against plastic.
 - Screw(x, z, back_y, seam_y, parts=[...], towers=[...], body=body): has post(), shell_cut(), cover_cut() and entry(). It refuses a post in a part's path or outside the body.
-- free_spots(parts, x0, x1, z0, z1, towers=[...], body=body, y=seam_y) and stop_spots(part, clear_of=[...]): the positions a post or stop can actually use. Call these and choose from the result, rather than guessing a position.
+- place_screws(parts, x0, x1, z0, z1, back_y, seam_y, towers=[...], body=body, count=3) and place_stops(part, cover_y, clear_of=[...], count=2): screws and stops on spots that fit, spread to the corners; a refused spot is skipped. Use these; never type a position by hand. (free_spots and stop_spots list the raw spots.)
 - Snap(body, side, z, seam_y): a one-arm snap latch on the -x or +x side. snap.arm() is added to the cover and snap.shell_cut() is cut from the Shell. Pass the snaps to finish(..., snaps=[...]).
 - wire_paths(data, parts, lane_y): guide paths for the wires.
 - finish(shell, cover, screen_and_inputs, controller, screws, wires, glued=[...], holder=..., insert_from=...): checks each part is one solid, exports it and writes design.json. For a controller with its own screen, pass holder="PRINT_Shell", insert_from="+y", and do not build a tower.

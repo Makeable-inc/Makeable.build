@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ALLOWED_IMPORTS = {"build123d", "math", "json", "pathlib", "case_parts"}
+ALLOWED_IMPORTS = {"build123d", "math", "json", "pathlib", "case_parts", "body_parts"}
 BANNED_NAMES = {"eval", "exec", "compile", "__import__", "globals", "locals", "getattr", "setattr", "breakpoint", "input"}
 TIME_LIMIT_SECONDS = 300
 OUTPUT_LIMIT = 4000
@@ -72,6 +72,10 @@ def run_design(code, folder):
     except subprocess.TimeoutExpired:
         return False, f"The code ran longer than the {TIME_LIMIT_SECONDS} second limit."
     (folder / "output.txt").write_text(done.stdout + done.stderr, encoding="utf-8")
+    if done.returncode != 0 and not done.stderr.strip():
+        # Python died before it could say anything: the machine (memory, a killed process), not the script.
+        return False, (f"The code crashed:\nThe run stopped with exit code {done.returncode} and printed nothing. That is not "
+                       "your script: the computer may be out of memory, or Python could not start. RunStoppedError")
     if done.returncode != 0:
         return False, f"The code crashed:\n{done.stderr[-OUTPUT_LIMIT:]}"
     return True, ""

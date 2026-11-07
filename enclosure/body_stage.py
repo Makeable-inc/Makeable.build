@@ -34,14 +34,24 @@ How to get a form that looks designed rather than like a box with rounded corner
 BODY_SYSTEM = BODY_SYSTEM + "\n\n" + (Path(__file__).resolve().parent / "DESIGN_RULES.md").read_text(encoding="utf-8")
 
 
+# How small the screen may be on the body's front: a sanity limit so a small screen never gets a huge empty case,
+# not a proportion rule. The body takes its proportions from the concept picture. (It was 40-50% with an either/or cap,
+# which squashed every body to the screen's height: the 2.42" screen capped the front at 68.7 mm tall.)
+BODY_SCREEN_SHARE_ALONG = 0.35    # along the screen's long side
+BODY_SCREEN_SHARE_ACROSS = 0.2    # across it
+
+
 def screen_limits(base):
-    """The largest front the screen-size check can ever pass, so a frozen body can never make it impossible."""
+    """The largest front the body may have for its screen. tight_* equal max_* (kept so callers that test either way
+    still work)."""
     cards = [build_card(part_id) for part_id in base["parts"].split(",")]
     size = next(card["features"]["screen"]["size"] for card in cards if "screen" in card["features"])
     short, long = sorted(size[:2])
     wide = long if base["width_to_height"][0] >= 1 else short
     tall = short if base["width_to_height"][0] >= 1 else long
-    return {"screen_width": wide, "screen_height": tall, "max_width": wide / MIN_SCREEN_SHARE_OTHER, "max_height": tall / MIN_SCREEN_SHARE_OTHER, "tight_width": wide / MIN_SCREEN_SHARE_WIDEST, "tight_height": tall / MIN_SCREEN_SHARE_WIDEST}
+    along, across = (BODY_SCREEN_SHARE_ALONG, BODY_SCREEN_SHARE_ACROSS) if wide >= tall else (BODY_SCREEN_SHARE_ACROSS, BODY_SCREEN_SHARE_ALONG)
+    max_width, max_height = wide / along, tall / across
+    return {"screen_width": wide, "screen_height": tall, "max_width": max_width, "max_height": max_height, "tight_width": max_width, "tight_height": max_height}
 
 
 def body_brief(base):
@@ -50,7 +60,7 @@ def body_brief(base):
         minimum = base["min_body"]
         lines.append(f"The parts need at least this much room: width {minimum['width']} mm, height {minimum['height']} mm, depth {minimum['depth']} mm. Keep the body at or above these. Sizes are real, so do not shrink below them for looks.")
     limit = screen_limits(base)
-    lines.append(f"The real screen is {limit['screen_width']:.1f} mm wide and {limit['screen_height']:.1f} mm tall and cannot change. It must be the main feature of the front, so the front is at most {limit['max_width']:.1f} mm wide and {limit['max_height']:.1f} mm tall, and also either at most {limit['tight_width']:.1f} mm wide or at most {limit['tight_height']:.1f} mm tall. Size the form from these numbers, not from how large it looks in the picture.")
+    lines.append(f"The real screen is {limit['screen_width']:.1f} mm wide and {limit['screen_height']:.1f} mm tall and cannot change. Take the body's proportions from the picture, at or above the parts' room. So that the screen still reads as the face, the front is at most {limit['max_width']:.1f} mm wide and {limit['max_height']:.1f} mm tall.")
     lines.append(f"The back, opposite the front, becomes a printed cover that must lie flat on a print bed, because printers build layer by layer. Make the whole back one flat plane with only a small edge, so at least {MIN_BACK_FLAT:.0%} of the back's outline is flat. Keep the curves on the front, top and sides.")
     return "\n".join(lines)
 
@@ -90,8 +100,8 @@ def body_problems(mesh, base):
             if value < need:
                 problems.append(f"The {label} is {value:.1f} mm and the parts need at least {need} mm.")
     limit = screen_limits(base)
-    if size[0] > limit["max_width"] or size[2] > limit["max_height"] or not (size[0] <= limit["tight_width"] or size[2] <= limit["tight_height"]):
-        problems.append(f"The front is {size[0]:.1f} mm wide and {size[2]:.1f} mm tall, too big for the real screen. It must be at most {limit['max_width']:.1f} wide and {limit['max_height']:.1f} tall, and also either at most {limit['tight_width']:.1f} wide or at most {limit['tight_height']:.1f} tall.")
+    if size[0] > limit["max_width"] or size[2] > limit["max_height"]:
+        problems.append(f"The front is {size[0]:.1f} mm wide and {size[2]:.1f} mm tall, too big for the real screen. It must be at most {limit['max_width']:.1f} wide and {limit['max_height']:.1f} tall.")
     back = back_flat_share(mesh, base.get("front", "-y"))
     if back < MIN_BACK_FLAT:
         problems.append(f"Only {back:.0%} of the back's outline is flat, and it needs at least {MIN_BACK_FLAT:.0%}, so the rear cover can lie flat on a print bed. Make the back one flat plane with only a small edge.")

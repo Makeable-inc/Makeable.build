@@ -47,16 +47,23 @@ def _axis(text):
     return vector
 
 
-def check_access(part_ids, meshes, cards, transforms):
-    """Each item on the access list has a clear straight path from the part to outside the case."""
+def check_access(part_ids, meshes, cards, transforms, fitted=None):
+    """Each item on the access list has a clear straight path from the part to outside the case. fitted: printed parts
+    fitted onto a part from outside ({"PRINT_Knob": "PURCHASE_Part3"}): a knob cap is how you reach its shaft, so it is
+    left out of that part's path (every other printed part still counts)."""
     if not meshes:
         return []
-    union = trimesh.util.concatenate(list(meshes.values()))
+    fitted = fitted or {}
     results = []
     for name, key, why in access_list(part_ids):
         if name not in transforms or name not in cards:
             continue
         card, matrix = cards[name], transforms[name]
+        others = [m for n, m in meshes.items() if fitted.get(n) != name]
+        if not others:
+            results.append(result("access", f"{name} {key}", True, measured="clear", limit="a clear straight path to outside the case", where=why))
+            continue
+        union = trimesh.util.concatenate(others)
         feature = card["features"][key]
         if key == "usb":
             sides = [feature["opens_toward"]]

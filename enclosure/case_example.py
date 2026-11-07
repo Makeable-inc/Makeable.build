@@ -18,19 +18,22 @@ shell, cover = split(body, seam_y)
 usb = usb_opening(controller, data)
 wire_room = block([knob.feature("pcb")[0][0], knob.feature("pcb")[1][1] + 1.0, 4.0], [50.5, seam_y + 1, 50.0])
 cuts = [pocket(screen, seam_y + 1, data), pocket(knob, seam_y + 1, data), pocket(controller, seam_y + 1, data), tower_room(controller, seam_y + 1), wire_room,
-        window(screen), shaft_hole(knob), knob_recess(knob, knob.feature("bushing")[0][1] + 1.0), usb]
+        screen_bezel(screen, body), shaft_hole(knob), knob_recess(knob, knob.feature("bushing")[0][1] + 1.0, data=data), usb]
 shell = one_solid(shell - joined(cuts), "hollow shell")
 
-spots = free_spots([screen, knob], -50, 50, 3, 51, towers=[controller], body=body, y=seam_y)
-screws = [Screw(x, z, back_y, seam_y, parts=[screen, knob], towers=[controller], body=body) for x, z in ((-42.0, 50.5), (42.0, 50.5), (49.0, 8.0))]
-print(f"{len(spots)} places fit a screw post, for example {spots[:3]}")
+# Screws and stops go on spots that fit, found by the library and spread to the corners: never typed in by hand.
+screws = place_screws([screen, knob], -50, 50, 3, 51, back_y, seam_y, towers=[controller], body=body, count=3)
+print("screws at", [(s.x, s.z) for s in screws])
 shell = one_solid(shell + (joined([s.post() for s in screws]) & body), "shell with posts")
 shell = one_solid(shell - joined([s.shell_cut() for s in screws]) - usb, "drilled shell")
 
 inner = back_y - COVER_THICKNESS + 0.5
-extras = [tower(controller, inner), stop(screen, -15.0, 8.0, inner, clear_of=[controller]), stop(screen, -15.0, 44.0, inner, clear_of=[controller]), stop(knob, 35.0, 27.0, inner)]
+extras = [tower(controller, inner)] + place_stops(screen, inner, clear_of=[controller]) + place_stops(knob, inner)
 cover = one_solid(cover + joined(extras), "cover with tower and stops")
 cover = one_solid(cover - joined([s.cover_cut() for s in screws]) - usb, "PRINT_Base")
 
 wires = wire_paths(data, [screen, knob, controller], seam_y - 6.0)
-finish(shell, cover, [screen, knob], controller, screws, wires, glued=[controller.name])
+dish = knob_dish(knob, knob.feature("bushing")[0][1] + 1.0, data=data)
+# a printed cap on the knob, sized to turn inside its dish; choose its profile and squash for the look
+cap = knob_cap(knob, profile=[(0, 7.0), (3, 8.0), (6, 7.0), (8, 4.5)], squash=1.4, fit_radius=dish[3])
+finish(shell, cover, [screen, knob], controller, screws, wires, glued=[controller.name], extra_prints={"PRINT_Knob": cap}, fitted_on={"PRINT_Knob": knob})

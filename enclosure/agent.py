@@ -35,7 +35,7 @@ MAX_CODE_FAILURES = 6
 NO_PROGRESS_TRIES = 2
 # One token limit for the whole job: every stage, every look check and the automatic retry. Passing jobs used
 # 25k to 90k on AWS, the hardest pass 195k; the one that reached 392k failed anyway.
-JOB_TOKEN_LIMIT = 250_000
+JOB_TOKEN_LIMIT = int(os.environ.get("ENCLOSURE_JOB_TOKEN_LIMIT", 250_000))  # 0 = no limit (local test runs only)
 _job = {"tokens": 0}
 
 
@@ -44,9 +44,20 @@ def start_job():
     _job["tokens"] = 0
 
 
+CACHED_WEIGHT = 0.1  # cached input is billed at a fraction of new input, so it counts this much against the limit
+
+
 def spend(usage):
-    """Counts one model call's tokens against the job. Takes the reply's usage, or a number."""
-    _job["tokens"] += usage if isinstance(usage, int) else (usage or {}).get("total_tokens") or 0
+    """Counts one model call's tokens against the job, by cost: new input and output in full, cached input at
+    CACHED_WEIGHT (an agent run resends its context each step, and about 95% of it is served from the cache).
+    Takes the reply's usage, or a number."""
+    if isinstance(usage, int):
+        _job["tokens"] += usage
+        return
+    usage = usage or {}
+    total = usage.get("total_tokens") or 0
+    cached = (usage.get("input_tokens_details") or {}).get("cached_tokens") or 0
+    _job["tokens"] += round(total - cached * (1 - CACHED_WEIGHT))
 
 
 def job_tokens():
@@ -54,7 +65,7 @@ def job_tokens():
 
 
 def job_out_of_tokens():
-    return _job["tokens"] >= JOB_TOKEN_LIMIT
+    return JOB_TOKEN_LIMIT > 0 and _job["tokens"] >= JOB_TOKEN_LIMIT
 
 
 def token_limit_reason():

@@ -4,14 +4,17 @@ The case goes together along world y: the screen faces -y, and the flat rear cov
 Each piece keeps its safe limits. A piece raises a clear error, rather than building something that cannot print or cannot be assembled.
 """
 import json
+import math
 
-from build123d import Box, Cylinder, Pos, Rot, export_stl
+from build123d import (Align, Box, Cylinder, Ellipse, Plane, Pos, RectangleRounded, Rot, Sphere, export_stl, extrude,
+                       loft, scale)
 
 # Limits, in mm. A real print may change these numbers; nothing else needs to.
 GAP = 0.15
 MIN_WALL = 1.6
 HOLDER_WALL = 2.4
 MIN_STOP_WIDTH = 4.0
+STOP_TOUCH = 0.4        # mm: a stop counts as holding a board only if it ends this close behind the board
 MAX_STOP_SLENDERNESS = 8.0
 POST_RADIUS = 2.8
 PLUG_WIDTH = 2.8
@@ -200,12 +203,38 @@ def shaft_hole(part, gap=GAP):
     return along_y(x, z, -FAR, high[1], radius)
 
 
-def knob_recess(part, depth_from_y, room=5.0):
-    """Finger room around the knob, cut into the front from outside down to depth_from_y."""
+def knob_dish(part, depth_from_y, room=5.0, data=None):
+    """(x, z, depth, radius) of the finger dish knob_recess cuts: the room a knob cap may use (knob_cap(fit_radius=...))."""
     low, high = part.feature("knob")
     x, z = (low[0] + high[0]) / 2, (low[2] + high[2]) / 2
-    radius = max(high[0] - low[0], high[2] - low[2]) / 2 + room + 0.2
-    return along_y(x, z, -FAR, depth_from_y, radius)
+    knob_radius = max(high[0] - low[0], high[2] - low[2]) / 2
+    radius, depth = knob_radius + room + 0.2, depth_from_y
+    knob, shaft = part.feature("knob"), part.feature("shaft")
+    inside = lambda box, f: all(f[0][i] - 0.01 <= box[0][i] and box[1][i] <= f[1][i] + 0.01 for i in range(3))
+    boxes = [b for b in part.solids(include_later=True) if not inside(b, knob) and not inside(b, shaft)]
+    boxes += part.plugs(data) if data else []
+    keep = GAP + MIN_WALL
+    for _ in range(2):
+        for b in [b for b in boxes if b[0][1] - keep < depth]:
+            dx, dz = max(b[0][0] - x, 0, x - b[1][0]), max(b[0][2] - z, 0, z - b[1][2])
+            reach = math.hypot(dx, dz) - keep
+            if reach <= 0:
+                depth = min(depth, b[0][1] - keep)
+            elif reach < radius:
+                if reach >= knob_radius + 2.0:
+                    radius = reach
+                else:
+                    depth = min(depth, b[0][1] - keep)
+    return x, z, depth, radius
+
+
+def knob_recess(part, depth_from_y, room=5.0, data=None):
+    """Finger room around the knob: a round dish cut into the front from outside down to depth_from_y. It never opens
+    into the case: anything of the part in front of that depth (its body, the bushing in the wall, and, with data, its
+    jumper plugs) keeps MIN_WALL of plastic to the dish. The dish narrows to stay clear of it; if it would get too
+    tight for fingers, it gets shallower instead. The only way in stays the shaft hole."""
+    x, z, depth, radius = knob_dish(part, depth_from_y, room, data)
+    return along_y(x, z, -FAR, depth, radius)
 
 
 def touch_opening(part, depth=2.0):
@@ -293,13 +322,23 @@ def free_spots(parts, x0, x1, z0, z1, reach=POST_RADIUS, towers=(), step=2.0, bo
     """Places a post or stop can go without blocking any part: every (x, z) in the area that is clear of each part's outline by reach. With the body and a y given, only places where it fits inside the body. Ask this first, rather than guessing."""
     outlines = [outline(p) for p in parts] + [outline(p, GAP + HOLDER_WALL) for p in towers]
     spots = []
-    count_x, count_z = int((x1 - x0) / step), int((z1 - z0) / step)
-    for i in range(count_x + 1):
-        for j in range(count_z + 1):
-            x, z = x0 + i * step, z0 + j * step
-            if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines):
-                if body is None or all(inside(body, px, y - depth, pz) for px, pz in ((x - reach - 0.4, z), (x + reach + 0.4, z), (x, z - reach - 0.4), (x, z + reach + 0.4)) for depth in (0.3, 9.0)):
-                    spots.append((round(x, 2), round(z, 2)))
+    # the grid, plus the exact edges where each outline's keep-out ends, so a strip narrower than the grid step
+    # between two parts (or between a part and the wall) is still found
+    xs = {round(x0 + i * step, 2) for i in range(int((x1 - x0) / step) + 1)} | {x1}
+    zs = {round(z0 + j * step, 2) for j in range(int((z1 - z0) / step) + 1)} | {z1}
+    for a, b, c, d in outlines:
+        xs |= {round(a - reach - 0.05, 2), round(b + reach + 0.05, 2)}
+        zs |= {round(c - reach - 0.05, 2), round(d + reach + 0.05, 2)}
+    clear = [(x, z) for x in sorted(v for v in xs if x0 <= v <= x1) for z in sorted(v for v in zs if z0 <= v <= z1)
+             if not any(a - reach < x < b + reach and c - reach < z < d + reach for a, b, c, d in outlines)]
+    if body is None:
+        return [(round(x, 2), round(z, 2)) for x, z in clear]
+    # each spot fits if 8 points round it (4 sides, 2 depths) are inside the body: tested all at once
+    probes = [(px, y - depth, pz) for x, z in clear
+              for px, pz in ((x - reach - 0.4, z), (x + reach + 0.4, z), (x, z - reach - 0.4), (x, z + reach + 0.4))
+              for depth in (0.3, 9.0)]
+    found = inside_many(body, probes).reshape(-1, 8) if clear else []
+    spots = [(round(x, 2), round(z, 2)) for (x, z), ok in zip(clear, found) if ok.all()]
     return spots
 
 
@@ -321,10 +360,157 @@ def stop_spots(part, clear_of=(), width=MIN_STOP_WIDTH, step=2.0):
     return spots
 
 
+
+# ---------- placing fasteners and stops from the spots that fit, never by guessing ----------
+
+CORNERS = ((-1, 1), (1, 1), (1, -1), (-1, -1))   # the order screws are spread: top left, top right, bottom right, ...
+
+
+def spread(spots, count, centre=None):
+    """Spots spread to the corners around `centre` (default: the middle of the spots), best first: the screw-spread
+    rule wants one in each half across and up. spots: [(x, z), ...]."""
+    if not spots:
+        return []
+    xs, zs = [s[0] for s in spots], [s[1] for s in spots]
+    cx, cz = centre or ((min(xs) + max(xs)) / 2, (min(zs) + max(zs)) / 2)
+    order = []
+    for sx, sz in CORNERS:
+        ranked = sorted(spots, key=lambda s: -(sx * (s[0] - cx) + sz * (s[1] - cz)))
+        order += [s for s in ranked if s not in order][:1]
+    order += [s for s in spots if s not in order]
+    return order[:max(count, len(order))]
+
+
+def place_screws(parts, x0, x1, z0, z1, back_y, seam_y, towers=(), body=None, count=3):
+    """`count` screws on spots that fit (free_spots), spread to the corners; a spot whose post is refused is skipped
+    and the next one tried. Returns the Screw list. Raises with a clear reason if fewer than `count` fit."""
+    spots = free_spots(parts, x0, x1, z0, z1, towers=towers, body=body, y=seam_y)
+    screws, refused = [], []
+    for x, z in spread(spots, len(spots), centre=((x0 + x1) / 2, (z0 + z1) / 2)):
+        if len(screws) >= count:
+            break
+        if any(abs(x - s.x) < 4 * POST_RADIUS and abs(z - s.z) < 4 * POST_RADIUS for s in screws):
+            continue   # not on top of a screw already placed
+        try:
+            screws.append(Screw(x, z, back_y, seam_y, parts=parts, towers=towers, body=body))
+        except AssertionError as error:
+            refused.append(str(error))
+    assert len(screws) >= count, (f"Only {len(screws)} of {count} screw posts fit between x {x0} and {x1}, z {z0} and {z1} "
+                                  f"({len(spots)} spots fit). Widen the area, or hold a side with a Snap instead."
+                                  + (f" Last refusal: {refused[-1]}" if refused else ""))
+    return screws
+
+
+def place_stops(part, cover_y, clear_of=(), count=None):
+    """Stops behind `part` on spots that fit (stop_spots), spread evenly around its middle, so the part cannot tip:
+    around the shaft for a knob (3 stops, so pressing it pushes against plastic on every side), around the board's
+    middle otherwise (2, on opposite sides). Each direction takes the farthest spot that fits there; a refused spot is
+    skipped and the next one tried. Returns the stop solids; raises with a clear reason if none fits."""
+    features = part.data["features"]
+    if "shaft" in features:
+        low, high = part.feature("shaft")
+    else:
+        x0, x1, z0, z1 = outline(part)
+        low, high = (x0, 0, z0), (x1, 0, z1)
+    cx, cz = (low[0] + high[0]) / 2, (low[2] + high[2]) / 2
+    count = count or (3 if "shaft" in features else 2)
+    rear = part.feature("pcb")[1][1] if "pcb" in features else None   # the board's back, which the stops press on
+    spots = stop_spots(part, clear_of=clear_of)
+    stops, refused, used = [], [], []
+    for k in range(count):
+        # aim at evenly spaced directions around the middle; rank the spots by how far they reach that way
+        angle = math.pi / 4 + 2 * math.pi * k / count
+        ux, uz = math.cos(angle), math.sin(angle)
+        ranked = sorted(spots, key=lambda s: -((s[0] - cx) * ux + (s[1] - cz) * uz - 0.5 * abs(-(s[0] - cx) * uz + (s[1] - cz) * ux)))
+        for x, z in ranked:
+            if (x - cx) * ux + (z - cz) * uz <= 0 or any(abs(x - a) < 6 and abs(z - b) < 6 for a, b in used):
+                continue
+            try:
+                made = stop(part, x, z, cover_y, clear_of=clear_of)
+            except AssertionError as error:
+                refused.append(str(error))
+                continue
+            if rear is not None and made.bounding_box().min.Y - rear > STOP_TOUCH:
+                # it would rest on pins or solder tails behind the board, not on the board: it holds nothing when pressed
+                refused.append(f"A stop at x={x}, z={z} would stop {made.bounding_box().min.Y - rear:.1f} mm behind the board, on its pins.")
+                continue
+            stops.append(made)
+            used.append((x, z))
+            break
+    assert stops, (f"No stop fits behind {part.name} ({len(spots)} spots tried)." + (f" Last refusal: {refused[-1]}" if refused else ""))
+    return stops
+
+
 def inside(body, x, y, z):
     """True if this point is inside the body."""
     from build123d import Vector
     return body.is_inside(Vector(x, y, z))
+
+
+_classifiers = {}
+SLICE_SPACING = 0.2     # mm between outline points of a slice (chord error well under 0.01 mm on these bodies)
+SLICE_BAND = 0.02       # mm: a point this close to a slice outline gets the exact CAD test
+SLICE_FROM = 20         # points at one y before slicing pays off
+
+
+def _exact(body, points):
+    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+    from OCP.gp import gp_Pnt
+    from OCP.TopAbs import TopAbs_IN
+    import numpy as np
+    key = id(body)
+    if key not in _classifiers or _classifiers[key][0] is not body:
+        _classifiers[key] = (body, BRepClass3d_SolidClassifier(body.wrapped))
+    classifier = _classifiers[key][1]
+    found = np.zeros(len(points), dtype=bool)
+    for i, (x, y, z) in enumerate(points):
+        classifier.Perform(gp_Pnt(float(x), float(y), float(z)), 1.0e-6)
+        found[i] = classifier.State() == TopAbs_IN or classifier.IsOnAFace()
+    return found
+
+
+def _slice(body, y):
+    """The body's cross-section at this y, as a shapely shape in (x, z)."""
+    return _cut_slice(body, y)
+
+
+def _cut_slice(body, y):
+    import numpy as np
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    cut = body & Plane.XZ.offset(-y)
+    shapes = []
+    for face in (cut.faces() if cut is not None else []):
+        rings = []
+        for wire in [face.outer_wire()] + list(face.inner_wires()):
+            # points along the whole loop in order (joining edge by edge can run an edge backwards)
+            n = max(8, int(wire.length / SLICE_SPACING) + 1)
+            rings.append([(v.X, v.Z) for v in wire.positions(list(np.linspace(0, 1, n, endpoint=False)))])
+        shapes.append(Polygon(rings[0], rings[1:]).buffer(0))
+    return unary_union(shapes) if shapes else None
+
+
+def inside_many(body, points):
+    """inside() for many points, the same answers: points sharing a y are tested against one slice of the body; a
+    point within SLICE_BAND of the slice outline, or a y with few points, gets the exact CAD test. (build123d's
+    is_inside sets up its classifier for every point: ~50 ms each on a curved body.)"""
+    import numpy as np
+    import shapely
+    points = np.asarray(points, dtype=float).reshape(-1, 3)
+    found = np.zeros(len(points), dtype=bool)
+    ys = np.round(points[:, 1], 6)
+    for y in np.unique(ys):
+        rows = np.flatnonzero(ys == y)
+        section = _slice(body, float(y)) if len(rows) >= SLICE_FROM else None
+        if section is None or section.is_empty:
+            found[rows] = _exact(body, points[rows]) if section is None else False
+            continue
+        flat = shapely.points(points[rows][:, [0, 2]])
+        found[rows] = shapely.contains(section, flat)
+        near = rows[shapely.distance(section.boundary, flat) < SLICE_BAND]
+        if len(near):
+            found[near] = _exact(body, points[near])
+    return found
 
 
 def outside_points(body, low, high, wall=MIN_WALL, levels=3):
@@ -333,7 +519,8 @@ def outside_points(body, low, high, wall=MIN_WALL, levels=3):
     ys = [low[1] + (high[1] - low[1]) * i / (levels - 1) for i in range(levels)]
     points = [(x, y, z) for x in xs for z in zs for y in ys]
     points += [((low[0] + high[0]) / 2, y, z) for z in zs for y in ys] + [(x, y, (low[2] + high[2]) / 2) for x in xs for y in ys]
-    return [p for p in points if not inside(body, *p)]
+    found = inside_many(body, points)
+    return [p for p, f in zip(points, found) if not f]
 
 
 def tower_room(part, to_y, wall=HOLDER_WALL, gap=GAP, body=None):
@@ -461,9 +648,169 @@ def wire_paths(data, parts, lane_y, lane_step=0.6):
     return paths
 
 
-def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base", insert_from="-y", snaps=()):
+
+# ---------- finishing: a printed knob cap and a rounded screen bezel ----------
+
+KNOB_LIFT = 0.0          # mm the cap's back stands out past where the included knob's back sits
+CAP_WALL = 1.6           # mm of plastic round the socket
+SHAFT_FIT = 0.4          # mm under the shaft's modelled size: a push fit on a knurled split shaft (check with a test print)
+GROOVE_RADIUS = 0.45     # mm: a cap's grooves are half-round, this deep
+KNOB_TURN_ROOM = 0.5     # mm a cap keeps from its dish while it turns (the knob_turns check wants 0.3)
+
+
+def _knob_axis(part):
+    """(base point, outward unit vector) of the knob: from the bushing's outer face along the shaft."""
+    import numpy as np
+    shaft_lo, shaft_hi = (np.array(v) for v in part.feature("shaft"))
+    bush_lo, bush_hi = (np.array(v) for v in part.feature("bushing"))
+    s_mid, b_mid = (shaft_lo + shaft_hi) / 2, (bush_lo + bush_hi) / 2
+    outward = s_mid - b_mid
+    axis = int(np.argmax(np.abs(outward)))
+    unit = np.zeros(3); unit[axis] = 1.0 if outward[axis] > 0 else -1.0
+    base = b_mid.copy(); base[axis] = (bush_hi if unit[axis] > 0 else bush_lo)[axis]
+    tip = s_mid.copy(); tip[axis] = (shaft_hi if unit[axis] > 0 else shaft_lo)[axis]
+    return base, unit, float(abs(tip[axis] - base[axis]))
+
+
+def _cap(part, profile, squash, grooves, ridges, socket):
+    """Builds one knob cap; knob_cap() sizes it."""
+    import numpy as np
+    base, unit, reach = _knob_axis(part)
+    knob_lo, knob_hi = part.feature("knob")
+    # the cap's back goes where the included knob's back is (the dish and finger room were made round it)
+    axis_i = int(np.argmax(np.abs(unit)))
+    knob_back = (knob_lo if unit[axis_i] > 0 else knob_hi)[axis_i]
+    shift = (knob_back - base[axis_i]) * unit[axis_i] - KNOB_LIFT
+    base = base + unit * shift
+    reach -= shift
+    shaft_lo, shaft_hi = part.feature("shaft")
+    across = [i for i in range(3) if unit[i] == 0]
+    shaft_d = min(shaft_hi[i] - shaft_lo[i] for i in across)
+    socket = socket or shaft_d - SHAFT_FIT
+    assert len(profile) >= 2 and all(b[0] > a[0] for a, b in zip(profile, profile[1:])), "knob_cap: profile distances must rise"
+    assert min(r for _, r in profile[:2]) >= socket / 2 + CAP_WALL, f"knob_cap: the back sections need a radius of at least {socket / 2 + CAP_WALL:.1f} mm round the socket"
+    up = np.zeros(3); up[2 if across[1] == 2 or across[0] == 2 else across[1]] = 1.0
+    side = np.cross(up, unit)
+    start = base + unit * KNOB_LIFT
+    sections = []
+    for distance, radius in profile:
+        plane = Plane(origin=tuple(start + unit * distance), x_dir=tuple(side), z_dir=tuple(unit))
+        sections.append(plane * Ellipse(radius, radius * squash))
+    body = loft(sections)
+    # a round top: an ellipsoid starting half a millimetre inside the loft's end, as wide as it, so the
+    # two overlap and join cleanly (an ellipsoid whose rim sat exactly on the loft's end left a hidden inner face)
+    last_d, last_r = profile[-1]
+    dome = min(2.5, last_r)
+    sink = 0.5
+    size = abs(side) * last_r + abs(up) * last_r * squash + abs(unit) * (dome + sink)
+    top = Pos(*(start + unit * (last_d - sink))) * scale(Sphere(1), by=tuple(size))
+    cap = one_solid((body + top).clean(), "knob cap")   # clean: no seam left inside where the two meet
+    whole = cap   # before the socket: the grooves are measured on the outside only
+    # the socket stops a full wall short of the front, grooves included
+    hole_depth = min(reach - KNOB_LIFT - 0.5, last_d + dome - CAP_WALL - (GROOVE_RADIUS if grooves else 0.0))
+    # and only as deep as the cap stays thick enough all round it (a seed narrows toward its tip)
+    need = socket / 2 + CAP_WALL + (GROOVE_RADIUS if grooves else 0.0)
+    for (d0, r0), (d1, r1) in zip(profile, profile[1:]):
+        r0, r1 = r0 * min(1.0, squash), r1 * min(1.0, squash)
+        if r1 < need <= r0:
+            hole_depth = min(hole_depth, d0 + (d1 - d0) * (r0 - need) / (r0 - r1))
+            break
+        if r0 < need:
+            hole_depth = min(hole_depth, d0)
+            break
+    assert hole_depth >= 4.0, f"knob_cap: the cap is too thin to hold the shaft (a {hole_depth:.1f} mm socket); make its back sections wider"
+    socket_solid = Plane(origin=tuple(start - unit * 0.1), x_dir=tuple(side), z_dir=tuple(unit)) * Cylinder(socket / 2, hole_depth + 0.1, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    cap = one_solid(cap - socket_solid, "knob cap socket")
+    front = last_d + dome
+    if grooves:
+        # lengthwise grooves: thin round rods laid along the face (along `up`) and cut away, each leaving a half-round
+        # groove GROOVE_RADIUS deep that follows the surface; spread across the width, clear of the rim
+        from build123d import Axis as _Axis
+        widest = max(r for _, r in profile)
+        for k in range(grooves):
+            t = (k + 0.5) / grooves * 2 - 1
+            for v in np.linspace(-0.6, 0.6, 7):
+                # a short rod at a time, following the face's curve from bottom to top
+                origin = start + unit * (front + 5) + side * (t * widest * 0.6) + up * (v * widest * squash)
+                hits = whole.find_intersection_points(_Axis(tuple(origin), tuple(-unit)))
+                pts = [p for p, _ in hits] if hits and isinstance(hits[0], tuple) else list(hits)
+                if not pts:
+                    continue
+                surface = max(pts, key=lambda q: np.dot(np.array([q.X, q.Y, q.Z]), unit))
+                centre = np.array([surface.X, surface.Y, surface.Z])
+                if (centre - start) @ unit > last_d - sink - GROOVE_RADIUS - 0.3:
+                    continue   # grooves stay on the lofted face, clear of the rounded top and its join
+                rod =Plane(origin=tuple(centre), x_dir=tuple(side), z_dir=tuple(up)) * Cylinder(GROOVE_RADIUS, widest * squash * 1.2 / 6 + 0.6)
+                try:
+                    cap = one_solid(cap - rod, "knob cap grooves")
+                except Exception:
+                    continue
+    if ridges:
+        radius = max(r for _, r in profile)
+        for k in range(ridges):
+            a = 2 * np.pi * k / ridges
+            centre = start + unit * (profile[1][0] / 2) + (side * np.cos(a) + up * np.sin(a)) * radius
+            rib = Plane(origin=tuple(centre), x_dir=tuple(side), z_dir=tuple(unit)) * Cylinder(0.7, max(profile[1][0], 2.0))
+            cap = one_solid(cap + rib, "knob cap ridges")
+    return cap
+
+
+def knob_cap(part, profile=None, squash=1.0, grooves=0, ridges=0, socket=None, fit_radius=None):
+    """A printed cap pushed onto the knob's shaft, in place of the bare metal knob: its own part (PRINT_Knob, pass it
+    to finish(..., extra_prints={"PRINT_Knob": cap})).
+    profile: [(distance out from the cap's back, radius), ...] from the back to the front; the default is a soft dome
+      16 mm across. squash: height over width of each section (1 round; 1.4 an upright seed or egg).
+    grooves: lengthwise grooves on its face (a sunflower seed has about 5). ridges: grip ridges round its side (a dial).
+    socket: the socket's diameter (default: the shaft's modelled size less SHAFT_FIT, a push fit; check with a print).
+    fit_radius: the dish it turns in (knob_dish(...)[3]): the cap is scaled down to keep KNOB_TURN_GAP from it, with a
+    note. It sits where the part's own knob sits; the knob_turns check turns it all the way round."""
+    import numpy as np
+    profile = profile or [(0.0, 8.0), (5.0, 8.0), (9.0, 6.0), (11.5, 3.0)]
+    cap = _cap(part, profile, squash, grooves, ridges, socket)
+    if not fit_radius:
+        return cap
+    base, unit, _ = _knob_axis(part)
+    room = fit_radius - KNOB_TURN_ROOM
+    for _ in range(3):
+        # its real reach from the shaft's axis, measured on the built cap (the round top and grooves count)
+        pts = np.array([[v.X, v.Y, v.Z] for v in cap.vertices()] + [list(p) for p in cap.tessellate(0.1, 0.3)[0]])
+        rel = pts - base
+        reach = float(np.max(np.linalg.norm(rel - np.outer(rel @ unit, unit), axis=1)))
+        if reach <= room:
+            return cap
+        k = room / reach * 0.995
+        print(f"knob_cap note: scaled to {k:.2f} to turn inside the {fit_radius:.1f} mm dish (it reached {reach:.1f} mm)")
+        profile = [(d, r * k) for d, r in profile]
+        cap = _cap(part, profile, squash, grooves, ridges, socket)
+    return cap
+
+
+def screen_bezel(part, body, width=3.0, corner=2.5, gap=0.2):
+    """The screen opening as a finished bezel: tight round the glass at the glass face (window_fit), then opening out
+    with rounded corners to `width` mm wider each side at the front surface, a soft sloped frame instead of a square
+    hole (it also clears the view from an angle). Use it in place of window(part)."""
+    low, high = part.feature("glass")
+    x, z = (low[0] + high[0]) / 2, (low[2] + high[2]) / 2
+    w, h = high[0] - low[0] + 2 * gap, high[2] - low[2] + 2 * gap
+    glass_y = low[1]
+    surface = front_surface(body, x, z)
+    depth = max(glass_y - surface, 0.6)
+    inner = Plane.XZ.offset(-glass_y) * RectangleRounded(w, h, min(corner * 0.4, w / 2 - 0.01, h / 2 - 0.01))
+    outer_w, outer_h = w + 2 * width, h + 2 * width
+    outer = Plane.XZ.offset(-(surface - 0.05)) * RectangleRounded(outer_w, outer_h, min(corner + width, outer_w / 2 - 0.01, outer_h / 2 - 0.01))
+    slope = loft([Pos(x, 0, z) * inner, Pos(x, 0, z) * outer])
+    out = Pos(x, 0, z) * (Plane.XZ.offset(-(surface - 0.04)) * extrude(RectangleRounded(outer_w, outer_h, min(corner + width, outer_w / 2 - 0.01, outer_h / 2 - 0.01)), FAR))
+    through = block([low[0] - gap, glass_y - 0.01, low[2] - gap], [high[0] + gap, high[1], high[2] + gap])
+    return joined([one_solid(slope, "bezel slope"), one_solid(out, "bezel front"), through])
+
+
+def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), holder="PRINT_Base", insert_from="-y", snaps=(),
+           extra_prints=None, fitted_on=None):
     """Checks each printed part is one solid, exports it, and writes design.json with the build order. The cover and controller go first, and the Shell closes over everything last."""
     prints = {"PRINT_Shell": one_solid(shell, "PRINT_Shell"), "PRINT_Base": one_solid(base, "PRINT_Base")}
+    # extra printed parts fitted after the case is closed, such as a knob cap pushed on from outside
+    extra = {name: one_solid(shape, name) for name, shape in (extra_prints or {}).items()}
+    prints.update(extra)
     for name, shape in prints.items():
         assert shape.is_valid, f"{name} is not a valid solid."
         export_stl(shape, f"{name}.stl", tolerance=0.01)
@@ -473,12 +820,15 @@ def finish(shell, base, screen_and_inputs, controller, screws, wires, glued=(), 
         "purchased": {p.name: {"part_id": p.part_id, "transform": p.matrix} for p in parts},
         "holds": {holder: {"part": controller.name, "insert_from": insert_from}},
         "case": {
-            "assembly": [{"add": "PRINT_Base"}, {"add": controller.name, "from": "-y"}] + [{"add": p.name, "from": "-y"} for p in screen_and_inputs] + [{"add": "PRINT_Shell", "from": "-y"}],
+            "assembly": [{"add": "PRINT_Base"}, {"add": controller.name, "from": "-y"}] + [{"add": p.name, "from": "-y"} for p in screen_and_inputs] + [{"add": "PRINT_Shell", "from": "-y"}]
+                        + [{"add": name, "from": "-y"} for name in extra],
             "screws": [s.entry() for s in screws],
             "glued": list(glued),
             "snaps": [snap.entry() for snap in snaps],
         },
         "wires": wires,
+        # a printed part fitted onto a purchased part from outside, such as a knob cap on its shaft
+        "fitted_on": {name: part.name for name, part in (fitted_on or {}).items()},
     }
     with open("design.json", "w", encoding="utf-8") as file:
         json.dump(design, file, indent=1)

@@ -2,6 +2,7 @@
 import json
 
 import numpy as np
+import nearest as exact_nearest
 import trimesh
 from scipy.spatial import ConvexHull, QhullError
 
@@ -52,17 +53,37 @@ def ring(outer, inner, start, direction, length):
     return trimesh.boolean.difference([cylinder(outer, start, direction, length), cylinder(inner, np.array(start) - np.array(direction) * 0.5, direction, length + 1)], engine="manifold")
 
 
+NEAR_MARGIN = 5.0     # mm: points farther than this from the other part's bounds cannot be the closest pair
+QUERY_BATCH = 1000    # points per closest-point query, so its memory stays small on dense meshes
+
+
+def nearest_gaps(mesh, points):
+    """(distances, points) from each point near `mesh` to its surface. Points farther than NEAR_MARGIN from the
+    mesh's bounds are left out: they cannot be the closest, and for a point far from a surface the closest-point search
+    gathers thousands of candidate triangles (a full query ran out of memory on two runs). Queried in batches."""
+    lo, hi = mesh.bounds[0] - NEAR_MARGIN, mesh.bounds[1] + NEAR_MARGIN
+    near = points[np.all((points >= lo) & (points <= hi), axis=1)]
+    if not len(near):
+        return np.array([]), near
+    found = [exact_nearest.closest_point(mesh, near[i:i + QUERY_BATCH])[1] for i in range(0, len(near), QUERY_BATCH)]
+    return np.concatenate(found), near
+
+
 def check_plastic_pairs(meshes):
     results = []
     names = list(meshes)
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             volume = overlap(meshes[a], meshes[b])
-            points_a, points_b = plastic_points(meshes[a]), plastic_points(meshes[b])
-            _, one, _ = trimesh.proximity.closest_point(meshes[b], points_a)
-            _, two, _ = trimesh.proximity.closest_point(meshes[a], points_b)
-            gap = float(min(one.min(), two.min()))
-            place = rounded(points_a[np.argmin(one)] if one.min() <= two.min() else points_b[np.argmin(two)])
+            one, near_a = nearest_gaps(meshes[b], plastic_points(meshes[a]))
+            two, near_b = nearest_gaps(meshes[a], plastic_points(meshes[b]))
+            if not len(one) and not len(two):
+                # nowhere within NEAR_MARGIN of each other: the gap is at least that
+                gap, place = NEAR_MARGIN, rounded(meshes[a].centroid)
+            elif not len(two) or (len(one) and one.min() <= two.min()):
+                gap, place = float(one.min()), rounded(near_a[np.argmin(one)])
+            else:
+                gap, place = float(two.min()), rounded(near_b[np.argmin(two)])
             results.append(result("parts_gap", f"{a} / {b}", volume < 1e-3 and gap >= MIN_GAP - GAP_TOLERANCE, measured=round(gap, 3), limit=f"at least {MIN_GAP} mm and no overlap", where=f"closest at {place}, overlap {volume:.3f} mm3",
                                   fix=f"{a} and {b} overlap or touch near {place}. Keep every mating surface at least {MIN_GAP} mm apart."))
     return results
@@ -99,7 +120,7 @@ def allow_glue(results, glued):
     return results
 
 
-def check_assembly(steps, meshes, purchased, part_points):
+def check_assembly(steps, meshes, purchased, part_points, fitted=None):
     """Each part must reach its final place in a straight line, past everything already placed."""
     expected = set(meshes) | set(purchased)
     listed = [s.get("add") for s in steps]
@@ -112,6 +133,8 @@ def check_assembly(steps, meshes, purchased, part_points):
         worst, where, blocker, moving_at, blocker_at = np.inf, None, None, None, None
         depth = 0.0
         for other in placed:
+            if (fitted or {}).get(moving) == other:
+                continue   # a cap is pushed onto its part's shaft: meeting that part is the point
             pairs = []
             if moving in meshes:
                 source = plastic_points(meshes[other]) if other in meshes else part_points[other]
@@ -299,6 +322,29 @@ def check_window_view(name, card, transform, union, others, axis, side):
                   fix="Looking straight at the window you can see into the case beside the glass, often at the corners. Match the window's corners to the glass's rounded corners, or bring the rim closer.")
 
 
+FACE_DEPTH = 3.0  # mm behind the screen face: the case front is measured on a slice there
+
+
+def face_size(union, screen, transform, axis, side, others):
+    """The size of the case front the screen sits in: the case cut by a plane just behind the screen face. Ears,
+    antennas, arms and legs that stand out of the body away from that plane are ornaments and do not count; if
+    the slice fails, the whole case counts."""
+    rotation, offset = transform[:3, :3], transform[:3, 3]
+    local = (union.vertices - offset) @ rotation
+    whole = local[:, others].max(axis=0) - local[:, others].min(axis=0)
+    point = (np.array(screen["min"]) + np.array(screen["max"])) / 2
+    point[axis] = screen["max" if side else "min"][axis] - (FACE_DEPTH if side else -FACE_DEPTH)
+    normal = rotation @ AXES[axis]
+    try:
+        cut = union.section(plane_origin=apply(transform, point[None])[0], plane_normal=normal)
+    except Exception:
+        cut = None
+    if cut is None or len(cut.vertices) < 3:
+        return whole
+    flat = (np.asarray(cut.vertices) - offset) @ rotation
+    return flat[:, others].max(axis=0) - flat[:, others].min(axis=0)
+
+
 def check_screen(name, card, transform, union):
     results = []
     screen, glass = card["features"]["screen"], card["features"]["glass"]
@@ -341,12 +387,11 @@ def check_screen(name, card, transform, union):
 
     results.append(check_window_view(name, card, transform, union, others, axis, side))
 
-    local = (union.vertices - offset) @ rotation
-    case_size =local[:, others].max(axis=0) - local[:, others].min(axis=0)
+    case_size = face_size(union, screen, transform, axis, side, others)
     shares = (high - low)[others] / case_size
     best, other = float(shares.max()), float(shares.min())
     results.append(result("screen_share", name, best >= MIN_SCREEN_SHARE_WIDEST and other >= MIN_SCREEN_SHARE_OTHER, measured=[round(best, 2), round(other, 2)], limit=f"screen is at least {MIN_SCREEN_SHARE_WIDEST} of the case front one way and {MIN_SCREEN_SHARE_OTHER} the other",
-                          where=f"case front {np.round(case_size, 1).tolist()} mm, screen {np.round((high - low)[others], 1).tolist()} mm", fix="The screen looks small in the case. Trim the case front so the screen is its main feature."))
+                          where=f"case front (at the screen, ornaments not counted) {np.round(case_size, 1).tolist()} mm, screen {np.round((high - low)[others], 1).tolist()} mm", fix="The screen looks small in the case. Trim the case front so the screen is its main feature."))
 
     elevation = float(np.degrees(np.arcsin(np.clip(normal[2], -1, 1))))
     results.append(result("screen_faces_viewer", name, -5 <= elevation <= MAX_SCREEN_TILT_UP, measured=round(elevation, 1), limit=f"screen faces between -5 and {MAX_SCREEN_TILT_UP} degrees above horizontal when the case sits on a desk",
@@ -409,17 +454,17 @@ OUTER_SKIN_ALLOWANCE = 6.0
 MAX_WRONG_OUTSIDE = 20.0
 
 
-def check_outer_parts(meshes, front, body):
+def check_outer_parts(meshes, front, body, fitted=()):
     """Only the Shell and the flat back of the rear cover may form the outside. A holder or stop showing through the wall prints, but shows as a patch. The outside is the frozen body's surface."""
     if "PRINT_Shell" not in meshes or body is None:
         return []
     back = -direction_vector(front)
     results = []
     for name, mesh in meshes.items():
-        if name == "PRINT_Shell":
-            continue
+        if name == "PRINT_Shell" or name in fitted:
+            continue   # a cap fitted on a shaft from outside is meant to be on the outside
         points, faces = trimesh.sample.sample_surface(mesh, 5000, seed=5)
-        _, distance, _ = trimesh.proximity.closest_point(body, points)
+        _, distance, _ = exact_nearest.closest_point(body, points)
         on_outside = distance < 0.3
         allowed = np.zeros(len(points), dtype=bool)
         if name == "PRINT_Base":
@@ -433,7 +478,61 @@ def check_outer_parts(meshes, front, body):
     return results
 
 
-def check_case(design, meshes, purchased, cards, transforms):
+KEEP_PITCH = 1.0        # mm between sight lines when comparing the case's outline with the body's
+MAX_LOST_OUTLINE = 30.0  # mm2: at most this much of the body's outline may be missing from the case, seen from any side
+
+
+def check_keeps_body(meshes, body):
+    """The printed case keeps the frozen body's outside: seen from the front, the top and the side, every part of the
+    body's outline (an arm, an ear, a foot) is still there. Openings do not change the outline, a lost piece does."""
+    if body is None:
+        return []
+    case = trimesh.util.concatenate([m for n, m in meshes.items() if n.startswith("PRINT_")])
+    lo, hi = body.bounds
+    results = []
+    for axis, label in ((1, "front"), (2, "top"), (0, "side")):
+        others = [i for i in range(3) if i != axis]
+        us = np.arange(lo[others[0]] + KEEP_PITCH / 2, hi[others[0]], KEEP_PITCH)
+        vs = np.arange(lo[others[1]] + KEEP_PITCH / 2, hi[others[1]], KEEP_PITCH)
+        grid = np.array([(u, v) for u in us for v in vs])
+        origins = np.zeros((len(grid), 3))
+        origins[:, others[0]], origins[:, others[1]], origins[:, axis] = grid[:, 0], grid[:, 1], lo[axis] - 10
+        direction = np.zeros(3)
+        direction[axis] = 1
+        rays = np.tile(direction, (len(grid), 1))
+        in_body = body.ray.intersects_any(origins, rays)
+        in_case = case.ray.intersects_any(origins, rays)
+        lost = in_body & ~in_case
+        area = float(lost.sum() * KEEP_PITCH ** 2)
+        where = rounded(origins[lost][len(origins[lost]) // 2]) if lost.any() else None
+        results.append(result("keeps_body", label, area <= MAX_LOST_OUTLINE, measured=round(area, 1),
+                              limit=f"at most {MAX_LOST_OUTLINE} mm2 of the body's outline missing, seen from the {label}", where=where,
+                              fix=f"Seen from the {label}, {area:.0f} mm2 of the body's outline is gone from the printed case, near {where}: "
+                                  "a feature (an arm, ear, foot or antenna) was cut off or left as a loose piece. Keep every piece of "
+                                  "the body joined to the Shell: move openings and cuts off the features, or join the feature back."))
+    return results
+
+
+# the check names each family makes, so a focused check can run only the families it needs
+FAMILIES = {
+    "pairs": {"parts_gap"}, "bed": {"flat_on_bed"}, "outer": {"outer_parts"}, "keeps": {"keeps_body"},
+    "clearance": {"clearance"}, "retained": {"retained"}, "usb": {"usb_access", "usb_above_desk"},
+    "screen": {"screen_faces_viewer", "screen_share", "viewing_angle", "window_fit", "window_view"},
+    "standing": {"stands"}, "assembly": {"assembly", "insertable"}, "knob_turns": {"knob_turns"},
+    "snaps": {"snap_strain", "snap_flex", "snap_catch"},
+    "screws": {"screw_clear", "screw_count", "screw_driver", "screw_fit", "screw_gap", "screw_grip", "screw_seat", "screw_spread"},
+    "wiring": {"knob_place", "knob_room", "plug_clear_parts", "plug_inside", "plug_room", "press_not_on_wire", "press_stop",
+               "shaft_hole", "wire_bend", "wire_clear_parts", "wire_clear_plastic", "wire_clear_usb", "wire_inside",
+               "wire_length", "wire_reach", "wire_route", "button_reach", "touch_depth", "touch_opening", "touch_place", "touch_rim"},
+    "layout": {"base_depth", "base_facing", "base_place", "base_proportion", "base_usb", "body_kept", "body_no_growth",
+               "case_closed", "opening_fit", "see_through", "wire_bay", "wire_crossing", "wire_hidden", "wire_room"},
+    "access": {"access"},
+}
+
+
+def check_case(design, meshes, purchased, cards, transforms, only=None):
+    def want(family):
+        return only is None or bool(FAMILIES[family] & set(only))
     case = design.get("case")
     if not isinstance(case, dict):
         return [result("case", "design.json", False, fix="design.json needs a case section with assembly and screws.")]
@@ -442,23 +541,32 @@ def check_case(design, meshes, purchased, cards, transforms):
         return [result("case", "design.json", False, measured=missing, limit=REQUIRED_PARTS, fix="A case is at least PRINT_Shell and PRINT_Base. The controller's holder may be built into one of them or be its own PRINT_Carrier.")]
     if not all(m.is_watertight for m in meshes.values()) or set(transforms) != set(purchased):
         return []
-    results = check_plastic_pairs(meshes)
-    results.extend(check_flat_on_bed(meshes))
+    results = check_plastic_pairs(meshes) if want("pairs") else []
+    if want("bed"):
+        results.extend(check_flat_on_bed(meshes))
     body_path = design.get("body_stl")
-    results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), load_stl(body_path) if body_path else None))
+    body = load_stl(body_path) if body_path else None
+    fitted = design.get("fitted_on") or {}
+    if want("outer"):
+        results.extend(check_outer_parts(meshes, (design.get("base_design") or {}).get("front", "-y"), body, fitted))
+    if want("keeps"):
+        results.extend(check_keeps_body(meshes, body))
     union = merged(meshes.values())
     part_points = {}
     for name, transform in transforms.items():
         part_id = purchased[name]["part_id"]
         part_points[name] = apply(transform, part_surface(part_id)[2])
-        for mesh_name, mesh in meshes.items():
+        for mesh_name, mesh in (meshes.items() if want("clearance") else ()):
+            if fitted.get(mesh_name) == name:
+                continue   # the cap grips this part's shaft by design; knob_turns checks it instead
             gap, inside, where = clearance(mesh, part_id, transform)
             place = rounded(where) if where is not None else None
             results.append(result("clearance", f"{mesh_name} / {name}", gap >= MIN_GAP - GAP_TOLERANCE and inside == 0, measured=None if np.isinf(gap) else round(gap, 3), limit=f"at least {MIN_GAP} mm", where=f"at {place}, {inside} points inside the plastic",
                                   fix=f"{mesh_name} is too close to {name} at {place}. Move that surface away until the gap is at least {MIN_GAP} mm."))
-        results.extend(allow_glue(check_retained(name, part_points[name], union), glueable(set((design.get("case") or {}).get("glued") or []), cards)))
+        if want("retained"):
+            results.extend(allow_glue(check_retained(name, part_points[name], union), glueable(set((design.get("case") or {}).get("glued") or []), cards)))
         card = cards[name]
-        if "usb" in card["features"]:
+        if "usb" in card["features"] and want("usb"):
             room = port_room_box(card["features"]["usb"], transform)
             blocked = sum(overlap(m, room) for m in meshes.values())
             path = f"{rounded(room.bounds[0])} to {rounded(room.bounds[1])}"
@@ -466,11 +574,12 @@ def check_case(design, meshes, purchased, cards, transforms):
             desk = union.bounds[0][2]
             results.append(result("usb_above_desk", name, room.bounds[0][2] >= desk, measured=round(float(room.bounds[0][2] - desk), 2), limit="plug stays above the desk (0 or more)", where=f"plug path lowest z {room.bounds[0][2]:.2f}, desk z {desk:.2f}",
                                   fix="The plug would hit the desk. Turn the board so the USB faces sideways or backward, or raise it, so the whole plug path stays above the lowest point of the case."))
-        if "screen" in card["features"] and "glass" in card["features"]:
+        if "screen" in card["features"] and "glass" in card["features"] and want("screen"):
             results.extend(check_screen(name, card, transform, union))
-    if "PRINT_Carrier" in meshes:
+    if "PRINT_Carrier" in meshes and want("retained"):
         results.extend(check_retained("PRINT_Carrier", plastic_points(meshes["PRINT_Carrier"]), merged(m for n, m in meshes.items() if n != "PRINT_Carrier")))
-    results.extend(check_standing(meshes))
+    if want("standing"):
+        results.extend(check_standing(meshes))
     assembly_points = {}
     for name, points in part_points.items():
         keep = np.ones(len(points), dtype=bool)
@@ -480,14 +589,67 @@ def check_case(design, meshes, purchased, cards, transforms):
                 keep &= ~np.all((local >= np.array(feature["min"]) - 0.01) & (local <= np.array(feature["max"]) + 0.01), axis=1)
         assembly_points[name] = points[keep]
     snaps = case.get("snaps") or []
-    results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points))
-    results.extend(check_snaps(snaps, meshes))
-    results.extend(check_screws(case.get("screws") or [], meshes, part_points, case.get("snaps") or []))
-    from wiring_checks import check_wiring
-    results.extend(check_wiring(design, meshes, purchased, cards, transforms))
-    from layout_checks import check_layout
-    results.extend(check_layout(design, cards, transforms, union))
-    if design.get("base_design", {}) and design["base_design"].get("use_library"):
+    if want("assembly"):
+        results.extend(check_assembly(case.get("assembly") or [{}], trimmed_for_assembly(meshes, snaps), purchased, assembly_points, fitted))
+    if want("knob_turns"):
+        results.extend(check_knob_turns(meshes, fitted, cards, transforms))
+    if want("snaps"):
+        results.extend(check_snaps(snaps, meshes))
+    if want("screws"):
+        results.extend(check_screws(case.get("screws") or [], meshes, part_points, case.get("snaps") or []))
+    if want("wiring"):
+        from wiring_checks import check_wiring
+        results.extend(check_wiring(design, meshes, purchased, cards, transforms))
+    if want("layout"):
+        from layout_checks import check_layout
+        results.extend(check_layout(design, cards, transforms, union))
+    if want("access") and design.get("base_design", {}) and design["base_design"].get("use_library"):
         from access import check_access
-        results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms))
+        results.extend(check_access(design["base_design"]["parts"].split(","), meshes, cards, transforms, fitted))
+    return results
+
+
+KNOB_TURN_GAP = 0.3   # mm the cap keeps from the case while it turns
+
+
+def check_knob_turns(meshes, fitted, cards, transforms):
+    """A cap fitted on a knob turns with it: turned all the way round, it must keep KNOB_TURN_GAP from the case.
+    Measured as a sweep: in each band along the shaft, the cap's farthest reach from the axis against the case's
+    nearest plastic around it."""
+    results = []
+    for cap_name, part_name in fitted.items():
+        card = cards.get(part_name)
+        if cap_name not in meshes or part_name not in transforms or not card or "shaft" not in card["features"]:
+            continue
+        shaft, bushing = card["features"]["shaft"], card["features"]["bushing"]
+        s_mid = apply(transforms[part_name], ((np.array(shaft["min"]) + np.array(shaft["max"])) / 2)[None])[0]
+        b_mid = apply(transforms[part_name], ((np.array(bushing["min"]) + np.array(bushing["max"])) / 2)[None])[0]
+        axis = (s_mid - b_mid) / np.linalg.norm(s_mid - b_mid)
+        cap = meshes[cap_name]
+        others = merged([m for n, m in meshes.items() if n != cap_name and n not in fitted])
+
+        def polar(points):
+            along = (points - b_mid) @ axis
+            radius = np.linalg.norm((points - b_mid) - np.outer(along, axis), axis=1)
+            return along, radius
+        cap_points = trimesh.sample.sample_surface(cap, 6000, seed=7)[0]
+        c_along, c_radius = polar(np.vstack([cap_points, cap.vertices]))
+        w_points = trimesh.sample.sample_surface(others, 40000, seed=8)[0]
+        w_along, w_radius = polar(w_points)
+        worst, where = np.inf, None
+        for low in np.arange(c_along.min(), c_along.max(), 0.5):
+            band = (c_along >= low) & (c_along < low + 0.5)
+            wall = (w_along >= low - 0.25) & (w_along < low + 0.75)
+            if not band.any() or not wall.any():
+                continue
+            reach = c_radius[band].max()
+            near = w_radius[wall] - reach
+            outside = near > -0.5 * reach   # plastic beyond the cap's own reach (the socket's inside is not the case)
+            if outside.any():
+                gap = float(near[outside].min())
+                if gap < worst:
+                    worst, where = gap, rounded(w_points[wall][outside][np.argmin(near[outside])])
+        results.append(result("knob_turns", cap_name, worst >= KNOB_TURN_GAP, measured=None if np.isinf(worst) else round(worst, 2),
+                              limit=f"at least {KNOB_TURN_GAP} mm from the case all the way round", where=where,
+                              fix=f"{cap_name} would rub the case near {where} when it turns. Make the dish round it wider, or the cap narrower there."))
     return results
