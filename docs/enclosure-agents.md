@@ -55,6 +55,24 @@ design file + parts
 - Tuning designs (kitten, robot, TV, dino) may be used to tune the tools. Held-back test designs are frozen before any
   run and never tuned on; a change must fix a failure seen on at least two tuning designs.
 
+### Running test generations (agents and people)
+
+Run each test generation in its own container with the cloud task's limits, not as a process on your machine:
+
+```sh
+docker build --platform linux/amd64 -f enclosure/Dockerfile -t makeable-enclosure .    # once, from the repo root
+docker run --rm --memory=8g --cpus=4 --env-file .env -v "$PWD/enclosure/runs:/app/enclosure/runs" \
+  makeable-enclosure python -W ignore <runner> <design.json> runs/<out>                  # one container per run
+```
+
+- Why: on AWS every job is a fresh Fargate task with 4 vCPU and 8 GB (`infra/enclosure.yml`). Several runs as plain
+  processes share and exhaust the machine's memory (six at once crashed a 32 GB laptop), and they hide a run that would
+  be killed at 8 GB in the cloud (one local run's process reached 9.9 GB). A container per run starts clean, cannot
+  starve the others, and is stopped at the same limit as the cloud.
+- Run at most two at a time on a 32 GB machine (2 x 8 GB plus the system).
+- A run killed for memory is a real failure to fix (exit 137), not a flaky run.
+- `--env-file` passes the keys without printing them; never echo or commit `.env`.
+
 ## Results so far
 
 All four tuning designs now give a working case (every case check passes) on the parts-based concepts. The look is
