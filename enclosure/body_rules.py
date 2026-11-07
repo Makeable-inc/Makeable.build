@@ -134,11 +134,10 @@ def check(mesh, base, features, output, step_path=None, groups=GROUPS):
         results.append(rule("depth", "size", size[1] <= base["max_depth"], f"Depth is {size[1]:.1f} mm, limit {base['max_depth']} mm.", round(float(size[1]), 1)))
         width, height = face_size(mesh)
         limit = screen_limits(base)
-        fits = width <= limit["max_width"] and height <= limit["max_height"] and (width <= limit["tight_width"] or height <= limit["tight_height"])
+        fits = width <= limit["max_width"] and height <= limit["max_height"]
         results.append(rule("face_size", "size", fits,
                             f"The face (the main form's front, ornaments not counted) is {width:.1f} x {height:.1f} mm. It must be at most "
-                            f"{limit['max_width']:.1f} wide and {limit['max_height']:.1f} tall, and either at most {limit['tight_width']:.1f} "
-                            f"wide or at most {limit['tight_height']:.1f} tall.", [round(width, 1), round(height, 1)]))
+                            f"{limit['max_width']:.1f} wide and {limit['max_height']:.1f} tall.", [round(width, 1), round(height, 1)]))
         # The main form's size from the script's "core:" line; without it, the whole body counts (stricter, never skipped).
         core = printed(output, "core") or [float(v) for v in size]
         if base.get("width_to_height"):

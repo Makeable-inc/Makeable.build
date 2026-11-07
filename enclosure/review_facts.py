@@ -60,7 +60,7 @@ def facts(base, size=None):
              "- Parts seen from outside: " + ("; ".join(p for p in parts if "inside" not in p) or "as in the picture") + "."]
     if limit:
         lines.append(f"- The face (the main front, ornaments not counted) must be at most {limit['max_width']:.0f} mm wide and "
-                     f"{limit['max_height']:.0f} mm tall, and either at most {limit['tight_width']:.0f} wide or {limit['tight_height']:.0f} tall.")
+                     f"{limit['max_height']:.0f} mm tall.")
     if base.get("max_depth"):
         lines.append(f"- Depth at most {base['max_depth']} mm. The back is a flat printed cover.")
     if size is not None and limit and base.get("max_depth"):
@@ -131,10 +131,14 @@ def space_report(base):
     # The face may be wide and low (up to max_width wide, at most tight_height tall) or narrow and tall (at most
     # tight_width wide, up to max_height tall). Only shapes the parts' room fits into are real options.
     options = []
-    if h <= limit["tight_height"] and w <= limit["max_width"]:
-        options.append(("wide and low", limit["max_width"] - w, limit["tight_height"] - h))
-    if w <= limit["tight_width"] and h <= limit["max_height"]:
-        options.append(("narrow and tall", limit["tight_width"] - w, limit["max_height"] - h))
+    if (limit["tight_width"], limit["tight_height"]) == (limit["max_width"], limit["max_height"]):
+        if w <= limit["max_width"] and h <= limit["max_height"]:
+            options.append(("any proportions", limit["max_width"] - w, limit["max_height"] - h))
+    else:
+        if h <= limit["tight_height"] and w <= limit["max_width"]:
+            options.append(("wide and low", limit["max_width"] - w, limit["tight_height"] - h))
+        if w <= limit["tight_width"] and h <= limit["max_height"]:
+            options.append(("narrow and tall", limit["tight_width"] - w, limit["max_height"] - h))
     lines = [f"Space for the main form beyond the parts' room ({w:.0f} wide, {d:.0f} deep, {h:.0f} tall mm, walls included):"]
     if not options:
         lines.append("- none: the parts' room is already bigger than the face limits allow.")

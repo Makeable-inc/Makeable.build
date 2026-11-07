@@ -83,3 +83,15 @@ class SpaceReport(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FaceLimit(unittest.TestCase):
+    """The screen limit is a sanity cap, not a proportion rule: a chunky front taller than the screen's old 40% cap is
+    allowed (it squashed every body to the screen's height), a front far larger than the screen is not."""
+    def test_a_chunky_front_is_allowed_and_a_huge_one_is_not(self):
+        from body_stage import screen_limits
+        base = {"parts": "seeed-xiao-esp32s3,ssd1309-242-oled,ky-040-rotary-encoder", "width_to_height": [1.0, 2.4]}
+        limit = screen_limits(base)
+        chunky = (114, 105)          # the screen covers about 48% of the width and 26% of the height
+        self.assertTrue(chunky[0] <= limit["max_width"] and chunky[1] <= limit["max_height"])
+        self.assertFalse(200 <= limit["max_width"] and 160 <= limit["max_height"])
